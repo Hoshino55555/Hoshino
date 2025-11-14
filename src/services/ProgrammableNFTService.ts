@@ -193,17 +193,20 @@ export class ProgrammableNFTService {
         servicePublicKey: this.mobileWalletService.getPublicKey()?.toString()
       });
 
-      // Create metadata attributes
+      // Create metadata attributes (with fallbacks for missing properties)
+      const element = (character as any).element || 'Cosmic';
+      const rarity = (character as any).rarity || 'Common';
+      
       const attributes = [
-        { trait_type: 'Element', value: character.element },
-        { trait_type: 'Rarity', value: character.rarity },
+        { trait_type: 'Element', value: element },
+        { trait_type: 'Rarity', value: rarity },
         { trait_type: 'Type', value: 'Character' }
       ];
 
       // Create and upload metadata
       const metadata = this.createMetadata(
         character.name,
-        character.description || `A ${character.rarity} ${character.element} character in Hoshino.`,
+        character.description || `A ${rarity} ${element} character in Hoshino.`,
         imageCid,
         attributes
       );
@@ -211,10 +214,10 @@ export class ProgrammableNFTService {
       const metadataCid = await this.uploadMetadataToIPFS(metadata);
       const metadataUri = `https://ipfs.io/ipfs/${metadataCid}`;
 
-      // Call backend to generate transaction
+      // Call backend to generate transaction with retry logic for cold starts
       console.log('📤 Calling backend for transaction generation...');
       
-      const response = await fetch(getFunctionUrl('generateNFTTransaction'), {
+      const response = await this.fetchWithRetry(getFunctionUrl('generateNFTTransaction'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,8 +225,8 @@ export class ProgrammableNFTService {
         body: JSON.stringify({
           character: {
             name: character.name,
-            element: character.element,
-            rarity: character.rarity,
+            element: (character as any).element || 'Cosmic',
+            rarity: (character as any).rarity || 'Common',
             description: character.description
           },
           userPublicKey: this.walletPublicKey,
@@ -232,6 +235,17 @@ export class ProgrammableNFTService {
           tokenStandard: 'pNFT'
         })
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Backend request failed (${response.status}): ${errorText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const errorText = await response.text();
+        throw new Error(`Expected JSON response but got: ${contentType}. Response: ${errorText.substring(0, 100)}`);
+      }
 
       const transactionData = await response.json();
 
@@ -326,10 +340,10 @@ export class ProgrammableNFTService {
       const metadataCid = await this.uploadMetadataToIPFS(metadata);
       const metadataUri = `https://ipfs.io/ipfs/${metadataCid}`;
 
-      // Call backend to generate transaction
+      // Call backend to generate transaction with retry logic for cold starts
       console.log('📤 Calling backend for achievement transaction generation...');
       
-      const response = await fetch(getFunctionUrl('generateNFTTransaction'), {
+      const response = await this.fetchWithRetry(getFunctionUrl('generateNFTTransaction'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -347,6 +361,17 @@ export class ProgrammableNFTService {
           tokenStandard: 'pNFT'
         })
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Backend request failed (${response.status}): ${errorText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const errorText = await response.text();
+        throw new Error(`Expected JSON response but got: ${contentType}. Response: ${errorText.substring(0, 100)}`);
+      }
 
       const transactionData = await response.json();
 
@@ -393,8 +418,8 @@ export class ProgrammableNFTService {
     try {
       console.log('💰 Purchasing coins:', { amount, recipientAddress });
 
-      // Call backend to generate purchase transaction
-      const response = await fetch(getFunctionUrl('generateCurrencyPurchaseTransaction'), {
+      // Call backend to generate purchase transaction with retry logic for cold starts
+      const response = await this.fetchWithRetry(getFunctionUrl('generateCurrencyPurchaseTransaction'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -406,6 +431,17 @@ export class ProgrammableNFTService {
           purchaseType: 'coins'
         })
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Backend request failed (${response.status}): ${errorText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const errorText = await response.text();
+        throw new Error(`Expected JSON response but got: ${contentType}. Response: ${errorText.substring(0, 100)}`);
+      }
 
       const transactionData = await response.json();
 
@@ -511,6 +547,36 @@ export class ProgrammableNFTService {
       success: false,
       error: 'NFT URI update not yet implemented'
     };
+  }
+
+  /**
+   * Fetch with retry logic for Firebase Functions cold starts
+   */
+  private async fetchWithRetry(url: string, options: RequestInit, maxRetries: number = 3): Promise<Response> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, options);
+        
+        // If it's a 503 (cold start), wait and retry
+        if (response.status === 503 && attempt < maxRetries) {
+          const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 30000); // Exponential backoff, max 30s
+          console.log(`⚠️ Cold start detected (503), retrying in ${waitTime}ms... (attempt ${attempt}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+        
+        return response;
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
+        console.log(`⚠️ Request failed, retrying in ${waitTime}ms... (attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+    
+    throw new Error('Max retries exceeded');
   }
 
   /**

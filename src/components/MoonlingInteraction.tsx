@@ -10,6 +10,8 @@ import InnerScreen from './InnerScreen';
 import WalletButton from './WalletButton';
 import Settings from './Settings';
 import Frame from './Frame';
+import GamesList from './GamesList';
+import Starburst from './Starburst';
 import { useWallet } from '../contexts/WalletContext';
 import { StatDecayService, MoodState } from '../services/StatDecayService';
 import { LocalGameEngine, GameStats } from '../services/local/LocalGameEngine';
@@ -109,6 +111,8 @@ const MoonlingInteraction: React.FC<Props> = ({
 
     const [showShop, setShowShop] = useState(false);
     const [showGallery, setShowGallery] = useState(false);
+    const [showGamesList, setShowGamesList] = useState(false);
+    const [currentGame, setCurrentGame] = useState<string | null>(null);
     const [isTransitioning, setIsTransitioning] = useState(true);
     const [transitionOpacity, setTransitionOpacity] = useState(1);
 
@@ -385,33 +389,7 @@ const MoonlingInteraction: React.FC<Props> = ({
                 break;
 
             case 'games':
-                if (localGameEngine) {
-                    const newStats = await localGameEngine.playWithMoonling();
-                    const result = await statDecayService.recordAction(
-                        selectedCharacter!.id,
-                        'play',
-                        { mood: 2 }
-                    );
-
-                    const syncedStats = {
-                        ...newStats,
-                        mood: result.newStats.mood,
-                        hunger: result.newStats.hunger,
-                        energy: Math.max(result.newStats.energy - 1, 0)
-                    };
-
-                    setCurrentStats(syncedStats);
-                    await localGameEngine.updateStats(syncedStats);
-
-                    onNotification?.(
-                        result.canGainMood
-                            ? `🎮 Played with ${selectedCharacter!.name}! Mood +2, Energy -1`
-                            : `🎮 Played with ${selectedCharacter!.name}! Energy -1 (Already earned today's mood bonus)`,
-                        'success'
-                    );
-                } else {
-                    onNotification?.(`🎮 Games coming soon! Stay tuned for amazing mini-games with ${selectedCharacter!.name}!`, 'info');
-                }
+                setShowGamesList(true);
                 break;
 
             case 'gallery':
@@ -482,6 +460,31 @@ const MoonlingInteraction: React.FC<Props> = ({
     }
 
 
+
+    // If a game is active, only show the game
+    if (currentGame === 'starburst') {
+        return (
+            <>
+                <Starburst
+                    onBack={() => {
+                        setCurrentGame(null);
+                        setShowGamesList(true);
+                    }}
+                />
+                <GamesList
+                    visible={showGamesList}
+                    onClose={() => {
+                        setShowGamesList(false);
+                        setCurrentGame(null);
+                    }}
+                    onSelectGame={(gameId) => {
+                        setCurrentGame(gameId);
+                        setShowGamesList(false);
+                    }}
+                />
+            </>
+        );
+    }
 
     return (
         <>
@@ -598,7 +601,19 @@ const MoonlingInteraction: React.FC<Props> = ({
                     onDismiss={() => setShowSleepMode(false)}
                 />
             )}
-            
+
+            {/* Games List Modal */}
+            <GamesList
+                visible={showGamesList}
+                onClose={() => {
+                    setShowGamesList(false);
+                    setCurrentGame(null);
+                }}
+                onSelectGame={(gameId) => {
+                    setCurrentGame(gameId);
+                    setShowGamesList(false);
+                }}
+            />
 
         </>
     );

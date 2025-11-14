@@ -27,23 +27,61 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
     const [score, setScore] = useState<number>(1);
     const [gameStatus, setGameStatus] = useState<GameStatus>('playing');
 
-    // Generate a valid game grid
+    // Generate a valid game grid with more challenge
     const generateGrid = useCallback((): GridCell[][] => {
         const newGrid: GridCell[][] = [];
         
-        // Generate random grid
+        // Very challenging probabilities: even fewer 1s, more 2s/3s, more Stars
+        // 35% chance of 1, 25% chance of 2, 25% chance of 3, 15% chance of 0 (Star)
         for (let i = 0; i < GRID_SIZE; i++) {
             newGrid[i] = [];
             for (let j = 0; j < GRID_SIZE; j++) {
-                // Random value: 70% chance of 1, 15% chance of 2, 10% chance of 3, 5% chance of 0 (Star)
                 const rand = Math.random();
                 let value: CellValue;
-                if (rand < 0.7) value = 1;
-                else if (rand < 0.85) value = 2;
-                else if (rand < 0.95) value = 3;
+                if (rand < 0.35) value = 1;
+                else if (rand < 0.6) value = 2;
+                else if (rand < 0.85) value = 3;
                 else value = 0;
                 
                 newGrid[i][j] = { value, flipped: false };
+            }
+        }
+
+        // Ensure high difficulty: at least 3 Stars total, and at least 8 squares with 2s or 3s
+        let starCount = 0;
+        let valuableCount = 0;
+        for (let i = 0; i < GRID_SIZE; i++) {
+            for (let j = 0; j < GRID_SIZE; j++) {
+                if (newGrid[i][j].value === 0) starCount++;
+                if (newGrid[i][j].value === 2 || newGrid[i][j].value === 3) valuableCount++;
+            }
+        }
+
+        // If not challenging enough, add more Stars and valuable squares
+        if (starCount < 3) {
+            // Add Stars to random positions
+            let added = 0;
+            while (starCount + added < 3 && added < 5) {
+                const row = Math.floor(Math.random() * GRID_SIZE);
+                const col = Math.floor(Math.random() * GRID_SIZE);
+                if (newGrid[row][col].value === 1) {
+                    newGrid[row][col].value = 0;
+                    added++;
+                }
+            }
+        }
+
+        // Ensure we have enough 2s and 3s to make it challenging
+        if (valuableCount < 8) {
+            let added = 0;
+            while (valuableCount + added < 8 && added < 7) {
+                const row = Math.floor(Math.random() * GRID_SIZE);
+                const col = Math.floor(Math.random() * GRID_SIZE);
+                if (newGrid[row][col].value === 1) {
+                    // 50/50 chance of 2 or 3
+                    newGrid[row][col].value = Math.random() < 0.5 ? 2 : 3;
+                    added++;
+                }
             }
         }
 
@@ -162,9 +200,7 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
                     <Text style={styles.backButtonText}>← Back</Text>
                 </TouchableOpacity>
                 <Text style={styles.title}>Starburst</Text>
-                <TouchableOpacity style={styles.newGameButton} onPress={handleNewGame}>
-                    <Text style={styles.newGameButtonText}>New Game</Text>
-                </TouchableOpacity>
+                <View style={styles.headerSpacer} />
             </View>
 
             <View style={styles.scoreContainer}>
@@ -228,6 +264,12 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
                     Avoid Stars (⭐) - they end the game!
                 </Text>
             </View>
+
+            <View style={styles.newGameContainer}>
+                <TouchableOpacity style={styles.newGameButton} onPress={handleNewGame}>
+                    <Text style={styles.newGameButtonText}>New Game</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 };
@@ -246,6 +288,10 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 20,
+        marginTop: 10,
+    },
+    headerSpacer: {
+        width: 80, // Same width as back button to center title
     },
     backButton: {
         backgroundColor: '#2E5A3E',
@@ -265,6 +311,11 @@ const styles = StyleSheet.create({
         color: '#2E5A3E',
         fontFamily: 'PressStart2P',
     },
+    newGameContainer: {
+        alignItems: 'center',
+        marginTop: 15,
+        marginBottom: 10,
+    },
     newGameButton: {
         backgroundColor: '#2E5A3E',
         paddingHorizontal: 15,
@@ -282,7 +333,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 15,
+        marginBottom: 10,
     },
     scoreLabel: {
         fontSize: 14,

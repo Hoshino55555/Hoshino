@@ -106,6 +106,7 @@ function App() {
     const {
         quickMintCharacter,
         quickMintAchievement,
+        mintCharacterNFT,
         connected: nftConnected,
         connectWallet: connectNFTWallet,
         disconnect: disconnectNFTWallet,
