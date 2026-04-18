@@ -757,7 +757,7 @@ export class AchievementService {
 
   private checkAchievementCriteria(achievement: Achievement, userStats: any): boolean {
     switch (achievement.id) {
-              case 'first_moonling':
+              case 'first_moonoko':
         return true // Always qualifies when they first get the app
       case 'feed_master':
         return userStats.feedCount >= 100
@@ -789,13 +789,13 @@ export class AchievementService {
   getAvailableAchievements(): Achievement[] {
     return [
       {
-        id: 'first_moonling',
+        id: 'first_moonoko',
         name: 'First Companion',
-                  description: 'Welcome to the Hoshino universe! You\'ve adopted your first cosmic moonling.',
+                  description: 'Welcome to the Hoshino universe! You\'ve adopted your first cosmic moonoko.',
         rarity: AchievementRarity.COMMON,
         rewardType: RewardType.ACHIEVEMENT,
         isRareDrop: false,
-        imageUrl: 'https://hoshino.game/assets/achievements/first-moonling.png'
+        imageUrl: 'https://hoshino.game/assets/achievements/first-moonoko.png'
       },
       {
         id: 'feed_master',

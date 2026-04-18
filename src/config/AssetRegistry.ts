@@ -69,7 +69,7 @@ export const ASSET_REGISTRY: Record<string, NFTAsset> = {
   'first_feed': {
     id: 'first_feed',
     name: 'First Meal',
-            description: 'Fed your moonling for the first time. The beginning of a beautiful friendship!',
+            description: 'Fed your moonoko for the first time. The beginning of a beautiful friendship!',
     ipfsHash: 'QmAchievementHash1234567890abc', // Replace with your actual IPFS hash
     category: 'achievement'
   },
@@ -77,7 +77,7 @@ export const ASSET_REGISTRY: Record<string, NFTAsset> = {
   'caretaker_10': {
     id: 'caretaker_10',
     name: 'Caring Soul',
-            description: 'Fed your moonling 10 times. You\'re becoming a great caretaker!',
+            description: 'Fed your moonoko 10 times. You\'re becoming a great caretaker!',
     ipfsHash: 'QmAchievementHash2345678901bcd', // Replace with your actual IPFS hash
     category: 'achievement'
   },
@@ -85,7 +85,7 @@ export const ASSET_REGISTRY: Record<string, NFTAsset> = {
   'caretaker_50': {
     id: 'caretaker_50',
     name: 'Dedicated Caretaker', 
-            description: 'Fed your moonling 50 times. Your dedication knows no bounds!',
+            description: 'Fed your moonoko 50 times. Your dedication knows no bounds!',
     ipfsHash: 'QmAchievementHash3456789012cde', // Replace with your actual IPFS hash
     category: 'achievement'
   },
@@ -93,7 +93,7 @@ export const ASSET_REGISTRY: Record<string, NFTAsset> = {
   'playful_friend': {
     id: 'playful_friend',
     name: 'Playful Friend',
-            description: 'Played with your moonling 25 times. Fun is the key to happiness!',
+            description: 'Played with your moonoko 25 times. Fun is the key to happiness!',
     ipfsHash: 'QmAchievementHash4567890123def', // Replace with your actual IPFS hash
     category: 'achievement'
   },
@@ -101,7 +101,7 @@ export const ASSET_REGISTRY: Record<string, NFTAsset> = {
   'night_owl': {
     id: 'night_owl',
     name: 'Night Owl',
-            description: 'Put your moonling to sleep 20 times. Sweet dreams make for happy moonlings!',
+            description: 'Put your moonoko to sleep 20 times. Sweet dreams make for happy moonokos!',
     ipfsHash: 'QmAchievementHash5678901234efg', // Replace with your actual IPFS hash
     category: 'achievement'
   },

@@ -105,8 +105,8 @@ const genAI = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || ''
 });
 
-// Moonling character personalities
-const MOONLING_PERSONALITIES = {
+// Moonoko character personalities
+const MOONOKO_PERSONALITIES = {
   lyra: {
     name: 'Lyra',
     personality: 'Knows every existing anime, has a soft spot for Orion but she would NEVER admit it (´･ω･`). She\'s very comprehensive if you talk with her. Will start crying anime style (misa from death note, exaggerated) if you don\'t give enough attention (´;ω;`). Lowkey jealous of you (sentimentally), but in a funny way. When she\'s angry she becomes easily irritable and can roast you like someone with hormonal imbalance would (╯°□°）╯︵ ┻━┻. When sad she\'ll have an existential crisis (´･_･`). Make her a bpd egirl, like needy streamer overdose main character.',
@@ -139,8 +139,8 @@ exports.chat = onRequest({
   cors: ['*'],
   invoker: 'public'
 }, async (req, res) => {
-  let moonlingId; // Declare at function level for catch block access
-  let moonling; // Declare at function level for catch block access
+  let moonokoId; // Declare at function level for catch block access
+  let moonoko; // Declare at function level for catch block access
   
   try {
     // Validate request
@@ -148,25 +148,25 @@ exports.chat = onRequest({
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { message, moonlingId: reqMoonlingId, userId, conversationId } = req.body;
-    moonlingId = reqMoonlingId; // Assign to function-level variable
+    const { message, moonokoId: reqMoonokoId, userId, conversationId } = req.body;
+    moonokoId = reqMoonokoId; // Assign to function-level variable
 
-    if (!message || !moonlingId || !userId) {
+    if (!message || !moonokoId || !userId) {
       return res.status(400).json({ 
-        error: 'Missing required fields: message, moonlingId, userId' 
+        error: 'Missing required fields: message, moonokoId, userId' 
       });
     }
 
-    // Get moonling personality
-    moonling = MOONLING_PERSONALITIES[moonlingId]; // Assign to function-level variable
-    if (!moonling) {
-      return res.status(400).json({ error: 'Invalid moonling ID' });
+    // Get moonoko personality
+    moonoko = MOONOKO_PERSONALITIES[moonokoId]; // Assign to function-level variable
+    if (!moonoko) {
+      return res.status(400).json({ error: 'Invalid moonoko ID' });
     }
 
-    // Create system prompt for the moonling (optimized for token usage)
-    const systemPrompt = `You are ${moonling.name}. ${moonling.personality}
+    // Create system prompt for the moonoko (optimized for token usage)
+    const systemPrompt = `You are ${moonoko.name}. ${moonoko.personality}
 
-Key traits: ${moonling.traits.join(', ')}
+Key traits: ${moonoko.traits.join(', ')}
 
 Keep responses under 50 words.`;
 
@@ -254,7 +254,7 @@ Keep responses under 50 words.`;
     res.json({
       success: true,
       message: aiResponse,
-      moonlingName: moonling.name,
+      moonokoName: moonoko.name,
       conversationId: conversationId || 'new-conversation',
       timestamp: new Date().toISOString(),
       provider: usedProvider
@@ -273,12 +273,12 @@ Keep responses under 50 words.`;
         zaniah: "The astral plane is being protective! (´･ω･`) Let me align with better vibes!"
       };
       
-      const fallbackResponse = safetyFilterResponses[moonlingId] || "My cosmic filters are being extra careful! Let me adjust my energy! 😊";
+      const fallbackResponse = safetyFilterResponses[moonokoId] || "My cosmic filters are being extra careful! Let me adjust my energy! 😊";
       
       return res.json({
         success: true,
         message: fallbackResponse,
-        moonlingName: moonlingId || 'Unknown',
+        moonokoName: moonokoId || 'Unknown',
         conversationId: 'safety-fallback-conversation',
         timestamp: new Date().toISOString(),
         note: 'Using fallback response due to safety filter violation',
@@ -297,12 +297,12 @@ Keep responses under 50 words.`;
         zaniah: "The cosmic winds are still... (´･ω･`) We'll connect again soon!"
       };
       
-      const fallbackResponse = fallbackResponses[moonlingId] || "I'm taking a quick break! 😊";
+      const fallbackResponse = fallbackResponses[moonokoId] || "I'm taking a quick break! 😊";
       
       return res.json({
         success: true,
         message: fallbackResponse,
-        moonlingName: moonlingId || 'Unknown',
+        moonokoName: moonokoId || 'Unknown',
         conversationId: 'fallback-conversation',
         timestamp: new Date().toISOString(),
         note: 'Using fallback response due to API quota limit',

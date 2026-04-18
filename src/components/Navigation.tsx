@@ -10,7 +10,7 @@ const Navigation: FC = () => {
                         <Text style={styles.logo}>Hoshino</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.button}>
-                        <Text style={styles.buttonText}>Moonlings</Text>
+                        <Text style={styles.buttonText}>Moonokos</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.button}>
                         <Text style={styles.buttonText}>Gallery</Text>

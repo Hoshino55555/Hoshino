@@ -267,22 +267,22 @@ const MoonCycleDisplay: React.FC<Props> = ({
                             <Text style={styles.pointValue}>{globalPoints.dailyPoints}</Text>
                         </View>
                         <View style={styles.pointItem}>
-                            <Text style={styles.pointLabel}>Moonlings:</Text>
-                            <Text style={styles.pointValue}>{globalPoints.moonlings.length}</Text>
+                            <Text style={styles.pointLabel}>Moonokos:</Text>
+                            <Text style={styles.pointValue}>{globalPoints.moonokos.length}</Text>
                         </View>
                         <View style={styles.pointItem}>
                             <Text style={styles.pointLabel}>Streak:</Text>
                             <Text style={styles.pointValue}>{globalPoints.currentStreak} days</Text>
                         </View>
                     </View>
-                    {globalPoints.moonlings.length > 1 && (
+                    {globalPoints.moonokos.length > 1 && (
                         <LinearGradient
                             colors={['#fef3c7', '#fde68a']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
-                            style={styles.multiMoonlingBonus}
+                            style={styles.multiMoonokoBonus}
                         >
-                                                          <Text style={styles.multiMoonlingBonusText}>🎁 Multi-Moonling Bonus: +{Math.round((globalPoints.moonlings.length - 1) * 10)}% points!</Text>
+                                                          <Text style={styles.multiMoonokoBonusText}>🎁 Multi-Moonoko Bonus: +{Math.round((globalPoints.moonokos.length - 1) * 10)}% points!</Text>
                         </LinearGradient>
                     )}
                 </LinearGradient>
@@ -556,13 +556,13 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#0c4a6e',
     },
-    multiMoonlingBonus: {
+    multiMoonokoBonus: {
         borderWidth: 2,
         borderColor: '#f59e0b',
         borderRadius: 6,
         padding: 8,
     },
-    multiMoonlingBonusText: {
+    multiMoonokoBonusText: {
         textAlign: 'center',
         fontSize: 10,
         fontWeight: 'bold',

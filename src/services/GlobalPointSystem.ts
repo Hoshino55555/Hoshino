@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Adapted interfaces and class for React Native (using AsyncStorage instead of localStorage)
 
-export interface MoonlingInteractionPoints {
+export interface MoonokoInteractionPoints {
     characterMint: string;
     characterName: string;
     dailyPoints: number;
@@ -18,9 +18,9 @@ export interface GlobalPointsData {
     totalPoints: number;
     dailyPoints: number;
     starFragments: number; // Star Fragment currency
-    moonlings: MoonlingInteractionPoints[];
+    moonokos: MoonokoInteractionPoints[];
     lastUpdated: string;
-    currentStreak: number; // Days with interactions across any moonling
+    currentStreak: number; // Days with interactions across any moonoko
     longestStreak: number;
     rank?: number;
 }
@@ -28,7 +28,7 @@ export interface GlobalPointsData {
 export interface PointsReward {
     pointsEarned: number;
     bonusMultiplier: number;
-    source: 'feed' | 'sleep' | 'chat' | 'mood_bonus' | 'streak_bonus' | 'multi_moonling_bonus';
+    source: 'feed' | 'sleep' | 'chat' | 'mood_bonus' | 'streak_bonus' | 'multi_moonoko_bonus';
     description: string;
 }
 
@@ -46,7 +46,7 @@ class GlobalPointSystem {
             totalPoints: 0,
             dailyPoints: 0,
             starFragments: 0,
-            moonlings: [],
+            moonokos: [],
             lastUpdated: new Date().toISOString(),
             currentStreak: 0,
             longestStreak: 0,
@@ -56,7 +56,7 @@ class GlobalPointSystem {
         return data;
     }
 
-    // Award points for moonling interactions with linear scaling
+    // Award points for moonoko interactions with linear scaling
     async awardInteractionPoints(
         characterMint: string,
         characterName: string,
@@ -69,10 +69,10 @@ class GlobalPointSystem {
         }
 
         const today = new Date().toISOString().split('T')[0];
-        let moonlingData = data.moonlings.find(p => p.characterMint === characterMint);
+        let moonokoData = data.moonokos.find(p => p.characterMint === characterMint);
 
-        if (!moonlingData) {
-            moonlingData = {
+        if (!moonokoData) {
+            moonokoData = {
                 characterMint,
                 characterName,
                 dailyPoints: 0,
@@ -82,7 +82,7 @@ class GlobalPointSystem {
                 moodBonusPoints: 0,
                 streakDays: 0,
             };
-            data.moonlings.push(moonlingData);
+            data.moonokos.push(moonokoData);
         }
 
         // Base points per action
@@ -95,11 +95,11 @@ class GlobalPointSystem {
         let pointsEarned = basePoints[actionType];
         let bonusMultiplier = 1;
 
-        // Multi-moonling bonus: Linear scaling
-        // For each additional moonling, increase points by 10%
-        const moonlingCount = data.moonlings.length;
-        if (moonlingCount > 1) {
-            bonusMultiplier += (moonlingCount - 1) * 0.1;
+        // Multi-moonoko bonus: Linear scaling
+        // For each additional moonoko, increase points by 10%
+        const moonokoCount = data.moonokos.length;
+        if (moonokoCount > 1) {
+            bonusMultiplier += (moonokoCount - 1) * 0.1;
             pointsEarned = Math.floor(pointsEarned * bonusMultiplier);
         }
 
@@ -107,20 +107,20 @@ class GlobalPointSystem {
         if (achievedGoal) {
             const goalBonus = Math.floor(pointsEarned * 0.5); // 50% bonus for achieving daily goals
             pointsEarned += goalBonus;
-            moonlingData.moodBonusPoints += goalBonus;
+            moonokoData.moodBonusPoints += goalBonus;
         }
 
-        // Streak bonus (if interacting with any moonling daily)
+        // Streak bonus (if interacting with any moonoko daily)
         const streakBonus = this.calculateStreakBonus(data, today);
         if (streakBonus > 0) {
             pointsEarned += streakBonus;
         }
 
-        // Update moonling data
-        moonlingData.dailyPoints += pointsEarned;
-        moonlingData.totalPoints += pointsEarned;
-        moonlingData.lastInteraction = today;
-        moonlingData.interactionCount++;
+        // Update moonoko data
+        moonokoData.dailyPoints += pointsEarned;
+        moonokoData.totalPoints += pointsEarned;
+        moonokoData.lastInteraction = today;
+        moonokoData.interactionCount++;
 
         // Update global data
         data.totalPoints += pointsEarned;
@@ -129,7 +129,7 @@ class GlobalPointSystem {
 
         await this.saveData(data);
 
-        const description = this.getPointsDescription(actionType, achievedGoal, moonlingCount, bonusMultiplier);
+        const description = this.getPointsDescription(actionType, achievedGoal, moonokoCount, bonusMultiplier);
 
         return {
             pointsEarned,
@@ -139,15 +139,15 @@ class GlobalPointSystem {
         };
     }
 
-    // Calculate streak bonus across all moonlings
+    // Calculate streak bonus across all moonokos
     private calculateStreakBonus(data: GlobalPointsData, today: string): number {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-        // Check if any moonling was interacted with yesterday
-        const hadYesterdayInteraction = data.moonlings.some(moonling =>
-            moonling.lastInteraction === yesterdayStr || moonling.lastInteraction === today
+        // Check if any moonoko was interacted with yesterday
+        const hadYesterdayInteraction = data.moonokos.some(moonoko =>
+            moonoko.lastInteraction === yesterdayStr || moonoko.lastInteraction === today
         );
 
         if (hadYesterdayInteraction) {
@@ -166,13 +166,13 @@ class GlobalPointSystem {
     private getPointsDescription(
         actionType: string,
         achievedGoal: boolean,
-        moonlingCount: number,
+        moonokoCount: number,
         multiplier: number
     ): string {
         let desc = `+${actionType} points`;
 
-        if (moonlingCount > 1) {
-            desc += ` (${Math.round((multiplier - 1) * 100)}% multi-moonling bonus!)`;
+        if (moonokoCount > 1) {
+            desc += ` (${Math.round((multiplier - 1) * 100)}% multi-moonoko bonus!)`;
         }
 
         if (achievedGoal) {
@@ -188,41 +188,41 @@ class GlobalPointSystem {
     }
 
     // Get leaderboard data (using stored cache instead of mock for consistency)
-    async getLeaderboard(): Promise<Array<{ rank: number; walletAddress: string; totalPoints: number; moonlingCount: number }>> {
+    async getLeaderboard(): Promise<Array<{ rank: number; walletAddress: string; totalPoints: number; moonokoCount: number }>> {
         const globalKey = 'global_leaderboard_cache';
         const existingStr = await AsyncStorage.getItem(globalKey);
         const existing = existingStr ? JSON.parse(existingStr) : [];
         return existing;
     }
 
-    // Calculate potential daily points with current moonlings
+    // Calculate potential daily points with current moonokos
     async getDailyPointsPotential(): Promise<{
         maxDailyPoints: number;
-        currentMoonlings: number;
+        currentMoonokos: number;
         bonusMultiplier: number;
         breakdown: string[];
     }> {
         const data = await this.loadData();
-        const moonlingCount = data?.moonlings.length || 0;
+        const moonokoCount = data?.moonokos.length || 0;
 
-        // Base daily points per moonling (feed + sleep + chat + potential bonuses)
-        const baseDailyPerMoonling = 10 + 15 + 5 + 15; // 45 points base + 15 bonus points possible
+        // Base daily points per moonoko (feed + sleep + chat + potential bonuses)
+        const baseDailyPerMoonoko = 10 + 15 + 5 + 15; // 45 points base + 15 bonus points possible
 
-        // Multi-moonling multiplier
-        const multiplier = moonlingCount > 1 ? 1 + (moonlingCount - 1) * 0.1 : 1;
+        // Multi-moonoko multiplier
+        const multiplier = moonokoCount > 1 ? 1 + (moonokoCount - 1) * 0.1 : 1;
 
-        const maxDailyPoints = Math.floor(baseDailyPerMoonling * moonlingCount * multiplier);
+        const maxDailyPoints = Math.floor(baseDailyPerMoonoko * moonokoCount * multiplier);
 
         const breakdown = [
-            `${moonlingCount} moonlings × ${baseDailyPerMoonling} base points = ${moonlingCount * baseDailyPerMoonling}`,
-            `Multi-moonling bonus: ${Math.round((multiplier - 1) * 100)}%`,
+            `${moonokoCount} moonokos × ${baseDailyPerMoonoko} base points = ${moonokoCount * baseDailyPerMoonoko}`,
+            `Multi-moonoko bonus: ${Math.round((multiplier - 1) * 100)}%`,
             `Potential streak bonus: up to +${Math.min(50, 7)} points`,
             `Total potential: ${maxDailyPoints} points/day`,
         ];
 
         return {
             maxDailyPoints,
-            currentMoonlings: moonlingCount,
+            currentMoonokos: moonokoCount,
             bonusMultiplier: multiplier,
             breakdown,
         };
@@ -234,8 +234,8 @@ class GlobalPointSystem {
         if (!data) return;
 
         data.dailyPoints = 0;
-        data.moonlings.forEach(moonling => {
-            moonling.dailyPoints = 0;
+        data.moonokos.forEach(moonoko => {
+            moonoko.dailyPoints = 0;
         });
 
         await this.saveData(data);
@@ -302,14 +302,14 @@ class GlobalPointSystem {
             existing[index] = {
                 walletAddress: data.walletAddress,
                 totalPoints: data.totalPoints,
-                moonlingCount: data.moonlings.length,
+                moonokoCount: data.moonokos.length,
                 lastUpdated: data.lastUpdated,
             };
         } else {
             existing.push({
                 walletAddress: data.walletAddress,
                 totalPoints: data.totalPoints,
-                moonlingCount: data.moonlings.length,
+                moonokoCount: data.moonokos.length,
                 lastUpdated: data.lastUpdated,
             });
         }

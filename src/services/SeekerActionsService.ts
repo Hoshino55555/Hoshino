@@ -31,7 +31,7 @@ export class SeekerActionsService {
       type: "action",
       icon: character.image || `${this.baseUrl}/assets/images/${character.name.toLowerCase()}.png`,
       title: `Mint ${character.name}`,
-      description: `Create an NFT of ${character.name}, a ${character.element} element moonling with ${character.rarity} rarity.`,
+      description: `Create an NFT of ${character.name}, a ${character.element} element moonoko with ${character.rarity} rarity.`,
       label: `Mint ${character.name} NFT`,
       disabled: false,
       links: {
@@ -83,7 +83,7 @@ export class SeekerActionsService {
       type: "action",
       icon: item.icon || `${this.baseUrl}/assets/images/shop.png`,
       title: `Buy ${item.name}`,
-      description: `Purchase ${item.name} for your moonling. ${item.description}`,
+      description: `Purchase ${item.name} for your moonoko. ${item.description}`,
       label: `Buy for ${item.price} SOL`,
       disabled: false,
       links: {
@@ -142,7 +142,7 @@ export class SeekerActionsService {
 
       const response: ActionPostResponse = {
         transaction: serializedTransaction,
-        message: `✨ ${characterId} NFT ready to mint! This will create your unique moonling on the blockchain.`,
+        message: `✨ ${characterId} NFT ready to mint! This will create your unique moonoko on the blockchain.`,
         links: {
           next: {
             type: "inline",

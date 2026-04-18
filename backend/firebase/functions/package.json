@@ -1,7 +1,7 @@
 {
   "name": "hoshino-firebase-functions",
   "version": "1.0.0",
-  "description": "Firebase Functions for Hoshino moonling game with AI chat",
+  "description": "Firebase Functions for Hoshino moonoko game with AI chat",
   "main": "index.js",
   "scripts": {
     "serve": "firebase emulators:start --only functions",

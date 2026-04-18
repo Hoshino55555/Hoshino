@@ -10,13 +10,13 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  moonlingId: string;
+  moonokoId: string;
 }
 
 export interface Conversation {
   id: string;
   userId: string;
-  moonlingId: string;
+  moonokoId: string;
   messages: ChatMessage[];
   lastUpdated: Date;
 }
@@ -24,7 +24,7 @@ export interface Conversation {
 export interface ChatResponse {
   success: boolean;
   message: string;
-  moonlingName: string;
+  moonokoName: string;
   conversationId: string;
   timestamp: string;
 }
@@ -39,7 +39,7 @@ class FirebaseService {
   // Send chat message to Firebase Functions
   async sendChatMessage(
     message: string,
-    moonlingId: string,
+    moonokoId: string,
     userId: string,
     conversationId?: string
   ): Promise<ChatResponse> {
@@ -51,7 +51,7 @@ class FirebaseService {
         },
         body: JSON.stringify({
           message,
-          moonlingId,
+          moonokoId,
           userId,
           conversationId,
         }),
@@ -146,7 +146,7 @@ class FirebaseService {
         conversations.push({
           id: doc.id,
           userId: data.userId,
-          moonlingId: data.moonlingId,
+          moonokoId: data.moonokoId,
           messages: data.messages || [],
           lastUpdated: data.lastUpdated?.toDate() || new Date(),
         });

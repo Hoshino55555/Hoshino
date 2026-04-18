@@ -71,7 +71,7 @@ interface Props {
     onFadeInComplete?: () => void;
 }
 
-const MoonlingInteraction: React.FC<Props> = ({
+const MoonokoInteraction: React.FC<Props> = ({
     selectedCharacter,
     onSelectCharacter,
     onFeed,
@@ -342,7 +342,7 @@ const MoonlingInteraction: React.FC<Props> = ({
         switch (action) {
             case 'feed':
                 if (localGameEngine) {
-                    const newStats = await localGameEngine.feedMoonling();
+                    const newStats = await localGameEngine.feedMoonoko();
                     const result = await statDecayService.recordAction(
                         selectedCharacter!.id,
                         'feed',
@@ -539,8 +539,8 @@ const MoonlingInteraction: React.FC<Props> = ({
                 </>
             }
             onLeftButtonPress={onBack}
-            onCenterButtonPress={() => onNotification?.('🎮 Moonling Interaction: Care for your character!', 'info')}
-            onRightButtonPress={() => onNotification?.('🎮 Moonling Help: Feed, play, sleep, and care for your cosmic companion!', 'info')}
+            onCenterButtonPress={() => onNotification?.('🎮 Moonoko Interaction: Care for your character!', 'info')}
+            onRightButtonPress={() => onNotification?.('🎮 Moonoko Help: Feed, play, sleep, and care for your cosmic companion!', 'info')}
             leftButtonText=""
             centerButtonText=""
             rightButtonText=""
@@ -740,4 +740,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default MoonlingInteraction;
+export default MoonokoInteraction;

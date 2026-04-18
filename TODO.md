@@ -39,7 +39,7 @@ Players use logic to determine which squares are safe to flip based on these hin
 - Uses PressStart2P font for retro aesthetic
 - Green color scheme (#2E5A3E, #E8F5E8)
 - Components in `src/components/`
-- Character menu system in `MoonlingInteraction.tsx`
+- Character menu system in `MoonokoInteraction.tsx`
 
 ### Integration Points
 - Main character menu has a "Games" button
@@ -53,7 +53,7 @@ Players use logic to determine which squares are safe to flip based on these hin
 - [x] Create GamesList.tsx component with modal UI showing Starburst game option
   - Modal component displaying available games
   - Shows "Starburst" as selectable game option
-  - Styled to match existing modals (similar to MoonlingSelection modal pattern)
+  - Styled to match existing modals (similar to MoonokoSelection modal pattern)
   - Handles game selection and closes modal
   - Location: `src/components/GamesList.tsx`
 
@@ -72,13 +72,13 @@ Players use logic to determine which squares are safe to flip based on these hin
   - Back button to return to games list
   - Location: `src/components/Starburst.tsx`
 
-- [x] Update MoonlingInteraction.tsx to show GamesList modal when games button is clicked
+- [x] Update MoonokoInteraction.tsx to show GamesList modal when games button is clicked
   - Added state for games list modal visibility (`showGamesList`)
   - Added state for current game (`currentGame`)
   - Modified `handleMenuButtonAction` case 'games' to show GamesList modal
   - Added handlers for game navigation (show Starburst, return to list)
   - Added conditional rendering for Starburst game
-  - Location: `src/components/MoonlingInteraction.tsx`
+  - Location: `src/components/MoonokoInteraction.tsx`
 
 ## Current Implementation Status
 
@@ -101,7 +101,7 @@ The game is a **proof of concept** with core gameplay mechanics. It's fully play
 - `src/components/Starburst.tsx` - Starburst game implementation
 
 ### Files Modified
-- `src/components/MoonlingInteraction.tsx` - Updated games button handler and added game navigation
+- `src/components/MoonokoInteraction.tsx` - Updated games button handler and added game navigation
 
 ### Key Implementation Notes
 - Uses React Native Modal component for GamesList (following existing patterns)

@@ -36,7 +36,7 @@ export class LocalGameEngine {
         await this.loadCompletedAchievements();
     }
 
-    async feedMoonling(): Promise<GameStats> {
+    async feedMoonoko(): Promise<GameStats> {
         const stats = await this.getLocalStats();
 
         stats.mood = Math.min(stats.mood + 1, 5);
@@ -53,11 +53,11 @@ export class LocalGameEngine {
         await this.saveLocalStats(stats);
         await this.checkFeedingAchievements(stats);
 
-        console.log(`🍎 Fed moonling! Mood: ${stats.mood}, Hunger: ${stats.hunger}, Total feeds: ${stats.totalFeedings}`);
+        console.log(`🍎 Fed moonoko! Mood: ${stats.mood}, Hunger: ${stats.hunger}, Total feeds: ${stats.totalFeedings}`);
         return stats;
     }
 
-    async playWithMoonling(): Promise<GameStats> {
+    async playWithMoonoko(): Promise<GameStats> {
         const stats = await this.getLocalStats();
 
         stats.mood = Math.min(stats.mood + 2, 5);
@@ -74,11 +74,11 @@ export class LocalGameEngine {
         await this.saveLocalStats(stats);
         await this.checkPlayingAchievements(stats);
 
-        console.log(`🎮 Played with moonling! Mood: ${stats.mood}, Energy: ${stats.energy}, Total plays: ${stats.totalPlays}`);
+        console.log(`🎮 Played with moonoko! Mood: ${stats.mood}, Energy: ${stats.energy}, Total plays: ${stats.totalPlays}`);
         return stats;
     }
 
-    async putMoonlingToSleep(): Promise<GameStats> {
+    async putMoonokoToSleep(): Promise<GameStats> {
         const stats = await this.getLocalStats();
 
         stats.energy = 5;
@@ -90,7 +90,7 @@ export class LocalGameEngine {
         await this.saveLocalStats(stats);
         await this.checkSleepingAchievements(stats);
 
-        console.log(`😴 Moonling went to sleep! Energy restored, Total sleeps: ${stats.totalSleeps}`);
+        console.log(`😴 Moonoko went to sleep! Energy restored, Total sleeps: ${stats.totalSleeps}`);
         return stats;
     }
 

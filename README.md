@@ -1,6 +1,6 @@
-# Hoshino - Cosmic Moonling Game
+# Hoshino - Cosmic Moonoko Game
 
-A React Native game where you care for cosmic creatures called moonlings.
+A React Native game where you care for cosmic creatures called moonokos.
 
 ## Prerequisites
 

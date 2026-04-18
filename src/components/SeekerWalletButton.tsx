@@ -44,9 +44,9 @@ export const SeekerNFTExample: React.FC = () => {
 
     const handleMintAchievement = async () => {
         const exampleAchievement = {
-            id: 'first_moonling',
-            name: 'First Moonling Befriended',
-            description: 'You befriended your first moonling!',
+            id: 'first_moonoko',
+            name: 'First Moonoko Befriended',
+            description: 'You befriended your first moonoko!',
             rarity: 'Common' as const
         };
 

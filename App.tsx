@@ -9,9 +9,9 @@ import {
     SpaceMono_400Regular,
 } from '@expo-google-fonts/space-mono';
 
-import MoonlingSelection from './src/components/MoonlingSelection';
-import MoonlingInteraction from './src/components/MoonlingInteraction';
-import MoonlingCollection from './src/components/MoonlingCollection';
+import MoonokoSelection from './src/components/MoonokoSelection';
+import MoonokoInteraction from './src/components/MoonokoInteraction';
+import MoonokoCollection from './src/components/MoonokoCollection';
 import Shop from './src/components/Shop';
 import FeedingPage from './src/components/FeedingPage';
 import Gallery from './src/components/Gallery';
@@ -27,11 +27,9 @@ import { useWallet, WalletProvider } from './src/contexts/WalletContext';
 import { Connection, PublicKey } from '@solana/web3.js';
 
 // NEW: Programmable NFT Integration
-import { useProgrammableNFT } from './src/hooks/useProgrammableNFT';
-
 // New services and configs
 import { LocalGameEngine } from './src/services/local/LocalGameEngine';
-import { getAsset } from './src/config/AssetRegistry';
+import { getGameCharacters } from './src/data/moonokos';
 
 interface Character {
     id: string;
@@ -73,27 +71,6 @@ const validateCharacterInput = (character: Character): boolean => {
     return true;
 };
 
-const createRateLimiter = (maxAttempts: number, windowMs: number) => {
-    const attempts = new Map<string, number[]>();
-
-    return (key: string): boolean => {
-        const now = Date.now();
-        const userAttempts = attempts.get(key) || [];
-
-        const recentAttempts = userAttempts.filter((time) => now - time < windowMs);
-
-        if (recentAttempts.length >= maxAttempts) {
-            return false;
-        }
-
-        recentAttempts.push(now);
-        attempts.set(key, recentAttempts);
-        return true;
-    };
-};
-
-const mintRateLimiter = createRateLimiter(3, 60000);
-
 function App() {
     const [fontsLoaded] = useFonts({
         'PressStart2P': PressStart2P_400Regular,
@@ -101,17 +78,6 @@ function App() {
     });
 
 
-
-    // NEW: Programmable NFT Integration
-    const {
-        quickMintCharacter,
-        quickMintAchievement,
-        mintCharacterNFT,
-        connected: nftConnected,
-        connectWallet: connectNFTWallet,
-        disconnect: disconnectNFTWallet,
-        getServiceStatus
-    } = useProgrammableNFT();
 
     const { connected, publicKey, connect, disconnect } = useWallet();
     const [currentView, setCurrentView] = useState('welcome');
@@ -140,7 +106,6 @@ function App() {
         hunger: 5,
         energy: 2
     });
-    const [isLoading, setIsLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState('');
     const [achievements, setAchievements] = useState<string[]>([]);
     const [ownedCharacters, setOwnedCharacters] = useState<string[]>([]);
@@ -155,10 +120,7 @@ function App() {
     const [deploymentStatus, setDeploymentStatus] = useState<string>('')
     const [showDeploymentBanner, setShowDeploymentBanner] = useState(true)
 
-    // New service instances
     const [localGameEngine, setLocalGameEngine] = useState<LocalGameEngine | null>(null);
-    const [nftMinter, setNftMinter] = useState<any>(null); // Legacy NFT minter - now using ProgrammableNFTService
-    const [metaplexService, setMetaplexService] = useState<any>(null); // This will be updated to MetaplexService
 
     const addNotification = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => {
         const id = Date.now().toString();
@@ -175,21 +137,12 @@ function App() {
             const gameEngine = new LocalGameEngine(publicKey.toString());
             setLocalGameEngine(gameEngine);
             
-            // Initialize the game engine
             gameEngine.init().then(() => {
                 console.log('🎮 Game engine initialized for wallet:', publicKey.toString().slice(0, 8) + '...');
             });
 
-            // Initialize Metaplex service with UMI
-            // const mobileWalletService = new MobileWalletService(); // This line is removed as per new_code
-            // const metaplex = new MetaplexService(connection, mobileWalletService); // This line is removed as per new_code
-            // setMetaplexService(metaplex); // This line is removed as per new_code
-            console.log('📱 Metaplex service initialized with UMI for wallet:', publicKey.toString().slice(0, 8) + '...');
-
         } else {
             setLocalGameEngine(null);
-            setNftMinter(null);
-            setMetaplexService(null);
         }
     }, [connected, publicKey]);
 
@@ -272,126 +225,6 @@ function App() {
         }
     };
 
-    const handleMintCharacter = async () => {
-        console.log('🚀 Mint button clicked!', {
-            selectedCharacter,
-            connected,
-        });
-
-        if (!selectedCharacter) {
-            console.log('❌ No character selected');
-            return;
-        }
-
-        setIsLoading(true);
-        setStatusMessage('Preparing to mint your character...');
-        setLastError(null);
-
-        try {
-            if (!connected || !publicKey) {
-                setStatusMessage('Please connect your wallet first...');
-                setIsLoading(false);
-                return;
-            }
-
-            console.log('🪙 Starting minting process for:', selectedCharacter.name);
-            setStatusMessage(`Minting ${selectedCharacter.name} as NFT...`);
-
-            // Check if character exists in asset registry
-            const asset = getAsset(selectedCharacter.id);
-            if (!asset) {
-                throw new Error(`Character ${selectedCharacter.id} not found in asset registry`);
-            }
-
-            if (asset.category !== 'character') {
-                throw new Error(`Asset ${selectedCharacter.id} is not a character`);
-            }
-
-            // Mint NFT using existing IPFS CID from AssetRegistry
-            const result = await mintCharacterNFT(selectedCharacter, asset.ipfsHash);
-            
-            if (!result.success) {
-                throw new Error(result.error || 'Minting failed');
-            }
-
-            console.log('✅ Character NFT minted successfully!', result.mintAddress);
-            setStatusMessage(
-                '🎉 Character NFT minted successfully! Check your wallet.'
-            );
-
-            setSelectedCharacter((prev) =>
-                prev ? { ...prev, nftMint: 'mock_mint_address' } : null
-            );
-
-            if (selectedCharacter) {
-                setOwnedCharacters(prev => [...prev, selectedCharacter.id]);
-            }
-
-        } catch (error: any) {
-            console.error('❌ Minting failed:', error);
-            const errorMessage = error?.message || 'Unknown error occurred';
-            setLastError(errorMessage);
-            setStatusMessage(`❌ ${errorMessage}`);
-        } finally {
-            setIsLoading(false);
-            setTimeout(() => {
-                setStatusMessage('');
-                setLastError(null);
-            }, 8000);
-        }
-    };
-
-    const mintAchievementNFTs = async () => {
-        if (!localGameEngine) {
-            addNotification('Game not initialized', 'error');
-            return;
-        }
-
-        const queuedAchievements = localGameEngine.getQueuedAchievements();
-
-        if (queuedAchievements.length === 0) {
-            addNotification('No achievements to mint', 'info');
-            return;
-        }
-
-        setIsLoading(true);
-
-        let successCount = 0;
-        let failedCount = 0;
-
-        try {
-            for (let i = 0; i < queuedAchievements.length; i++) {
-                const achievementId = queuedAchievements[i];
-                setStatusMessage(`Minting achievement ${i + 1} of ${queuedAchievements.length}...`);
-
-                try {
-                    // TODO: Implement actual NFT minting
-                    console.log(`✅ Successfully minted achievement: ${achievementId} (mock)`);
-                    await localGameEngine.markAchievementMinted(achievementId);
-                    successCount++;
-                } catch (error) {
-                    failedCount++;
-                    console.error(`❌ Failed to mint achievement: ${achievementId}`, error);
-                }
-            }
-
-            if (successCount > 0) {
-                addNotification(`Successfully minted ${successCount} achievement NFT${successCount > 1 ? 's' : ''}!`, 'success');
-            }
-
-            if (failedCount > 0) {
-                addNotification(`Failed to mint ${failedCount} achievement${failedCount > 1 ? 's' : ''}. Will retry later.`, 'warning');
-            }
-
-        } catch (error) {
-            console.error('Achievement minting error:', error);
-            addNotification('Failed to mint achievements', 'error');
-        } finally {
-            setIsLoading(false);
-            setStatusMessage('');
-        }
-    };
-
     const handleCharacterSelect = async (character: Character) => {
         console.log('🎮 Character selected in App:', character.name, {
             connected,
@@ -416,24 +249,6 @@ function App() {
             energy: 4
         });
         setCurrentView('interaction');
-
-        if (nftConnected && !character.nftMint) {
-            console.log('🪙 NFT wallet connected, character ready to mint!');
-            setTimeout(() => {
-                setStatusMessage(
-                    `Use ◎ to mint NFT! Programmable NFTs with update authority enabled.`
-                );
-            }, 1000);
-        } else if (!nftConnected) {
-            console.log('💰 Wallet not connected, showing connection message');
-            setTimeout(() => {
-                setStatusMessage(
-                    'Connect your wallet to mint your character as an NFT with 70% savings!'
-                );
-            }, 1000);
-        }
-
-        setTimeout(() => setStatusMessage(''), 5000);
     };
 
     const [playerName, setPlayerName] = useState<string>('');
@@ -543,7 +358,7 @@ function App() {
         // Update game engine if available
         if (localGameEngine) {
             try {
-                const newStats = await localGameEngine.feedMoonling();
+                const newStats = await localGameEngine.feedMoonoko();
                 console.log('🍎 Updated game stats:', newStats);
             } catch (error) {
                 console.error('❌ Error updating game stats:', error);
@@ -570,12 +385,12 @@ function App() {
                         playerName={playerName}
                         goToCongratulations={shouldGoToCongratulations}
                         initialPhase={welcomePhase}
-                        selectedMoonlingName={selectedCharacter?.name}
+                        selectedMoonokoName={selectedCharacter?.name}
                     />
                 );
             case 'selection':
                 return (
-                    <MoonlingSelection
+                    <MoonokoSelection
                         onBack={() => {
                             if (previousView === 'welcome') {
                                 // Go back to the specific welcome phase
@@ -600,59 +415,8 @@ function App() {
                 );
             case 'collection':
                 return (
-                    <MoonlingCollection
-                        characters={[
-                            {
-                                id: 'lyra',
-                                name: 'Lyra',
-                                description: 'Anime-obsessed celestial maiden who knows every existing anime.',
-                                image: 'LYRA.png',
-                                baseStats: { mood: 4, hunger: 3, energy: 3 },
-                                rarity: 'Common',
-                                specialAbility: 'Healing Aura - Recovers faster when resting',
-                                nftMint: ownedCharacters.includes('lyra') ? 'mint_address_lyra' : null
-                            },
-                            {
-                                id: 'orion',
-                                name: 'Orion',
-                                description: 'Mystical guardian with moon and stars',
-                                image: 'ORION.png',
-                                baseStats: { mood: 3, hunger: 4, energy: 3 },
-                                rarity: 'Rare',
-                                specialAbility: 'Night Vision - Gains energy during nighttime',
-                                nftMint: ownedCharacters.includes('orion') ? 'mint_address_orion' : null
-                            },
-                            {
-                                id: 'aro',
-                                name: 'Aro',
-                                description: 'Bright guardian full of celestial energy',
-                                image: 'ARO.png',
-                                baseStats: { mood: 5, hunger: 2, energy: 3 },
-                                rarity: 'Epic',
-                                specialAbility: 'Star Power - Mood boosts last longer',
-                                nftMint: ownedCharacters.includes('aro') ? 'mint_address_aro' : null
-                            },
-                            {
-                                id: 'sirius',
-                                name: 'Sirius',
-                                description: 'The brightest star guardian with unmatched luminosity. Known as the Dog Star, Sirius is fiercely loyal and radiates powerful stellar energy. Has an intense, focused personality and never backs down from a challenge.',
-                                image: 'SIRIUS.png',
-                                baseStats: { mood: 5, hunger: 3, energy: 4 },
-                                rarity: 'Legendary',
-                                specialAbility: 'Stellar Radiance - Boosts all stats when mood is at maximum',
-                                nftMint: ownedCharacters.includes('sirius') ? 'mint_address_sirius' : null
-                            },
-                            {
-                                id: 'zaniah',
-                                name: 'Zaniah',
-                                description: 'Mysterious entity with ethereal presence. Zaniah embodies the essence of distant stars and ancient wisdom. Quiet and contemplative, but harbors immense power within.',
-                                image: 'ZANIAH.png',
-                                baseStats: { mood: 4, hunger: 3, energy: 5 },
-                                rarity: 'Legendary',
-                                specialAbility: 'Stellar Resonance - Amplifies all abilities during stellar events',
-                                nftMint: ownedCharacters.includes('zaniah') ? 'mint_address_zaniah' : null
-                            }
-                        ]}
+                    <MoonokoCollection
+                        characters={getGameCharacters(ownedCharacters, 'png')}
                         selectedCharacter={selectedCharacter}
                         onSelectCharacter={handleCharacterSelect}
                         onExit={() => setCurrentView('selection')}
@@ -663,7 +427,7 @@ function App() {
                 );
             case 'interaction':
                 return (
-                    <MoonlingInteraction
+                    <MoonokoInteraction
                         selectedCharacter={selectedCharacter}
                         onSelectCharacter={() => {
                             setShouldFadeInInteraction(false);
@@ -687,38 +451,6 @@ function App() {
                         localGameEngine={localGameEngine}
                         shouldFadeIn={shouldFadeInInteraction}
                         onFadeInComplete={() => setShouldFadeInInteraction(false)}
-                        onMintAchievements={mintAchievementNFTs}
-                        onMint={() => {
-                            console.log('🎫 Mint button clicked!', {
-                                selectedCharacter: selectedCharacter?.name,
-                                hasNftMint: !!selectedCharacter?.nftMint,
-                                connected,
-                                walletPublicKey: publicKey?.toString()
-                            });
-
-                            if (!selectedCharacter) {
-                                addNotification('❌ Please select a character first', 'error');
-                                return;
-                            }
-
-                            if (selectedCharacter.nftMint) {
-                                addNotification('❌ Character already minted as NFT', 'warning');
-                                return;
-                            }
-
-                            if (!connected) {
-                                addNotification('❌ Please connect your wallet first', 'error');
-                                return;
-                            }
-
-                            addNotification(
-                                `🎭 Preparing to mint ${selectedCharacter.name} as NFT! Your wallet will popup to approve the transaction...`,
-                                'info',
-                                3000
-                            );
-
-                            handleMintCharacter();
-                        }}
                     />
                 );
             case 'feeding':
@@ -734,7 +466,7 @@ function App() {
             case 'star-game':
                 return (
                     <View style={styles.gamePlaceholder}>
-                        <Text style={styles.gameText}>🎮 Redirecting to moonling interaction...</Text>
+                        <Text style={styles.gameText}>🎮 Redirecting to moonoko interaction...</Text>
                     </View>
                 );
             case 'chat':
@@ -772,49 +504,8 @@ function App() {
                 );
             case 'inventory':
                 return (
-                    <MoonlingCollection
-                        characters={[
-                            {
-                                id: 'lyra',
-                                name: 'Lyra',
-                                description: 'Anime-obsessed celestial maiden who knows every existing anime. Has a secret soft spot for Orion but would NEVER admit it. Very comprehensive when chatting, but turns into an exaggerated crying mess (Misa from Death Note style) if ignored. Lowkey jealous of you sentimentally but in a funny way. When angry, becomes irritable like someone with hormonal imbalance and will roast you. When sad, has existential crises.',
-                                image: 'LYRA.png',
-                                baseStats: { mood: 4, hunger: 3, energy: 3 },
-                                rarity: 'Common',
-                                specialAbility: 'Healing Aura - Recovers faster when resting',
-                                nftMint: ownedCharacters.includes('lyra') ? 'mint_address_lyra' : null
-                            },
-                            {
-                                id: 'orion',
-                                name: 'Orion',
-                                description: 'Mystical guardian with moon and stars',
-                                image: 'ORION.png',
-                                baseStats: { mood: 3, hunger: 4, energy: 3 },
-                                rarity: 'Rare',
-                                specialAbility: 'Night Vision - Gains energy during nighttime',
-                                nftMint: ownedCharacters.includes('orion') ? 'mint_address_orion' : null
-                            },
-                            {
-                                id: 'aro',
-                                name: 'Aro',
-                                description: 'Bright guardian full of celestial energy',
-                                image: 'ARO.png',
-                                baseStats: { mood: 5, hunger: 2, energy: 3 },
-                                rarity: 'Epic',
-                                specialAbility: 'Star Power - Mood boosts last longer',
-                                nftMint: ownedCharacters.includes('aro') ? 'mint_address_aro' : null
-                            },
-                            {
-                                id: 'sirius',
-                                name: 'Sirius',
-                                description: 'The brightest star guardian with unmatched luminosity. Known as the Dog Star, Sirius is fiercely loyal and radiates powerful stellar energy. Has an intense, focused personality and never backs down from a challenge.',
-                                image: 'SIRIUS.png',
-                                baseStats: { mood: 5, hunger: 3, energy: 4 },
-                                rarity: 'Legendary',
-                                specialAbility: 'Stellar Radiance - Boosts all stats when mood is at maximum',
-                                nftMint: ownedCharacters.includes('sirius') ? 'mint_address_sirius' : null
-                            }
-                        ]}
+                    <MoonokoCollection
+                        characters={getGameCharacters(ownedCharacters, 'png')}
                         selectedCharacter={selectedCharacter}
                         onSelectCharacter={handleCharacterSelect}
                         onExit={() => setCurrentView('interaction')}

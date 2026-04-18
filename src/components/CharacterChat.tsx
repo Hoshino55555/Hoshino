@@ -86,11 +86,11 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
             const userId = playerName || 'anonymous';
             chatService.setUserId(userId);
 
-            // Get moonling ID from character name
-            const moonlingId = character.name.toLowerCase();
+            // Get moonoko ID from character name
+            const moonokoId = character.name.toLowerCase();
             
             // Send message to Firebase AI service
-            const response = await chatService.sendMessage(userInput, moonlingId);
+            const response = await chatService.sendMessage(userInput, moonokoId);
             
             if (response.success) {
                 return response.message;

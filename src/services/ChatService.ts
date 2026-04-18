@@ -4,20 +4,20 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  moonlingId: string;
+  moonokoId: string;
 }
 
 interface ChatResponse {
   success: boolean;
   message: string;
-  moonlingName: string;
+  moonokoName: string;
   conversationId: string;
   timestamp: string;
 }
 
 interface ConversationData {
   userId: string;
-  moonlingId: string;
+  moonokoId: string;
   messages: ChatMessage[];
   lastUpdated: string;
 }
@@ -64,7 +64,7 @@ class ChatService {
 
   async sendMessage(
     message: string, 
-    moonlingId: string, 
+    moonokoId: string, 
     conversationId?: string
   ): Promise<ChatResponse> {
     if (!this.userId) {
@@ -73,7 +73,7 @@ class ChatService {
 
     const payload = {
       message,
-      moonlingId,
+      moonokoId,
       userId: this.userId,
       ...(conversationId && { conversationId }),
     };
@@ -102,9 +102,9 @@ class ChatService {
     return this.makeRequest('/health');
   }
 
-  // Helper method to get moonling personality info
-  getMoonlingInfo(moonlingId: string) {
-    const moonlings = {
+  // Helper method to get moonoko personality info
+  getMoonokoInfo(moonokoId: string) {
+    const moonokos = {
       lyra: {
         name: 'Lyra',
         description: 'Anime-obsessed celestial maiden',
@@ -132,7 +132,7 @@ class ChatService {
       }
     };
 
-    return moonlings[moonlingId as keyof typeof moonlings] || null;
+    return moonokos[moonokoId as keyof typeof moonokos] || null;
   }
 
   // Method to format conversation for display
@@ -142,7 +142,7 @@ class ChatService {
       text: msg.content,
       isUser: msg.role === 'user',
       timestamp: new Date(msg.timestamp),
-      moonlingId: msg.moonlingId
+      moonokoId: msg.moonokoId
     }));
   }
 }

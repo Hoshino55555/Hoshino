@@ -112,7 +112,7 @@ const InnerScreen: React.FC<InnerScreenProps> = ({
                                         <Text style={styles.starRating}>⭐⭐⭐⭐⭐</Text>
                                     </View>
                                     <View style={styles.statItem}>
-                                        <Text style={styles.statLabel}>Moonlings</Text>
+                                        <Text style={styles.statLabel}>Moonokos</Text>
                                         <Text style={styles.starRating}>⭐⭐⭐⭐⭐</Text>
                                     </View>
                                     <View style={styles.statItem}>

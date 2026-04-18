@@ -53,7 +53,7 @@ const IngredientSelection: React.FC<IngredientSelectionProps> = ({
         {
             id: 'dream-dessert',
             name: 'Dream Dessert',
-            description: 'A sweet treat that makes moonlings happy',
+            description: 'A sweet treat that makes moonokos happy',
             ingredients: [
                 { id: 'dream-bean', quantity: 2 },
                 { id: 'moon-sugar', quantity: 1 }
@@ -68,7 +68,7 @@ const IngredientSelection: React.FC<IngredientSelectionProps> = ({
         {
             id: 'nebula-delight',
             name: 'Nebula Delight',
-            description: 'A colorful dish that energizes moonlings',
+            description: 'A colorful dish that energizes moonokos',
             ingredients: [
                 { id: 'nebula-plum', quantity: 1 },
                 { id: 'cosmic-honey', quantity: 1 }
@@ -156,8 +156,8 @@ const IngredientSelection: React.FC<IngredientSelectionProps> = ({
     return (
         <InnerScreen
             onLeftButtonPress={onBack}
-            onCenterButtonPress={() => onNotification?.('🍳 Cooking Help: Select ingredients and craft delicious meals for your moonlings!', 'info')}
-            onRightButtonPress={() => onNotification?.('🍳 Cooking Tips: Combine ingredients to create special recipes that boost your moonling\'s stats!', 'info')}
+            onCenterButtonPress={() => onNotification?.('🍳 Cooking Help: Select ingredients and craft delicious meals for your moonokos!', 'info')}
+            onRightButtonPress={() => onNotification?.('🍳 Cooking Tips: Combine ingredients to create special recipes that boost your moonoko\'s stats!', 'info')}
             leftButtonText=""
             centerButtonText=""
             rightButtonText=""

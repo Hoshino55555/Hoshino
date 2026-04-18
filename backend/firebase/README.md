@@ -1,10 +1,10 @@
 # Hoshino Firebase Backend
 
-This is the Firebase backend for the Hoshino moonling game, providing AI chat functionality and data persistence.
+This is the Firebase backend for the Hoshino moonoko game, providing AI chat functionality and data persistence.
 
 ## Features
 
-- 🤖 **AI Chat**: OpenAI-powered conversations with moonling characters
+- 🤖 **AI Chat**: OpenAI-powered conversations with moonoko characters
 - 🔥 **Firebase Functions**: Serverless backend deployment
 - 📊 **Firestore**: Database for conversation history and user data
 - 🔐 **Security**: Proper authentication and authorization rules
@@ -51,7 +51,7 @@ firebase deploy
 
 ## API Endpoints
 
-### Chat with Moonling
+### Chat with Moonoko
 ```
 POST /chat
 ```
@@ -60,7 +60,7 @@ POST /chat
 ```json
 {
   "message": "Hello Lyra!",
-  "moonlingId": "lyra",
+  "moonokoId": "lyra",
   "userId": "user123",
   "conversationId": "optional_conversation_id"
 }
@@ -71,7 +71,7 @@ POST /chat
 {
   "success": true,
   "message": "Hello there! 🌟 I'm so happy you're talking to me! What anime have you been watching lately?",
-  "moonlingName": "Lyra",
+  "moonokoName": "Lyra",
   "conversationId": "conversation_123",
   "timestamp": "2024-01-15T10:30:00.000Z"
 }
@@ -87,9 +87,9 @@ GET /getConversation?conversationId=123&userId=user123
 GET /health
 ```
 
-## Moonling Characters
+## Moonoko Characters
 
-Each moonling has a unique personality:
+Each moonoko has a unique personality:
 
 - **Lyra**: Anime-obsessed, emotional, comprehensive
 - **Orion**: Mystical, protective, wise
@@ -146,7 +146,7 @@ const response = await fetch('https://us-central1-your-project.cloudfunctions.ne
   },
   body: JSON.stringify({
     message: userMessage,
-    moonlingId: selectedMoonling,
+    moonokoId: selectedMoonoko,
     userId: currentUser.id,
     conversationId: conversationId
   })

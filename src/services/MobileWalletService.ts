@@ -8,7 +8,7 @@ import { Transaction, PublicKey} from '@solana/web3.js';
 // App identity for wallet authorization
 const APP_IDENTITY = {
   name: 'Hoshino',
-  uri: 'https://hoshino.com',
+  uri: 'https://hoshino.gg',
   icon: '/icon.png',
 };
 

@@ -19,7 +19,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "moonlingId",
+          "fieldPath": "moonokoId",
           "order": "ASCENDING"
         },
         {

@@ -9,7 +9,7 @@ interface Props {
 
 const GlobalLeaderboard: React.FC<Props> = ({ walletAddress, onClose }) => {
     const [globalPointSystem] = useState(() => walletAddress ? new GlobalPointSystem(walletAddress) : null);
-    const [leaderboard, setLeaderboard] = useState<Array<{ rank: number; walletAddress: string; totalPoints: number; moonlingCount: number }>>([]);
+    const [leaderboard, setLeaderboard] = useState<Array<{ rank: number; walletAddress: string; totalPoints: number; moonokoCount: number }>>([]);
     const [userRank, setUserRank] = useState<number | null>(null);
     const [pointsPotential, setPointsPotential] = useState<any>(null);
 
@@ -43,7 +43,7 @@ const GlobalLeaderboard: React.FC<Props> = ({ walletAddress, onClose }) => {
                 <ScrollView>
                     <View style={styles.leaderboardHeader}>
                         <Text style={styles.leaderboardHeaderH2}>🏆 Global Leaderboard</Text>
-                        <Text style={styles.leaderboardHeaderP}>More moonlings = More points!</Text>
+                        <Text style={styles.leaderboardHeaderP}>More moonokos = More points!</Text>
                         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
                             <Text style={styles.closeBtnText}>×</Text>
                         </TouchableOpacity>
@@ -54,15 +54,15 @@ const GlobalLeaderboard: React.FC<Props> = ({ walletAddress, onClose }) => {
                             <Text style={styles.pointsPotentialH3}>Your Daily Potential</Text>
                             <View style={styles.potentialSummary}>
                                 <View style={styles.potentialItem}>
-                                    <Text style={styles.potentialLabel}>Current Moonlings:</Text>
-                                    <Text style={styles.potentialValue}>{pointsPotential.currentMoonlings}</Text>
+                                    <Text style={styles.potentialLabel}>Current Moonokos:</Text>
+                                    <Text style={styles.potentialValue}>{pointsPotential.currentMoonokos}</Text>
                                 </View>
                                 <View style={styles.potentialItem}>
                                     <Text style={styles.potentialLabel}>Max Daily Points:</Text>
                                     <Text style={styles.potentialValue}>{pointsPotential.maxDailyPoints}</Text>
                                 </View>
                                 <View style={styles.potentialItem}>
-                                    <Text style={styles.potentialLabel}>Multi-Moonling Bonus:</Text>
+                                    <Text style={styles.potentialLabel}>Multi-Moonoko Bonus:</Text>
                                     <Text style={styles.potentialValue}>+{Math.round((pointsPotential.bonusMultiplier - 1) * 100)}%</Text>
                                 </View>
                             </View>
@@ -80,25 +80,25 @@ const GlobalLeaderboard: React.FC<Props> = ({ walletAddress, onClose }) => {
                         <View style={styles.tableHeader}>
                             <View style={styles.tableColumnRank}><Text style={styles.tableHeaderText}>Rank</Text></View>
                             <View style={styles.tableColumnWallet}><Text style={styles.tableHeaderText}>Wallet</Text></View>
-                            <View style={styles.tableColumnMoonlings}><Text style={styles.tableHeaderText}>Moonlings</Text></View>
+                            <View style={styles.tableColumnMoonokos}><Text style={styles.tableHeaderText}>Moonokos</Text></View>
                             <View style={styles.tableColumnPoints}><Text style={styles.tableHeaderText}>Points</Text></View>
                         </View>
                         {leaderboard.map((entry) => (
                             <View key={entry.rank} style={[styles.tableRow, entry.rank === userRank ? styles.userRow : null]}>
                                 <View style={styles.tableColumnRank}><Text style={styles.rank}>{entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}</Text></View>
                                 <View style={styles.tableColumnWallet}><Text style={styles.wallet}>{entry.walletAddress}</Text></View>
-                                <View style={styles.tableColumnMoonlings}><Text style={styles.moonlings}>{entry.moonlingCount} moonlings</Text></View>
+                                <View style={styles.tableColumnMoonokos}><Text style={styles.moonokos}>{entry.moonokoCount} moonokos</Text></View>
                                 <View style={styles.tableColumnPoints}><Text style={styles.points}>{entry.totalPoints.toLocaleString()}</Text></View>
                             </View>
                         ))}
                     </View>
 
                     <View style={styles.advantages}>
-                        <Text style={styles.advantagesH3}>🎁 Multi-Moonling Advantages</Text>
+                        <Text style={styles.advantagesH3}>🎁 Multi-Moonoko Advantages</Text>
                         <View style={styles.advantageList}>
                             <View style={styles.advantageItem}>
                                 <Text style={styles.advantageIcon}>📈</Text>
-                                <Text style={styles.advantageText}>+10% points per additional moonling</Text>
+                                <Text style={styles.advantageText}>+10% points per additional moonoko</Text>
                             </View>
                             <View style={styles.advantageItem}>
                                 <Text style={styles.advantageIcon}>🔥</Text>
@@ -116,9 +116,9 @@ const GlobalLeaderboard: React.FC<Props> = ({ walletAddress, onClose }) => {
                     </View>
 
                     <View style={styles.ctaSection}>
-                        <Text style={styles.ctaSectionP}>Want to climb the leaderboard? Mint more moonlings for linear point scaling!</Text>
+                        <Text style={styles.ctaSectionP}>Want to climb the leaderboard? Mint more moonokos for linear point scaling!</Text>
                         <TouchableOpacity style={styles.mintCta} onPress={onClose}>
-                            <Text style={styles.mintCtaText}>Mint More Moonlings! 🚀</Text>
+                            <Text style={styles.mintCtaText}>Mint More Moonokos! 🚀</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     tableColumnWallet: {
         flex: 1,
     },
-    tableColumnMoonlings: {
+    tableColumnMoonokos: {
         width: 80,
         alignItems: 'center',
     },
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
         fontFamily: 'monospace',
         fontSize: 7,
     },
-    moonlings: {
+    moonokos: {
         textAlign: 'center',
         color: '#059669',
         fontWeight: 'bold',

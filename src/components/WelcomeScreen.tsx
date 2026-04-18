@@ -17,13 +17,13 @@ interface Props {
     playerName?: string;
     goToCongratulations?: boolean;
     initialPhase?: string;
-    selectedMoonlingName?: string;
+    selectedMoonokoName?: string;
 }
 
-const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToSelection, connected, onConnectWallet, playerName: storedPlayerName, goToCongratulations, initialPhase, selectedMoonlingName }) => {
+const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToSelection, connected, onConnectWallet, playerName: storedPlayerName, goToCongratulations, initialPhase, selectedMoonokoName }) => {
     const { publicKey } = useWallet();
     
-    const [currentPhase, setCurrentPhase] = useState<'intro' | 'introNo' | 'name' | 'nameInput' | 'explanation' | 'explanationNo' | 'chooseMoonling' | 'congratulations' | 'mintMore' | 'final' | 'complete'>(initialPhase as any || 'intro');
+    const [currentPhase, setCurrentPhase] = useState<'intro' | 'introNo' | 'name' | 'nameInput' | 'explanation' | 'explanationNo' | 'chooseMoonoko' | 'congratulations' | 'mintMore' | 'final' | 'complete'>(initialPhase as any || 'intro');
     const [playerName, setPlayerName] = useState(storedPlayerName || '');
     const [dialogIndex, setDialogIndex] = useState(0);
     const [selectedChoice, setSelectedChoice] = useState<'yes' | 'no'>('yes');
@@ -229,12 +229,12 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
             "I saw one that was so cute I thought you would have loved it but...",
             "You sure?"
         ],
-        chooseMoonling: [
+        chooseMoonoko: [
             "Amazing news!",
-            "Hush hush, choose and mint your Moonling!"
+            "Hush hush, choose and mint your Moonoko!"
         ],
         congratulations: [
-            selectedMoonlingName ? `YAY! IT'S ${selectedMoonlingName.toUpperCase()}!` : "YAY! IT'S YOUR MOONLING!"
+            selectedMoonokoName ? `YAY! IT'S ${selectedMoonokoName.toUpperCase()}!` : "YAY! IT'S YOUR MOONOKO!"
         ],
         mintMore: [
             "Happy with your pick?",
@@ -299,11 +299,11 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
     useEffect(() => {
         if (goToCongratulations) {
             console.log('📱 WelcomeScreen: Going to congratulations phase');
-            console.log('📱 WelcomeScreen: Selected moonling name:', selectedMoonlingName);
+            console.log('📱 WelcomeScreen: Selected moonoko name:', selectedMoonokoName);
             setCurrentPhase('congratulations');
             setDialogIndex(0);
         }
-    }, [goToCongratulations, selectedMoonlingName]);
+    }, [goToCongratulations, selectedMoonokoName]);
 
     const handleDialogClick = () => {
         if (dialogIndex < processedDialogs[currentPhase].length - 1) {
@@ -326,8 +326,8 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                 case 'explanationNo':
                     // Will be handled by button choice
                     break;
-                case 'chooseMoonling':
-                    // Go to moonling selection screen
+                case 'chooseMoonoko':
+                    // Go to moonoko selection screen
                     if (onGoToSelection) {
                         onGoToSelection(currentPhase);
                     } else {
@@ -375,10 +375,10 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
             setCurrentPhase('introNo'); // Repeat introNo to try to convince them
             setDialogIndex(0);
         } else if (currentPhase === 'explanation') {
-            setCurrentPhase('chooseMoonling');
+            setCurrentPhase('chooseMoonoko');
             setDialogIndex(0);
         } else if (currentPhase === 'explanationNo') {
-            setCurrentPhase('chooseMoonling');
+            setCurrentPhase('chooseMoonoko');
             setDialogIndex(0);
         } else if (currentPhase === 'mintMore') {
             // Continue to final phase (YES = done)
@@ -398,7 +398,7 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
             setCurrentPhase('explanationNo');
             setDialogIndex(0);
         } else if (currentPhase === 'explanationNo') {
-            setCurrentPhase('chooseMoonling');
+            setCurrentPhase('chooseMoonoko');
             setDialogIndex(0);
         } else if (currentPhase === 'mintMore') {
             // Go back to selection screen (NO = mint more)

@@ -55,8 +55,8 @@ const SleepMode: React.FC<Props> = ({ character, onSleepSessionEnd, onClose }) =
     const [sleepSessionData, setSleepSessionData] = useState<SleepSessionData | null>(null);
 
     const starTwinkle = useRef(new Animated.Value(0)).current;
-    const moonlingScale = useRef(new Animated.Value(1)).current;
-    const moonlingTranslateY = useRef(new Animated.Value(0)).current;
+    const moonokoScale = useRef(new Animated.Value(1)).current;
+    const moonokoTranslateY = useRef(new Animated.Value(0)).current;
     const zFloat1 = useRef(new Animated.Value(0)).current;
     const zFloat2 = useRef(new Animated.Value(0)).current;
     const zFloat3 = useRef(new Animated.Value(0)).current;
@@ -90,15 +90,15 @@ const SleepMode: React.FC<Props> = ({ character, onSleepSessionEnd, onClose }) =
 
             Animated.loop(
                 Animated.sequence([
-                            Animated.timing(moonlingScale, { toValue: 1.02, duration: 1500, useNativeDriver: true }),
-        Animated.timing(moonlingScale, { toValue: 1, duration: 1500, useNativeDriver: true }),
+                            Animated.timing(moonokoScale, { toValue: 1.02, duration: 1500, useNativeDriver: true }),
+        Animated.timing(moonokoScale, { toValue: 1, duration: 1500, useNativeDriver: true }),
                 ])
             ).start();
 
             Animated.loop(
                 Animated.sequence([
-                            Animated.timing(moonlingTranslateY, { toValue: -2, duration: 1500, useNativeDriver: true }),
-        Animated.timing(moonlingTranslateY, { toValue: 0, duration: 1500, useNativeDriver: true }),
+                            Animated.timing(moonokoTranslateY, { toValue: -2, duration: 1500, useNativeDriver: true }),
+        Animated.timing(moonokoTranslateY, { toValue: 0, duration: 1500, useNativeDriver: true }),
                 ])
             ).start();
 
@@ -230,7 +230,7 @@ const SleepMode: React.FC<Props> = ({ character, onSleepSessionEnd, onClose }) =
         return `${hours}h ${mins}m`;
     };
 
-    const getMoonlingMoodReaction = (mood: string): string => {
+    const getMoonokoMoodReaction = (mood: string): string => {
         const reactions = {
             excellent: `😍 ${character.name} feels amazing! Full of cosmic energy!`,
             good: `😊 ${character.name} had great rest and feels refreshed!`,
@@ -265,8 +265,8 @@ const SleepMode: React.FC<Props> = ({ character, onSleepSessionEnd, onClose }) =
                             <Text style={styles.sleepTitleText}>💤 Sleep Mode</Text>
                         </View>
                     </View>
-                                <View style={styles.sleepingMoonlingContainer}>
-                                                    <Image source={getImageSource(character.image)} style={styles.sleepingMoonlingImage} />
+                                <View style={styles.sleepingMoonokoContainer}>
+                                                    <Image source={getImageSource(character.image)} style={styles.sleepingMoonokoImage} />
                         <Text style={styles.sleepPrompt}>Tap "Start Sleep Session" to begin</Text>
                     </View>
                     <View style={styles.sleepSettings}>
@@ -359,13 +359,13 @@ const SleepMode: React.FC<Props> = ({ character, onSleepSessionEnd, onClose }) =
                             <Text style={styles.recordingSleepText}>🔴 Recording Sleep</Text>
                         </View>
                     </View>
-                    <View style={styles.sleepingMoonlingContainer}>
+                    <View style={styles.sleepingMoonokoContainer}>
                         <Animated.Image
                             source={getImageSource(character.image)}
                             style={[
-                                styles.sleepingMoonlingImage,
+                                styles.sleepingMoonokoImage,
                                 {
-                                    transform: [{ scale: moonlingScale }, { translateY: moonlingTranslateY }],
+                                    transform: [{ scale: moonokoScale }, { translateY: moonokoTranslateY }],
                                 },
                             ]}
                         />
@@ -480,11 +480,11 @@ const SleepMode: React.FC<Props> = ({ character, onSleepSessionEnd, onClose }) =
                                 </View>
                             </View>
                         </View>
-                        <View style={styles.moonlingReaction}>
+                        <View style={styles.moonokoReaction}>
                             <Animated.Image
                                 source={getImageSource(character.image)}
                                 style={[
-                                    styles.reactionMoonlingImage,
+                                    styles.reactionMoonokoImage,
                                     {
                                         transform: [
                                             {
@@ -500,7 +500,7 @@ const SleepMode: React.FC<Props> = ({ character, onSleepSessionEnd, onClose }) =
                                     },
                                 ]}
                             />
-                            <Text style={styles.reactionText}>{getMoonlingMoodReaction(sleepSessionData.mood)}</Text>
+                            <Text style={styles.reactionText}>{getMoonokoMoodReaction(sleepSessionData.mood)}</Text>
                         </View>
                         {sleepSessionData.dreamLog && (
                             <LinearGradient
@@ -617,14 +617,14 @@ const styles = StyleSheet.create({
     recordingSleepText: {
         color: 'white',
     },
-    sleepingMoonlingContainer: {
+    sleepingMoonokoContainer: {
         position: 'relative',
         zIndex: 10,
         flexDirection: 'column',
         alignItems: 'center',
         marginVertical: 40,
     },
-    sleepingMoonlingImage: {
+    sleepingMoonokoImage: {
         width: 120,
         height: 120,
         marginBottom: 20,
@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
         color: '#059669',
         fontWeight: 'bold',
     },
-    moonlingReaction: {
+    moonokoReaction: {
         backgroundColor: '#f7fafc',
         borderRadius: 12,
         padding: 20,
@@ -819,7 +819,7 @@ const styles = StyleSheet.create({
         flexDirection: 'column',
         alignItems: 'center',
     },
-    reactionMoonlingImage: {
+    reactionMoonokoImage: {
         width: 60,
         height: 60,
     },

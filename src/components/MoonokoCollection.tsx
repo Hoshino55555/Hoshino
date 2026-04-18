@@ -55,7 +55,7 @@ interface Props {
     onNotification?: (message: string, type: 'info' | 'error' | 'success' | 'warning') => void;
 }
 
-const MoonlingCollection: React.FC<Props> = ({
+const MoonokoCollection: React.FC<Props> = ({
     characters,
     selectedCharacter,
     onSelectCharacter,
@@ -63,7 +63,7 @@ const MoonlingCollection: React.FC<Props> = ({
     onNotification
 }) => {
     const [startIndex, setStartIndex] = useState(0);
-    const [activeCategory, setActiveCategory] = useState<string>('Moonlings');
+    const [activeCategory, setActiveCategory] = useState<string>('Moonokos');
     const [selectedItem, setSelectedItem] = useState<InventoryItem | Character | null>(null);
 
     // Sample inventory data with actual images
@@ -75,12 +75,12 @@ const MoonlingCollection: React.FC<Props> = ({
             { id: 'nebula_spice', name: 'Nebula Spice', description: 'Exotic spice that adds flavor and magic to any dish.', type: 'ingredient', rarity: 'Legendary', quantity: 1, icon: '/miau.webp' }
         ],
         'Accessories': [
-            { id: 'star_crown', name: 'Star Crown', description: 'A beautiful crown that makes your moonling sparkle in the moonlight.', type: 'accessory', rarity: 'Rare', quantity: 1, icon: '/hoshino star.png' },
+            { id: 'star_crown', name: 'Star Crown', description: 'A beautiful crown that makes your moonoko sparkle in the moonlight.', type: 'accessory', rarity: 'Rare', quantity: 1, icon: '/hoshino star.png' },
             { id: 'stellar_scarf', name: 'Stellar Scarf', description: 'A warm scarf woven from stardust threads.', type: 'accessory', rarity: 'Common', quantity: 2, icon: '/backpack_.webp' },
             { id: 'galaxy_collar', name: 'Galaxy Collar', description: 'A collar that shows swirling galaxies within.', type: 'accessory', rarity: 'Epic', quantity: 1, icon: '/io.webp' }
         ],
         'Special Items': [
-            { id: 'moon_crystal', name: 'Moon Crystal', description: 'A rare crystal that can reset your moonling\'s evolution path.', type: 'special', rarity: 'Legendary', quantity: 1, icon: '/null-11.webp' },
+            { id: 'moon_crystal', name: 'Moon Crystal', description: 'A rare crystal that can reset your moonoko\'s evolution path.', type: 'special', rarity: 'Legendary', quantity: 1, icon: '/null-11.webp' },
             { id: 'star_fragment', name: 'Star Fragment', description: 'A piece of a fallen star. Can be used for special rituals.', type: 'special', rarity: 'Epic', quantity: 2, icon: '/games.webp' },
             { id: 'stellar_potion', name: 'Stellar Potion', description: 'A mysterious potion with unknown effects.', type: 'special', rarity: 'Rare', quantity: 1, icon: '/sleepzzzz.webp' }
         ],
@@ -155,23 +155,23 @@ const MoonlingCollection: React.FC<Props> = ({
                         <View style={styles.inventoryCategoryTabs}>
                             <View style={styles.categoryRow}>
                                 <TouchableOpacity
-                                    style={[styles.inventoryTab, activeCategory === 'Moonlings' ? styles.active : null]}
-                                    onPress={() => setActiveCategory('Moonlings')}
+                                    style={[styles.inventoryTab, activeCategory === 'Moonokos' ? styles.active : null]}
+                                    onPress={() => setActiveCategory('Moonokos')}
                                 >
                                     {/* Tab pixelated borders */}
                                     <View style={styles.tabBorderTop} />
                                     <View style={styles.tabBorderBottom} />
                                     <View style={styles.tabBorderLeft} />
                                     <View style={styles.tabBorderRight} />
-                                    <View style={[styles.tabCornerTL, activeCategory === 'Moonlings' ? styles.activeTabCorner : null]} />
-                                    <View style={[styles.tabCornerTR, activeCategory === 'Moonlings' ? styles.activeTabCorner : null]} />
-                                    <View style={[styles.tabCornerBL, activeCategory === 'Moonlings' ? styles.activeTabCorner : null]} />
-                                    <View style={[styles.tabCornerBR, activeCategory === 'Moonlings' ? styles.activeTabCorner : null]} />
+                                    <View style={[styles.tabCornerTL, activeCategory === 'Moonokos' ? styles.activeTabCorner : null]} />
+                                    <View style={[styles.tabCornerTR, activeCategory === 'Moonokos' ? styles.activeTabCorner : null]} />
+                                    <View style={[styles.tabCornerBL, activeCategory === 'Moonokos' ? styles.activeTabCorner : null]} />
+                                    <View style={[styles.tabCornerBR, activeCategory === 'Moonokos' ? styles.activeTabCorner : null]} />
                                     {/* Tab dithering */}
                                     <View style={styles.tabDither} />
 
-                                    <Text style={[styles.tabText, activeCategory === 'Moonlings' ? styles.activeTabText : null]}>
-                                        MOONLINGS
+                                    <Text style={[styles.tabText, activeCategory === 'Moonokos' ? styles.activeTabText : null]}>
+                                        MOONOKOS
                                     </Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
@@ -270,8 +270,8 @@ const MoonlingCollection: React.FC<Props> = ({
                             <View style={styles.containerDither2} />
                             <View style={styles.containerDither3} />
 
-                            {activeCategory === 'Moonlings' ? (
-                                // Moonlings Tab Content
+                            {activeCategory === 'Moonokos' ? (
+                                // Moonokos Tab Content
                                 <View style={styles.simpleInventoryGrid}>
                                     {displayedCharacters.map((character) => (
                                         <View key={character.id} style={styles.slotWrapper}>
@@ -1363,4 +1363,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default MoonlingCollection;
+export default MoonokoCollection;

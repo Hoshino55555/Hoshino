@@ -13,9 +13,8 @@ import {
 import InnerScreen from './InnerScreen';
 import WalletButton from './WalletButton';
 
-// NEW: Programmable NFT Integration
 import { useProgrammableNFT } from '../hooks/useProgrammableNFT';
-import { getAsset } from '../config/AssetRegistry';
+import { MOONOKOS } from '../data/moonokos';
 
 
 // Helper function to get image source based on character image name
@@ -51,53 +50,26 @@ interface Props {
     onGoToCongratulations?: (character?: Character) => void;
 }
 
-const CHARACTERS: Character[] = [
-    {
-        id: 'lyra',
-        name: 'Lyra',
-        description: 'Lyra lives for attention, anime, and being just a little unhinged. She\'ll flirt, cry, and roast you in the same breath. Don\'t leave her on read — ever.',
-        image: 'LYRA.gif'
-    },
-    {
-        id: 'orion',
-        name: 'Orion',
-        description: 'A dramatic starboy with too many feelings and a quiet grudge. Sometimes you\'ll catch him in a corner, blasting Lil Peep like it\'s a coping mechanism. Don\'t ask, he won\'t tell.',
-        image: 'ORION.gif'
-    },
-    {
-        id: 'aro',
-        name: 'Aro',
-        description: 'A chaotic little menace. Loud, unhinged, and always ready to play. Share a secret and he\'ll turn it into his favorite joke for weeks.',
-        image: 'ARO.gif'
-    },
-    {
-        id: 'sirius',
-        name: 'Sirius',
-        description: 'A robot cat who thinks he\'s hilarious. Loves making dad jokes about AI and insists you call him "Hey Sirius". But don\'t worry, he\'s still learning emotions… kind of.',
-        image: 'SIRIUS.gif'
-    },
-    {
-        id: 'zaniah',
-        name: 'Zaniah',
-        description: 'If she\'s moody, don\'t ask — it\'s either Mercury retrograde or you\'re a Scorpio. Or both. Let her vibe it out, she\'s in her healing era.',
-        image: 'ZANIAH.gif'
-    }
-];
+const CHARACTERS: Character[] = MOONOKOS.map((m) => ({
+    id: m.id,
+    name: m.name,
+    description: m.description,
+    image: `${m.imageBase}.gif`,
+}));
 
 const CARD_WIDTH = 220; // 200 card width + 20 total margin (10 on each side)
 
-const MoonlingSelection: React.FC<Props> = ({
+const MoonokoSelection: React.FC<Props> = ({
     onBack,
     onNotification,
     onGoToCongratulations
 }) => {
 
-    const { 
-        connected, 
-        publicKey, 
-        connectWallet, 
+    const {
+        connected,
+        publicKey,
+        connectWallet,
         disconnect,
-        mintCharacterNFT
     } = useProgrammableNFT();
     const [currentCharacterIndex, setCurrentCharacterIndex] = useState<number>(0); // Start with first character
     const [isMinting, setIsMinting] = useState(false);
@@ -197,19 +169,6 @@ const MoonlingSelection: React.FC<Props> = ({
     const spinSlotMachine = async () => {
         if (isSpinning || isMinting) return;
 
-        // Check wallet connection first
-        if (!connected) {
-            onNotification?.('❌ Please connect your wallet first', 'error');
-            try {
-                await connectWallet();
-                onNotification?.('✅ Wallet connected successfully!', 'success');
-            } catch (error) {
-                console.error('Connection error:', error);
-                onNotification?.('❌ Failed to connect wallet', 'error');
-            }
-            return;
-        }
-
         setIsSpinning(true);
         setIsMinting(true);
         const spinDuration = ANIMATION_CONFIG.spinDuration;
@@ -219,19 +178,15 @@ const MoonlingSelection: React.FC<Props> = ({
         const spin = () => {
             elapsed += spinInterval;
             performSpinStep(elapsed, spinDuration);
-            
+
             if (elapsed < spinDuration) {
                 setTimeout(spin, spinInterval);
             } else {
-                // Stop the spin animation first
                 setIsSpinning(false);
-                
-                // Small delay to ensure spin animation is completely stopped
                 setTimeout(() => {
                     const selectedCharacter = landOnRandomCharacter();
                     if (selectedCharacter) {
-                        // Start minting process
-                        handleMintAfterSpin(selectedCharacter);
+                        handleSpinComplete(selectedCharacter);
                     }
                 }, 100);
             }
@@ -240,45 +195,11 @@ const MoonlingSelection: React.FC<Props> = ({
         spin();
     };
 
-    const handleMintAfterSpin = async (character: Character) => {
-        try {
-            onNotification?.(`🎨 Minting ${character.name} pNFT...`, 'info');
-            
-            // Get character asset from registry
-            const asset = getAsset(character.id);
-            if (!asset) {
-                throw new Error(`Character ${character.id} not found in asset registry`);
-            }
-
-            if (asset.category !== 'character') {
-                throw new Error(`Asset ${character.id} is not a character`);
-            }
-            
-            // Map local Character to GameCharacter format for pNFT minting
-            const gameCharacter = {
-                ...character
-            };
-            
-            const result = await mintCharacterNFT(gameCharacter, asset.ipfsHash);
-            
-            if (result.success) {
-                onNotification?.(
-                    `🎉 ${character.name} pNFT minted successfully!`, 
-                    'success'
-                );
-                
-                // Show congratulations modal with minted character
-                setCongratulationsCharacter(character);
-                setShowCongratulationsModal(true);
-            } else {
-                throw new Error(result.error || 'Minting failed');
-            }
-        } catch (error) {
-            console.error('NFT minting error:', error);
-            onNotification?.(`❌ NFT minting failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-        } finally {
-            setIsMinting(false);
-        }
+    const handleSpinComplete = (character: Character) => {
+        onNotification?.(`✨ You got ${character.name}!`, 'success');
+        setCongratulationsCharacter(character);
+        setShowCongratulationsModal(true);
+        setIsMinting(false);
     };
 
 
@@ -676,4 +597,4 @@ const styles = StyleSheet.create({
 
 });
 
-export default MoonlingSelection;
+export default MoonokoSelection;
