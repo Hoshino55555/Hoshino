@@ -62,6 +62,7 @@ interface Props {
     onChat?: () => void;
     onBack?: () => void;
     onSettings?: () => void;
+    onGallery?: () => void;
     // ✅ New props for local game engine
     localGameEngine?: LocalGameEngine | null;
     // Transition animation control
@@ -86,6 +87,7 @@ const MoonokoInteraction: React.FC<Props> = ({
     onChat,
     onBack,
     onSettings,
+    onGallery,
     // ✅ New props
     localGameEngine,
     shouldFadeIn = false,
@@ -106,8 +108,6 @@ const MoonokoInteraction: React.FC<Props> = ({
     });
     const [statDecayService] = useState(() => new StatDecayService());
 
-    const [showShop, setShowShop] = useState(false);
-    const [showGallery, setShowGallery] = useState(false);
     const [currentGame, setCurrentGame] = useState<string | null>(null);
     const [isTransitioning, setIsTransitioning] = useState(true);
     const [transitionOpacity, setTransitionOpacity] = useState(1);
@@ -399,7 +399,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                 break;
 
             case 'gallery':
-                setShowGallery(true);
+                onGallery?.();
                 break;
 
                                     case 'settings':

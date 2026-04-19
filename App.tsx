@@ -394,6 +394,7 @@ function App() {
             onStarGame={() => setCurrentView('star-game')}
             onShop={() => setCurrentView('shop')}
             onInventory={() => setCurrentView('inventory')}
+            onGallery={() => setCurrentView('gallery')}
             onChat={() => setCurrentView('chat')}
             onSettings={() => setCurrentView('settings')}
             localGameEngine={localGameEngine}
