@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#21342b', // Dark forest green text
         marginLeft: 8,
-        fontFamily: 'monospace', // Game Boy pixel font
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         textShadowColor: '#f0fff0',
         textShadowOffset: { width: 1, height: 1 },
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
     statLabel: {
         color: '#21342b',
         fontSize: 12,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         marginBottom: 2,
         textShadowColor: '#f0fff0',
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     starRating: {
         color: '#8B4513', // Dark brown for contrast
         fontSize: 10,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
     },
     mainDisplayArea: {
         flex: 1,
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
     tabText: {
         color: '#21342b',
         fontSize: 10,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         textAlign: 'center',
         textShadowColor: '#f0fff0',
@@ -654,14 +654,14 @@ const styles = StyleSheet.create({
     badgeText: {
         color: '#f0fff0',
         fontSize: 8,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
     },
     emptySlotIcon: {
         fontSize: 20,
         color: '#2e4630',
         opacity: 0.5,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
     },
     selectedItemDescription: {
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
     itemTitle: {
         color: '#21342b',
         fontSize: 12,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         flex: 1,
         textShadowColor: '#f0fff0',
@@ -700,7 +700,7 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
         borderRadius: 3,
         fontSize: 8,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         borderWidth: 1,
         textShadowColor: 'rgba(0,0,0,0.5)',
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
     descriptionText: {
         color: '#21342b',
         fontSize: 10,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         marginBottom: 2,
         textShadowColor: '#f0fff0',
         textShadowOffset: { width: 1, height: 1 },
@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
     itemDescText: {
         color: '#21342b',
         fontSize: 10,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         lineHeight: 14,
         textShadowColor: '#f0fff0',
         textShadowOffset: { width: 1, height: 1 },
@@ -763,7 +763,7 @@ const styles = StyleSheet.create({
     itemQuantityLarge: {
         color: '#21342b',
         fontSize: 10,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         marginTop: 4,
         textShadowColor: '#f0fff0',
@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
     buttonText: {
         color: '#21342b',
         fontSize: 10,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         textShadowColor: '#f0fff0',
         textShadowOffset: { width: 1, height: 1 },

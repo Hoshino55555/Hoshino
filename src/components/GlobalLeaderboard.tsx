@@ -194,12 +194,12 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         color: '#4f46e5',
         fontSize: 14,
-        fontFamily: 'Press Start 2P',
+        fontFamily: 'PressStart2P',
     },
     leaderboardHeaderP: {
         color: '#6b7280',
         fontSize: 8,
-        fontFamily: 'Press Start 2P',
+        fontFamily: 'PressStart2P',
     },
     closeBtn: {
         position: 'absolute',
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
         fontSize: 8,
     },
     wallet: {
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontSize: 7,
     },
     moonokos: {
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     },
     mintCtaText: {
         color: 'white',
-        fontFamily: 'Press Start 2P',
+        fontFamily: 'PressStart2P',
         fontSize: 8,
     },
     bottomButtonLeft: {

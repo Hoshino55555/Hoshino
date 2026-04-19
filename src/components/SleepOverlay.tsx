@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     },
     gameTitle: {
         fontSize: 10,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         color: '#1f2937',
         letterSpacing: 1,
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
     },
     timeText: {
         fontSize: 28,
-        fontFamily: 'monospace', // Use pixel font here - you'd replace with 'PressStart2P' or similar
+        fontFamily: 'PressStart2P', // Use pixel font here - you'd replace with 'PressStart2P' or similar
         fontWeight: 'bold',
         color: '#ffffff',
         letterSpacing: 3,
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     trackingText: {
         fontSize: 12,
         color: '#fbbf24',
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         letterSpacing: 2,
         textShadowColor: '#000000',
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
         top: 8,
         right: 15,
         fontSize: 14,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         color: '#fbbf24',
         letterSpacing: 1,
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
     },
     pixelButtonText: {
         fontSize: 14,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontWeight: 'bold',
         color: '#ffffff',
         textAlign: 'center',
