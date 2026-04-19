@@ -9,7 +9,6 @@ import InnerScreen from './InnerScreen';
 import WalletButton from './WalletButton';
 import Settings from './Settings';
 import Frame from './Frame';
-import GamesList from './GamesList';
 import Starburst from './Starburst';
 import { useWallet } from '../contexts/WalletContext';
 import { StatDecayService } from '../services/StatDecayService';
@@ -109,7 +108,6 @@ const MoonokoInteraction: React.FC<Props> = ({
 
     const [showShop, setShowShop] = useState(false);
     const [showGallery, setShowGallery] = useState(false);
-    const [showGamesList, setShowGamesList] = useState(false);
     const [currentGame, setCurrentGame] = useState<string | null>(null);
     const [isTransitioning, setIsTransitioning] = useState(true);
     const [transitionOpacity, setTransitionOpacity] = useState(1);
@@ -397,7 +395,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                 break;
 
             case 'games':
-                setShowGamesList(true);
+                setCurrentGame('starburst');
                 break;
 
             case 'gallery':
@@ -468,31 +466,6 @@ const MoonokoInteraction: React.FC<Props> = ({
     }
 
 
-
-    // If a game is active, only show the game
-    if (currentGame === 'starburst') {
-        return (
-            <>
-                <Starburst
-                    onBack={() => {
-                        setCurrentGame(null);
-                        setShowGamesList(true);
-                    }}
-                />
-                <GamesList
-                    visible={showGamesList}
-                    onClose={() => {
-                        setShowGamesList(false);
-                        setCurrentGame(null);
-                    }}
-                    onSelectGame={(gameId) => {
-                        setCurrentGame(gameId);
-                        setShowGamesList(false);
-                    }}
-                />
-            </>
-        );
-    }
 
     return (
         <>
@@ -626,18 +599,11 @@ const MoonokoInteraction: React.FC<Props> = ({
                 />
             )}
 
-            {/* Games List Modal */}
-            <GamesList
-                visible={showGamesList}
-                onClose={() => {
-                    setShowGamesList(false);
-                    setCurrentGame(null);
-                }}
-                onSelectGame={(gameId) => {
-                    setCurrentGame(gameId);
-                    setShowGamesList(false);
-                }}
-            />
+            {currentGame === 'starburst' && (
+                <View style={[StyleSheet.absoluteFill, { zIndex: 2, elevation: 12 }]}>
+                    <Starburst onBack={() => setCurrentGame(null)} />
+                </View>
+            )}
 
         </>
     );

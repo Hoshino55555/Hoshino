@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import InnerScreen from './InnerScreen';
 
 interface StarburstProps {
     onBack: () => void;
 }
 
-type CellValue = 0 | 1 | 2 | 3; // 0 = Star, 1-3 = numbers
+type CellValue = 0 | 1 | 2 | 3;
 type GameStatus = 'playing' | 'won' | 'lost';
 
 interface GridCell {
@@ -26,13 +27,11 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
     const [colHints, setColHints] = useState<RowHint[]>([]);
     const [score, setScore] = useState<number>(1);
     const [gameStatus, setGameStatus] = useState<GameStatus>('playing');
+    const [isClosing, setIsClosing] = useState(false);
 
-    // Generate a valid game grid with more challenge
     const generateGrid = useCallback((): GridCell[][] => {
         const newGrid: GridCell[][] = [];
-        
-        // Very challenging probabilities: even fewer 1s, more 2s/3s, more Stars
-        // 35% chance of 1, 25% chance of 2, 25% chance of 3, 15% chance of 0 (Star)
+
         for (let i = 0; i < GRID_SIZE; i++) {
             newGrid[i] = [];
             for (let j = 0; j < GRID_SIZE; j++) {
@@ -42,12 +41,11 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
                 else if (rand < 0.6) value = 2;
                 else if (rand < 0.85) value = 3;
                 else value = 0;
-                
+
                 newGrid[i][j] = { value, flipped: false };
             }
         }
 
-        // Ensure high difficulty: at least 3 Stars total, and at least 8 squares with 2s or 3s
         let starCount = 0;
         let valuableCount = 0;
         for (let i = 0; i < GRID_SIZE; i++) {
@@ -57,9 +55,7 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
             }
         }
 
-        // If not challenging enough, add more Stars and valuable squares
         if (starCount < 3) {
-            // Add Stars to random positions
             let added = 0;
             while (starCount + added < 3 && added < 5) {
                 const row = Math.floor(Math.random() * GRID_SIZE);
@@ -71,21 +67,18 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
             }
         }
 
-        // Ensure we have enough 2s and 3s to make it challenging
         if (valuableCount < 8) {
             let added = 0;
             while (valuableCount + added < 8 && added < 7) {
                 const row = Math.floor(Math.random() * GRID_SIZE);
                 const col = Math.floor(Math.random() * GRID_SIZE);
                 if (newGrid[row][col].value === 1) {
-                    // 50/50 chance of 2 or 3
                     newGrid[row][col].value = Math.random() < 0.5 ? 2 : 3;
                     added++;
                 }
             }
         }
 
-        // Calculate hints
         const newRowHints: RowHint[] = [];
         const newColHints: RowHint[] = [];
 
@@ -96,14 +89,12 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
             let colStars = 0;
 
             for (let j = 0; j < GRID_SIZE; j++) {
-                // Row hints
                 if (newGrid[i][j].value === 0) {
                     rowStars++;
                 } else {
                     rowSum += newGrid[i][j].value;
                 }
 
-                // Col hints
                 if (newGrid[j][i].value === 0) {
                     colStars++;
                 } else {
@@ -121,7 +112,6 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
         return newGrid;
     }, []);
 
-    // Initialize game
     useEffect(() => {
         const newGrid = generateGrid();
         setGrid(newGrid);
@@ -129,12 +119,10 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
         setGameStatus('playing');
     }, []);
 
-    // Check win condition
     const checkWinCondition = useCallback((currentGrid: GridCell[][]): boolean => {
         for (let i = 0; i < GRID_SIZE; i++) {
             for (let j = 0; j < GRID_SIZE; j++) {
                 const cell = currentGrid[i][j];
-                // If it's a 2 or 3, it must be flipped
                 if ((cell.value === 2 || cell.value === 3) && !cell.flipped) {
                     return false;
                 }
@@ -143,7 +131,6 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
         return true;
     }, []);
 
-    // Handle cell flip
     const handleCellPress = (row: number, col: number) => {
         if (gameStatus !== 'playing') return;
         if (grid[row][col].flipped) return;
@@ -154,27 +141,28 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
         const cellValue = newGrid[row][col].value;
 
         if (cellValue === 0) {
-            // Hit a Star - game over
             setGameStatus('lost');
             setGrid(newGrid);
         } else {
-            // Update score
             setScore(prev => prev * cellValue);
             setGrid(newGrid);
 
-            // Check win condition
             if (checkWinCondition(newGrid)) {
                 setGameStatus('won');
             }
         }
     };
 
-    // Start new game
     const handleNewGame = () => {
         const newGrid = generateGrid();
         setGrid(newGrid);
         setScore(1);
         setGameStatus('playing');
+    };
+
+    const handleBack = () => {
+        if (isClosing) return;
+        setIsClosing(true);
     };
 
     const getCellDisplay = (cell: GridCell): string => {
@@ -194,186 +182,141 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
     };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity style={styles.backButton} onPress={onBack}>
-                    <Text style={styles.backButtonText}>← Back</Text>
-                </TouchableOpacity>
+        <InnerScreen
+            expanded
+            animateIn
+            exiting={isClosing}
+            onExitComplete={onBack}
+            showBackgroundImage={false}
+            leftButtonText=""
+            centerButtonText=""
+            rightButtonText=""
+            onLeftButtonPress={handleBack}
+            onRightButtonPress={handleNewGame}
+        >
+            <View style={styles.content}>
                 <Text style={styles.title}>Starburst</Text>
-                <View style={styles.headerSpacer} />
-            </View>
 
-            <View style={styles.scoreContainer}>
-                <Text style={styles.scoreLabel}>Score:</Text>
-                <Text style={styles.scoreValue}>{score}</Text>
-            </View>
-
-            {gameStatus === 'won' && (
-                <View style={styles.messageContainer}>
-                    <Text style={styles.winMessage}>You Win! 🎉</Text>
+                <View style={styles.scoreContainer}>
+                    <Text style={styles.scoreLabel}>Score:</Text>
+                    <Text style={styles.scoreValue}>{score}</Text>
                 </View>
-            )}
 
-            {gameStatus === 'lost' && (
-                <View style={styles.messageContainer}>
-                    <Text style={styles.loseMessage}>Game Over! ⭐</Text>
-                </View>
-            )}
+                {gameStatus === 'won' && (
+                    <View style={styles.messageContainer}>
+                        <Text style={styles.winMessage}>You Win! 🎉</Text>
+                    </View>
+                )}
 
-            <View style={styles.gameBoard}>
-                {/* Top row for column hints */}
-                <View style={styles.hintRow}>
-                    <View style={styles.cornerCell} />
-                    {colHints.map((hint, idx) => (
-                        <View key={idx} style={styles.hintCell}>
-                            <Text style={styles.hintSum}>{hint.sum}</Text>
-                            <Text style={styles.hintStar}>{hint.starCount}</Text>
+                {gameStatus === 'lost' && (
+                    <View style={styles.messageContainer}>
+                        <Text style={styles.loseMessage}>Game Over! ⭐</Text>
+                    </View>
+                )}
+
+                <View style={styles.gameBoard}>
+                    <View style={styles.hintRow}>
+                        <View style={styles.cornerCell} />
+                        {colHints.map((hint, idx) => (
+                            <View key={idx} style={styles.hintCell}>
+                                <Text style={styles.hintSum}>{hint.sum}</Text>
+                                <Text style={styles.hintStar}>{hint.starCount}</Text>
+                            </View>
+                        ))}
+                    </View>
+
+                    {grid.map((row, rowIdx) => (
+                        <View key={rowIdx} style={styles.gridRow}>
+                            <View style={styles.hintCell}>
+                                <Text style={styles.hintSum}>{rowHints[rowIdx]?.sum || 0}</Text>
+                                <Text style={styles.hintStar}>{rowHints[rowIdx]?.starCount || 0}</Text>
+                            </View>
+
+                            {row.map((cell, colIdx) => (
+                                <TouchableOpacity
+                                    key={colIdx}
+                                    style={getCellStyle(cell)}
+                                    onPress={() => handleCellPress(rowIdx, colIdx)}
+                                    disabled={gameStatus !== 'playing' || cell.flipped}
+                                >
+                                    <Text style={styles.cellText}>{getCellDisplay(cell)}</Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
                     ))}
                 </View>
 
-                {/* Grid rows with row hints */}
-                {grid.map((row, rowIdx) => (
-                    <View key={rowIdx} style={styles.gridRow}>
-                        {/* Row hint */}
-                        <View style={styles.hintCell}>
-                            <Text style={styles.hintSum}>{rowHints[rowIdx]?.sum || 0}</Text>
-                            <Text style={styles.hintStar}>{rowHints[rowIdx]?.starCount || 0}</Text>
-                        </View>
-
-                        {/* Grid cells */}
-                        {row.map((cell, colIdx) => (
-                            <TouchableOpacity
-                                key={colIdx}
-                                style={getCellStyle(cell)}
-                                onPress={() => handleCellPress(rowIdx, colIdx)}
-                                disabled={gameStatus !== 'playing' || cell.flipped}
-                            >
-                                <Text style={styles.cellText}>{getCellDisplay(cell)}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                ))}
-            </View>
-
-            <View style={styles.instructions}>
                 <Text style={styles.instructionText}>
-                    Flip all 2s and 3s to win!
-                </Text>
-                <Text style={styles.instructionText}>
-                    Avoid Stars (⭐) - they end the game!
+                    Flip all 2s and 3s. Avoid Stars!
                 </Text>
             </View>
-
-            <View style={styles.newGameContainer}>
-                <TouchableOpacity style={styles.newGameButton} onPress={handleNewGame}>
-                    <Text style={styles.newGameButtonText}>New Game</Text>
-                </TouchableOpacity>
-            </View>
-        </View>
+        </InnerScreen>
     );
 };
 
 const { width } = Dimensions.get('window');
-const CELL_SIZE = Math.min((width - 100) / (GRID_SIZE + 1), 50);
+const CELL_SIZE = Math.min((width - 100) / (GRID_SIZE + 1), 42);
 
 const styles = StyleSheet.create({
-    container: {
+    content: {
         flex: 1,
-        backgroundColor: '#E8F5E8',
-        padding: 20,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
-        marginTop: 10,
-    },
-    headerSpacer: {
-        width: 80, // Same width as back button to center title
-    },
-    backButton: {
-        backgroundColor: '#2E5A3E',
-        paddingHorizontal: 15,
-        paddingVertical: 8,
-        borderRadius: 5,
-        borderWidth: 2,
-        borderColor: '#2E5A3E',
-    },
-    backButtonText: {
-        color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        justifyContent: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 8,
     },
     title: {
-        fontSize: 20,
+        fontSize: 16,
         color: '#2E5A3E',
         fontFamily: 'PressStart2P',
-    },
-    newGameContainer: {
-        alignItems: 'center',
-        marginTop: 15,
-        marginBottom: 10,
-    },
-    newGameButton: {
-        backgroundColor: '#2E5A3E',
-        paddingHorizontal: 15,
-        paddingVertical: 8,
-        borderRadius: 5,
-        borderWidth: 2,
-        borderColor: '#2E5A3E',
-    },
-    newGameButtonText: {
-        color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        marginBottom: 8,
     },
     scoreContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     scoreLabel: {
-        fontSize: 14,
+        fontSize: 10,
         color: '#2E5A3E',
         fontFamily: 'PressStart2P',
-        marginRight: 10,
+        marginRight: 8,
     },
     scoreValue: {
-        fontSize: 18,
+        fontSize: 14,
         color: '#2E5A3E',
         fontFamily: 'PressStart2P',
     },
     messageContainer: {
         backgroundColor: '#2E5A3E',
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 15,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+        marginBottom: 8,
         alignItems: 'center',
     },
     winMessage: {
-        fontSize: 16,
+        fontSize: 12,
         color: '#E8F5E8',
         fontFamily: 'PressStart2P',
     },
     loseMessage: {
-        fontSize: 16,
+        fontSize: 12,
         color: '#E8F5E8',
         fontFamily: 'PressStart2P',
     },
     gameBoard: {
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 10,
     },
     hintRow: {
         flexDirection: 'row',
-        marginBottom: 5,
+        marginBottom: 4,
     },
     gridRow: {
         flexDirection: 'row',
-        marginBottom: 5,
+        marginBottom: 4,
     },
     cornerCell: {
         width: CELL_SIZE,
@@ -385,18 +328,18 @@ const styles = StyleSheet.create({
         backgroundColor: '#D4E8D4',
         borderWidth: 2,
         borderColor: '#2E5A3E',
-        borderRadius: 5,
+        borderRadius: 4,
         justifyContent: 'center',
         alignItems: 'center',
         marginHorizontal: 2,
     },
     hintSum: {
-        fontSize: 12,
+        fontSize: 10,
         color: '#2E5A3E',
         fontFamily: 'PressStart2P',
     },
     hintStar: {
-        fontSize: 10,
+        fontSize: 8,
         color: '#2E5A3E',
         fontFamily: 'PressStart2P',
     },
@@ -405,7 +348,7 @@ const styles = StyleSheet.create({
         height: CELL_SIZE,
         borderWidth: 2,
         borderColor: '#2E5A3E',
-        borderRadius: 5,
+        borderRadius: 4,
         justifyContent: 'center',
         alignItems: 'center',
         marginHorizontal: 2,
@@ -420,26 +363,17 @@ const styles = StyleSheet.create({
         backgroundColor: '#FF6B6B',
     },
     cellText: {
-        fontSize: 16,
+        fontSize: 14,
         color: '#2E5A3E',
         fontFamily: 'PressStart2P',
-    },
-    instructions: {
-        marginTop: 20,
-        padding: 15,
-        backgroundColor: '#D4E8D4',
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: '#2E5A3E',
     },
     instructionText: {
-        fontSize: 10,
+        fontSize: 8,
         color: '#2E5A3E',
         fontFamily: 'PressStart2P',
-        marginBottom: 5,
         textAlign: 'center',
+        marginTop: 4,
     },
 });
 
 export default Starburst;
-

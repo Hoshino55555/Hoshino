@@ -123,6 +123,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: isTablet ? 20 : 100,
         zIndex: 3,
+        elevation: 20,
     },
     bottomButton: {
         width: isTablet ? 80 : 75,
@@ -172,6 +173,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 3,
+        elevation: 20,
     },
     leftPhysical: {
         bottom: 20,
