@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, Modal, StyleSheet, Dimensions } from 'react-native';
 import Shop from './Shop';
 import Gallery from './Gallery';
-import MoonCycleDisplay from './MoonCycleDisplay';
 import FeedingAnimation from './FeedingAnimation';
 import SleepMode from './SleepMode';
 import IngredientSelection from './IngredientSelection';
