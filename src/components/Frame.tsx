@@ -31,22 +31,21 @@ const Frame: React.FC<FrameProps> = ({
     pixelSize: customPixelSize,
 
 }) => {
-    // Convert percentage strings to numbers for calculations
-    const getNumericValue = (value: string | number): number => {
+    const resolveAxis = (value: string | number, axis: 'width' | 'height'): number => {
         if (typeof value === 'number') return value;
         if (typeof value === 'string' && value.includes('%')) {
             const percentage = parseFloat(value) / 100;
-            return value.includes('width') ? screenWidth * percentage : screenHeight * percentage;
+            return (axis === 'width' ? screenWidth : screenHeight) * percentage;
         }
         return parseFloat(value) || 0;
     };
 
-    const frameWidth = getNumericValue(width);
-    const frameHeight = getNumericValue(height);
-    const frameTop = getNumericValue(top);
-    const frameLeft = typeof left === 'string' && left.includes('%') 
+    const frameWidth = resolveAxis(width, 'width');
+    const frameHeight = resolveAxis(height, 'height');
+    const frameTop = resolveAxis(top, 'height');
+    const frameLeft = typeof left === 'string' && left.includes('%')
         ? (screenWidth * parseFloat(left) / 100) - (frameWidth / 2)
-        : getNumericValue(left);
+        : resolveAxis(left, 'width');
 
     const pixelSize = customPixelSize || 4;
     const pixels: React.ReactNode[] = [];

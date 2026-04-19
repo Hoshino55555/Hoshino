@@ -609,10 +609,10 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                         >
                             {dialogContainerWidth > 0 && (
                             <Frame
-                                width={dialogContainerWidth - 16}
+                                width={dialogContainerWidth * 0.9}
                                 height={62}
                                 top={-26}
-                                left={8}
+                                left={dialogContainerWidth * 0.05}
                                 position="absolute"
                                 pixelSize={2}
                             >
