@@ -193,7 +193,7 @@ export class MoonCycleService {
                 (actionType === 'sleep' && todayStats.sleepCompleted) ||
                 (actionType === 'chat' && todayStats.chatCompleted)
 
-            pointsReward = this.globalPointSystem.awardInteractionPoints(
+            pointsReward = await this.globalPointSystem.awardInteractionPoints(
                 characterMint,
                 characterName,
                 actionType,

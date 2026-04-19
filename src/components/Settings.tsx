@@ -176,8 +176,7 @@ const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSet
                                         btn.order = idx;
                                     });
 
-                                    settingsService.settings.menuButtons = menuButtons;
-                                    settingsService.saveSettings();
+                                    settingsService.setMenuButtons(menuButtons);
                                     onSettingsChanged?.();
                                     onNotification?.(`Moved ${button.name}`, 'success');
 

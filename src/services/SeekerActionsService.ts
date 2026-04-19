@@ -141,6 +141,7 @@ export class SeekerActionsService {
       }).toString('base64');
 
       const response: ActionPostResponse = {
+        type: 'transaction',
         transaction: serializedTransaction,
         message: `✨ ${characterId} NFT ready to mint! This will create your unique moonoko on the blockchain.`,
         links: {
@@ -186,6 +187,7 @@ export class SeekerActionsService {
       }).toString('base64');
 
       const response: ActionPostResponse = {
+        type: 'transaction',
         transaction: serializedTransaction,
         message: `🏆 ${achievementId} achievement badge ready to claim!`,
         links: {

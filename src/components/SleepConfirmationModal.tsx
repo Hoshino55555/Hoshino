@@ -1,33 +1,4 @@
-const typewriterEffect = (text: string, duration: number = 2000) => {
-    setIsTyping(true);
-    setDisplayedText('');
-
-    const characters = text.split('');
-    const delay = duration / characters.length;
-
-    characters.forEach((char, index) => {
-        typingTimeoutRef.current = setTimeout(() => {
-            setDisplayedText(prev => prev + char);
-
-            // If this is the last character, mark typing as complete
-            if (index === characters.length - 1) {
-                setIsTyping(false);
-            }
-        }, delay * index);
-    });
-};
-
-const clearTypingTimeouts = () => {
-    if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-    }
-};
-
-useEffect(() => {
-    return () => {
-        clearTypingTimeouts();
-    };
-}, []); import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -71,6 +42,36 @@ const SleepConfirmationModal: React.FC<Props> = ({
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.8)).current;
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const typewriterEffect = (text: string, duration: number = 2000) => {
+        setIsTyping(true);
+        setDisplayedText('');
+
+        const characters = text.split('');
+        const delay = duration / characters.length;
+
+        characters.forEach((char, index) => {
+            typingTimeoutRef.current = setTimeout(() => {
+                setDisplayedText(prev => prev + char);
+
+                if (index === characters.length - 1) {
+                    setIsTyping(false);
+                }
+            }, delay * index);
+        });
+    };
+
+    const clearTypingTimeouts = () => {
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            clearTypingTimeouts();
+        };
+    }, []);
 
     useEffect(() => {
         if (visible) {
@@ -289,17 +290,12 @@ const styles = StyleSheet.create({
         minHeight: 160,
         borderWidth: 3,
         borderColor: '#000000', // Keep dark pixel border
-        // Soft cosmic glow effect
-        shadowColor: '#8b5cf6',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-        elevation: 15,
-        // Additional hard shadow for pixel effect
+        // Hard pixel-style shadow
         shadowColor: '#000000',
         shadowOffset: { width: 3, height: 3 },
         shadowOpacity: 0.3,
         shadowRadius: 0,
+        elevation: 15,
     },
     windowHeader: {
         flexDirection: 'row',

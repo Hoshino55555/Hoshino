@@ -70,8 +70,6 @@ const GameContainer: React.FC<GameContainerProps> = ({ connection, onNotificatio
                     onCraftFood={handleCraftFood}
                     onNotification={onNotification}
                     walletAddress="demo-wallet"
-                    // Pass the inventory as additional ingredients
-                    purchasedIngredients={inventory.getInventoryAsIngredients()}
                 />
             )}
         </View>

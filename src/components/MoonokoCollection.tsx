@@ -399,7 +399,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 12,
         backgroundColor: '#d4f5c4', // Light minty green
         borderWidth: 0, // Remove CSS border
         borderRadius: 0, // Remove smooth corners
@@ -449,7 +448,6 @@ const styles = StyleSheet.create({
     statsBar: {
         flexDirection: 'row',
         justifyContent: 'space-around',
-        marginBottom: 12,
         backgroundColor: '#d4f5c4',
         borderRadius: 0, // No smooth corners
         paddingVertical: 8,
@@ -900,15 +898,6 @@ const styles = StyleSheet.create({
         bottom: -3,
         width: 3,
         backgroundColor: '#b8d4b8', // Light shadow
-        zIndex: -1,
-    },
-    containerShadow: {
-        position: 'absolute',
-        top: 2,
-        right: -2,
-        bottom: -2,
-        width: 2,
-        backgroundColor: '#c8e4c8', // Very light shadow
         zIndex: -1,
     },
     slotWrapper: {

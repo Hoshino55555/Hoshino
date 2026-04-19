@@ -35,7 +35,7 @@ const StarFragmentMissions: React.FC<StarFragmentMissionsProps> = ({
 
         setIsLoading(true)
         try {
-            const loginResult = starFragmentService.checkDailyLogin(walletAddress)
+            const loginResult = await starFragmentService.checkDailyLogin(walletAddress)
             if (loginResult.isNewDay) {
                 onNotification(
                     `Daily login bonus: ${loginResult.loginReward + loginResult.streakBonus} star fragments! 🌟`,
@@ -43,12 +43,14 @@ const StarFragmentMissions: React.FC<StarFragmentMissionsProps> = ({
                 )
             }
 
-            const progress = starFragmentService.getPlayerProgress(walletAddress)
+            const progress = await starFragmentService.getPlayerProgress(walletAddress)
             setPlayerProgress(progress)
 
-            const daily = starFragmentService.getDailyMissions(walletAddress)
-            const weekly = starFragmentService.getWeeklyMissions(walletAddress)
-            const season = starFragmentService.getSeasonMissions(walletAddress)
+            const [daily, weekly, season] = await Promise.all([
+                starFragmentService.getDailyMissions(walletAddress),
+                starFragmentService.getWeeklyMissions(walletAddress),
+                starFragmentService.getSeasonMissions(walletAddress),
+            ])
 
             setDailyMissions(daily)
             setWeeklyMissions(weekly)
@@ -66,7 +68,7 @@ const StarFragmentMissions: React.FC<StarFragmentMissionsProps> = ({
 
         setIsLoading(true)
         try {
-            const result = starFragmentService.completeMission(walletAddress, missionId)
+            const result = await starFragmentService.completeMission(walletAddress, missionId)
 
             if (result.success) {
                 const fragmentsEarned = result.rewards

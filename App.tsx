@@ -38,15 +38,15 @@ interface Character {
     name: string;
     description: string;
     image: string;
-
-    rarity?: 'Common' | 'Rare' | 'Epic' | 'Legendary';
-    nftMint?: string | null;
-    baseStats?: {
+    element: string;
+    baseStats: {
         mood: number;
         hunger: number;
         energy: number;
     };
-    specialAbility?: string;
+    rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary';
+    specialAbility: string;
+    nftMint?: string | null;
 }
 
 const RPC_URL = 'https://api.devnet.solana.com';
@@ -424,23 +424,12 @@ function App() {
                     <MoonokoSelection
                         onBack={() => {
                             if (previousView === 'welcome') {
-                                // Go back to the specific welcome phase
                                 setCurrentView('welcome');
-                                // The welcome screen will handle the phase based on welcomePhase
                             } else {
-                                // Go back to the previous view (like interaction)
                                 navigateToView(previousView);
                             }
                         }}
-                        onSelectCharacter={handleCharacterSelect}
-                        onFeed={() => setCurrentView('feeding')}
-                        onChat={() => setCurrentView('chat')}
-                        onGame={() => setCurrentView('game')}
-                        ownedCharacters={ownedCharacters}
-                        connection={connection}
-                        playerName={playerName}
                         onNotification={addNotification}
-                        onViewCollection={() => setCurrentView('collection')}
                         onGoToCongratulations={handleGoToCongratulations}
                     />
                 );

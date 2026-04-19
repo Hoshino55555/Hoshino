@@ -1,13 +1,13 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
-import MarketplaceService, { MarketplaceItem, ItemCategory, ItemRarity } from '../services/MarketplaceService';
+import { MarketplaceService, MarketplaceItem, ItemCategory, ItemRarity } from '../services/MarketplaceService';
 import { GlobalPointSystem } from '../services/GlobalPointSystem';
 import { useWallet } from '../contexts/WalletContext';
 import { Connection } from '@solana/web3.js';
 import InnerScreen from './InnerScreen';
-import PinkSugar from '../../assets/images/Pink Sugar.png';
-import NovaEgg from '../../assets/images/Nova Egg.png';
-import MiraBerry from '../../assets/images/Mira Berry.png';
+const PinkSugar = require('../../assets/images/Pink Sugar.png');
+const NovaEgg = require('../../assets/images/Nova Egg.png');
+const MiraBerry = require('../../assets/images/Mira Berry.png');
 
 interface ShopProps {
     connection: Connection;
@@ -717,13 +717,8 @@ const styles = StyleSheet.create({
     removeButtonText: {
         color: 'white',
         fontWeight: 'bold',
-        fontSize: 10,
-        lineHeight: 10,
-    },
-    removeButtonText: {
-        color: 'white',
-        fontWeight: 'bold',
         fontSize: 12,
+        lineHeight: 10,
     },
     emptyCart: {
         padding: 20,

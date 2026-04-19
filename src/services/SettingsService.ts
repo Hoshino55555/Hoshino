@@ -92,6 +92,11 @@ class SettingsService {
         await this.saveSettings();
     }
 
+    async setMenuButtons(buttons: MenuButton[]): Promise<void> {
+        this.settings.menuButtons = buttons;
+        await this.saveSettings();
+    }
+
     getTheme(): string {
         return this.settings.theme;
     }

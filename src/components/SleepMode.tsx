@@ -65,8 +65,8 @@ const SleepMode: React.FC<Props> = ({ character, onSleepSessionEnd, onClose }) =
     const starPositions = useMemo(
         () =>
             [...Array(20)].map(() => ({
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%` as `${number}%`,
+                top: `${Math.random() * 100}%` as `${number}%`,
             })),
         []
     );

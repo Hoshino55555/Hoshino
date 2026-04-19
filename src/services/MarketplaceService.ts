@@ -1,6 +1,4 @@
 import { Connection, PublicKey, Keypair } from '@solana/web3.js'
-import { createUmi } from '@metaplex-foundation/umi'
-import { mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata'
 import StarFragmentService from './StarFragmentService'
 
 // UMI-based marketplace implementation for React Native compatibility
