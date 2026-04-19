@@ -162,7 +162,7 @@ const IngredientSelection: React.FC<IngredientSelectionProps> = ({
             centerButtonText=""
             rightButtonText=""
         >
-            <ScrollView style={[styles.mainDisplayArea, styles.ingredientSelection]}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.mainDisplayArea, styles.ingredientSelection]}>
                 {/* Tab Navigation */}
                 <View style={styles.tabNavigation}>
                     <TouchableOpacity
