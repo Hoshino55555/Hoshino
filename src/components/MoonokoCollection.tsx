@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import InnerScreen from './InnerScreen';
 
 // Helper function to get image source based on character image name
 const getImageSource = (imageName: string) => {
@@ -53,6 +54,7 @@ interface Props {
     walletAddress?: string;
     connected?: boolean;
     onNotification?: (message: string, type: 'info' | 'error' | 'success' | 'warning') => void;
+    onCloseStart?: () => void;
 }
 
 const MoonokoCollection: React.FC<Props> = ({
@@ -60,11 +62,19 @@ const MoonokoCollection: React.FC<Props> = ({
     selectedCharacter,
     onSelectCharacter,
     onExit,
-    onNotification
+    onNotification,
+    onCloseStart,
 }) => {
     const [startIndex, setStartIndex] = useState(0);
     const [activeCategory, setActiveCategory] = useState<string>('Moonokos');
     const [selectedItem, setSelectedItem] = useState<InventoryItem | Character | null>(null);
+    const [isClosing, setIsClosing] = useState(false);
+
+    const handleClose = () => {
+        if (isClosing) return;
+        setIsClosing(true);
+        onCloseStart?.();
+    };
 
     // Sample inventory data with actual images
     const inventoryData: Record<string, InventoryItem[]> = {
@@ -106,51 +116,19 @@ const MoonokoCollection: React.FC<Props> = ({
     };
 
     return (
-        <View style={styles.container}>
-            {/* Top Status Bar - Game Boy Style */}
-            <View style={styles.topStatus}>
-                {/* Pixelated borders for top status */}
-                <View style={styles.statusBorderTop} />
-                <View style={styles.statusBorderBottom} />
-                <View style={styles.statusBorderLeft} />
-                <View style={styles.statusBorderRight} />
-                <View style={styles.statusCornerTL} />
-                <View style={styles.statusCornerTR} />
-                <View style={styles.statusCornerBL} />
-                <View style={styles.statusCornerBR} />
-                {/* Status shadow with dithering */}
-                <View style={styles.statusShadow} />
-                <View style={styles.statusDither1} />
-                <View style={styles.statusDither2} />
-
-                <Image source={require('../../assets/images/backpack.png')} style={styles.gearImage} />
-                <Text style={styles.walletStatusText}>INVENTORY</Text>
-            </View>
-
-            {/* Main LCD Screen - Game Boy Style */}
-            <View style={styles.mainScreen}>
-                {/* Pixelated border layers */}
-                <View style={styles.pixelBorderTop} />
-                <View style={styles.pixelBorderBottom} />
-                <View style={styles.pixelBorderLeft} />
-                <View style={styles.pixelBorderRight} />
-
-                {/* Corner pixels */}
-                <View style={styles.cornerTopLeft} />
-                <View style={styles.cornerTopRight} />
-                <View style={styles.cornerBottomLeft} />
-                <View style={styles.cornerBottomRight} />
-
-                {/* Dithered shadow layers - more pixelated */}
-                <View style={styles.screenShadowLayer1} />
-                <View style={styles.screenShadowLayer2} />
-                <View style={styles.shadowCornerTopRight} />
-                <View style={styles.shadowCornerBottomLeft} />
-                <View style={styles.shadowCornerBottomRight} />
-
-                {/* Main Display Area */}
-                <View style={styles.mainDisplayArea}>
-                    <View style={styles.inventoryLcdScreen}>
+        <InnerScreen
+            expanded
+            animateIn
+            exiting={isClosing}
+            onExitComplete={onExit}
+            showBackgroundImage={false}
+            leftButtonText=""
+            centerButtonText=""
+            rightButtonText=""
+            onLeftButtonPress={handleClose}
+        >
+            <View style={styles.content}>
+                <View style={styles.inventoryLcdScreen}>
                         {/* Category Tabs - Game Boy Style*/}
                         <View style={styles.inventoryCategoryTabs}>
                             <View style={styles.categoryRow}>
@@ -397,37 +375,18 @@ const MoonokoCollection: React.FC<Props> = ({
                                 </View>
                             )}
                         </View>
-                    </View>
                 </View>
             </View>
-
-            {/* Bottom Navigation Buttons - Game Boy Style */}
-            <TouchableOpacity style={[styles.bottomButton, styles.left]} onPress={onExit}>
-                <View style={styles.buttonBorder}>
-                    <Text style={styles.buttonText}>BACK</Text>
-                </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={[styles.bottomButton, styles.center]}
-                onPress={() => onNotification?.('INVENTORY: Browse your collection!', 'info')}
-            >
-                <View style={styles.buttonBorder}>
-                    <Text style={styles.buttonText}>VIEW</Text>
-                </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-                style={[styles.bottomButton, styles.right]}
-                onPress={() => onNotification?.('INVENTORY HELP: Browse your collection and view character details!', 'info')}
-            >
-                <View style={styles.buttonBorder}>
-                    <Text style={styles.buttonText}>HELP</Text>
-                </View>
-            </TouchableOpacity>
-        </View>
+        </InnerScreen>
     );
 };
 
 const styles = StyleSheet.create({
+    content: {
+        flex: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+    },
     container: {
         flex: 1,
         backgroundColor: '#e8fbe4', // Minty Game Boy background

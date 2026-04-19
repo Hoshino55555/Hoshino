@@ -526,15 +526,22 @@ function App() {
                 );
             case 'inventory':
                 return (
-                    <MoonokoCollection
-                        characters={getGameCharacters(ownedCharacters, 'png')}
-                        selectedCharacter={selectedCharacter}
-                        onSelectCharacter={handleCharacterSelect}
-                        onExit={() => setCurrentView('interaction')}
-                        walletAddress={publicKey?.toString()}
-                        connected={connected}
-                        onNotification={addNotification}
-                    />
+                    <>
+                        <View key="mi-layer" style={[StyleSheet.absoluteFill, { zIndex: 1 }]}>
+                            {moonokoInteractionElement}
+                        </View>
+                        <View key="inventory-layer" style={[StyleSheet.absoluteFill, { zIndex: 2 }]}>
+                            <MoonokoCollection
+                                characters={getGameCharacters(ownedCharacters, 'png')}
+                                selectedCharacter={selectedCharacter}
+                                onSelectCharacter={handleCharacterSelect}
+                                onExit={() => setCurrentView('interaction')}
+                                walletAddress={publicKey?.toString()}
+                                connected={connected}
+                                onNotification={addNotification}
+                            />
+                        </View>
+                    </>
                 );
             case 'leaderboard':
                 return (
