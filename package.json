@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "reset-cache": "expo start --clear",
-    "tunnel": "expo start --tunnel"
+    "tunnel": "expo start --tunnel",
+    "release": "bash scripts/release.sh"
   },
   "dependencies": {
     "@expo-google-fonts/press-start-2p": "^0.4.0",

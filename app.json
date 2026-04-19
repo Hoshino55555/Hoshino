@@ -17,7 +17,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#023c69"
       },
       "package": "com.socks.hoshino",
       "softwareKeyboardLayoutMode": "pan"
