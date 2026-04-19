@@ -2,9 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, Modal, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
 import Shop from './Shop';
 import Gallery from './Gallery';
-import FeedingAnimation from './FeedingAnimation';
 import SleepMode from './SleepMode';
-import IngredientSelection from './IngredientSelection';
 import InnerScreen from './InnerScreen';
 import WalletButton from './WalletButton';
 import Settings from './Settings';
@@ -201,12 +199,8 @@ const MoonokoInteraction: React.FC<Props> = ({
         return () => clearInterval(interval);
     }, [localGameEngine, selectedCharacter, statDecayService]);
     const [showIngredients, setShowIngredients] = useState(false);
-    const [showIngredientSelection, setShowIngredientSelection] = useState(false);
-    const [showFeedingAnimation, setShowFeedingAnimation] = useState(false);
     const [showSleepMode, setShowSleepMode] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const [currentFoodItem, setCurrentFoodItem] = useState<string>('');
-    const [craftedFoodName, setCraftedFoodName] = useState<string>('');
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuBarLayout, setMenuBarLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
@@ -316,28 +310,6 @@ const MoonokoInteraction: React.FC<Props> = ({
         return () => clearInterval(interval);
     }, [selectedCharacter, localGameEngine, statDecayService]);
 
-    // Handle crafting completion from ingredient selection
-    const handleCraftFood = (foodId: string, foodName: string) => {
-        console.log('Food crafted:', foodId, foodName);
-        setCurrentFoodItem(foodId);
-        setCraftedFoodName(foodName);
-        setShowIngredientSelection(false);
-        setShowFeedingAnimation(true);
-
-        onNotification?.(`🍳 ${foodName} has been prepared! Watch ${selectedCharacter?.name} enjoy it!`, 'success');
-    };
-
-    // Handle feeding animation (showing ingredient selection first)
-    const handleFeedingFlow = () => {
-        if (!selectedCharacter) {
-            onNotification?.('❌ Please select a character first', 'error');
-            return;
-        }
-
-        console.log('Starting feeding flow - showing ingredient selection');
-        setShowIngredientSelection(true);
-    };
-
     // Handle menu button actions
     const handleMenuButtonAction = async (action: string) => {
         if (!selectedCharacter && action !== 'settings' && action !== 'shop') {
@@ -347,34 +319,7 @@ const MoonokoInteraction: React.FC<Props> = ({
 
         switch (action) {
             case 'feed':
-                if (localGameEngine) {
-                    const newStats = await localGameEngine.feedMoonoko();
-                    const result = await statDecayService.recordAction(
-                        selectedCharacter!.id,
-                        'feed',
-                        { hunger: 2, mood: 1 }
-                    );
-
-                    const syncedStats = {
-                        ...newStats,
-                        mood: result.newStats.mood,
-                        hunger: result.newStats.hunger,
-                        energy: result.newStats.energy
-                    };
-
-                    setCurrentStats(syncedStats);
-                    await localGameEngine.updateStats(syncedStats);
-
-                    onNotification?.(
-                        result.canGainMood
-                            ? `🍎 Fed ${selectedCharacter!.name}! Mood +1, Hunger +2`
-                            : `🍎 Fed ${selectedCharacter!.name}! Hunger +2 (Already earned today's mood bonus)`,
-                        'success'
-                    );
-                } else {
-                    handleFeedingFlow();
-                }
-                if (onFeed) onFeed();
+                onFeed?.();
                 break;
 
             case 'sleep':
@@ -452,20 +397,6 @@ const MoonokoInteraction: React.FC<Props> = ({
             </TouchableOpacity>
         );
     };
-
-    // If showing ingredient selection, render that instead
-    if (showIngredientSelection) {
-        return (
-            <IngredientSelection
-                onBack={() => setShowIngredientSelection(false)}
-                onCraftFood={handleCraftFood}
-                onNotification={onNotification}
-                walletAddress={walletAddress}
-            />
-        );
-    }
-
-
 
     return (
         <>

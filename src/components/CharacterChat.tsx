@@ -37,7 +37,7 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [isThinking, setIsThinking] = useState(false);
-    const [showChat, setShowChat] = useState(false);
+    const [showChat, setShowChat] = useState(true);
     const [keyboardVisible, setKeyboardVisible] = useState(false);
     const messagesEndRef = useRef<ScrollView>(null);
 

@@ -457,21 +457,8 @@ function App() {
                     />
                 );
             case 'interaction':
-                return (
-                    <>
-                        <View key="mi-layer" style={StyleSheet.absoluteFill}>
-                            {moonokoInteractionElement}
-                        </View>
-                    </>
-                );
             case 'feeding':
-                return (
-                    <FeedingPage
-                        onBack={() => setCurrentView('interaction')}
-                        onFeed={handleFeed}
-                        currentHunger={characterStats.hunger}
-                    />
-                );
+                return null;
             case 'game':
             case 'memory-game':
             case 'star-game':
@@ -500,29 +487,10 @@ function App() {
                     </View>
                 );
             case 'shop':
-                return (
-                    <Shop
-                        connection={connection}
-                        onNotification={addNotification}
-                        onClose={() => setCurrentView('interaction')}
-                    />
-                );
             case 'gallery':
-                return (
-                    <Gallery onBack={() => setCurrentView('interaction')} />
-                );
+                return null;
             case 'inventory':
-                return (
-                    <MoonokoCollection
-                        characters={getGameCharacters(ownedCharacters, 'png')}
-                        selectedCharacter={selectedCharacter}
-                        onSelectCharacter={handleCharacterSelect}
-                        onExit={() => setCurrentView('interaction')}
-                        walletAddress={publicKey?.toString()}
-                        connected={connected}
-                        onNotification={addNotification}
-                    />
-                );
+                return null;
             case 'leaderboard':
                 return (
                     <GlobalLeaderboard
@@ -531,12 +499,7 @@ function App() {
                     />
                 );
             case 'settings':
-                return (
-                    <Settings
-                        onBack={() => setCurrentView('interaction')}
-                        onNotification={addNotification}
-                    />
-                );
+                return null;
             default:
                 return (
                     <WelcomeScreen
@@ -553,11 +516,67 @@ function App() {
         return null; // or a loading screen
     }
 
+    const miRoutes = ['interaction', 'feeding', 'shop', 'gallery', 'inventory', 'settings'];
+    const miMounted = miRoutes.includes(currentView);
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="light" hidden={true} />
             <DeviceCasing />
-            {renderContent()}
+            {miMounted && (
+                <View
+                    key="mi-layer"
+                    style={StyleSheet.absoluteFill}
+                    pointerEvents="box-none"
+                >
+                    {moonokoInteractionElement}
+                </View>
+            )}
+            {currentView === 'feeding' && (
+                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                    <FeedingPage
+                        onBack={() => setCurrentView('interaction')}
+                        onFeed={handleFeed}
+                        currentHunger={characterStats.hunger}
+                    />
+                </View>
+            )}
+            {currentView === 'shop' && (
+                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                    <Shop
+                        connection={connection}
+                        onNotification={addNotification}
+                        onClose={() => setCurrentView('interaction')}
+                    />
+                </View>
+            )}
+            {currentView === 'gallery' && (
+                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                    <Gallery onBack={() => setCurrentView('interaction')} />
+                </View>
+            )}
+            {currentView === 'inventory' && (
+                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                    <MoonokoCollection
+                        characters={getGameCharacters(ownedCharacters, 'png')}
+                        selectedCharacter={selectedCharacter}
+                        onSelectCharacter={handleCharacterSelect}
+                        onExit={() => setCurrentView('interaction')}
+                        walletAddress={publicKey?.toString()}
+                        connected={connected}
+                        onNotification={addNotification}
+                    />
+                </View>
+            )}
+            {currentView === 'settings' && (
+                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                    <Settings
+                        onBack={() => setCurrentView('interaction')}
+                        onNotification={addNotification}
+                    />
+                </View>
+            )}
+            {!miMounted && renderContent()}
             <DeviceButtons />
 
             <WalletButton

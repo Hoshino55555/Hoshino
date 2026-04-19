@@ -281,6 +281,11 @@ const styles = StyleSheet.create({
         // Remove direct width/height since they're handled by shadowContainer
         // Keep only the margin adjustment
         marginTop: isTablet ? -10 : -20,
+        shadowColor: 'transparent',
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 0,
     },
     darkenedBackground: {
         opacity: 0.3,
