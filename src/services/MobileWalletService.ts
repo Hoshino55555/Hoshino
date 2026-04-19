@@ -41,9 +41,20 @@ export class MobileWalletService {
     private publicKey: PublicKey | null = null;
     private eventEmitter: EventEmitter;
     private authToken: string | null = null;
+    private accountAddressBase64: string | null = null;
 
     constructor() {
         this.eventEmitter = new EventEmitter();
+    }
+
+    private updateAuthorizedAccount(account: { address: string }) {
+        this.accountAddressBase64 = account.address;
+
+        const decoded = Buffer.from(account.address, 'base64');
+        const base58Address = bs58.encode(decoded);
+
+        this.publicKey = new PublicKey(base58Address);
+        this.connected = true;
     }
 
     async initialize(): Promise<any> {
@@ -78,13 +89,7 @@ export class MobileWalletService {
 
                 this.authToken = authorizationResult.auth_token;
                 const account = authorizationResult.accounts[0];
-                
-                // Convert base64 address to base58
-                const decoded = Buffer.from(account.address, 'base64');
-                const base58Address = bs58.encode(decoded);
-                
-                this.publicKey = new PublicKey(base58Address);
-                this.connected = true;
+                this.updateAuthorizedAccount(account);
 
                 this.eventEmitter.emit('connect', this.publicKey);
                 console.log('📱 Wallet connected:', this.publicKey.toString());
@@ -113,6 +118,7 @@ export class MobileWalletService {
             this.connected = false;
             this.publicKey = null;
             this.authToken = null;
+            this.accountAddressBase64 = null;
             
             this.eventEmitter.emit('disconnect');
         } catch (error) {
@@ -120,7 +126,51 @@ export class MobileWalletService {
             this.connected = false;
             this.publicKey = null;
             this.authToken = null;
+            this.accountAddressBase64 = null;
             this.eventEmitter.emit('disconnect');
+        }
+    }
+
+    /**
+     * Sign an arbitrary message using the mobile wallet adapter.
+     * Returns a base64 signature suitable for SIWS/SIWE-style auth flows.
+     */
+    async signMessage(message: string | Uint8Array): Promise<string> {
+        console.log('📱 Signing message with mobile wallet...');
+
+        if (!this.connected || !this.publicKey || !this.authToken || !this.accountAddressBase64) {
+            throw new Error('Wallet not connected');
+        }
+
+        const messageBytes = typeof message === 'string' ? Buffer.from(message, 'utf8') : message;
+
+        try {
+            return await transact(async (wallet) => {
+                const authorizationResult = await wallet.reauthorize({
+                    auth_token: this.authToken!,
+                    identity: APP_IDENTITY,
+                });
+
+                this.authToken = authorizationResult.auth_token;
+                const account = authorizationResult.accounts[0];
+                this.updateAuthorizedAccount(account);
+
+                const signedPayloads = await wallet.signMessages({
+                    addresses: [this.accountAddressBase64!],
+                    payloads: [messageBytes],
+                });
+                const signedPayload = signedPayloads[0];
+
+                if (!signedPayload) {
+                    throw new Error('No signed payload returned');
+                }
+
+                const signatureBytes = signedPayload.slice(-64);
+                return Buffer.from(signatureBytes).toString('base64');
+            });
+        } catch (error) {
+            console.error('❌ Failed to sign message:', error);
+            throw error;
         }
     }
 
@@ -136,22 +186,14 @@ export class MobileWalletService {
 
         try {
             const result = await transact(async (wallet) => {
-                // Re-authorize the wallet for this transaction session
-                const authorizationResult = await wallet.authorize({
-                    chain: 'solana:devnet',
+                const authorizationResult = await wallet.reauthorize({
+                    auth_token: this.authToken!,
                     identity: APP_IDENTITY,
-                    auth_token: this.authToken || undefined,
                 });
                 
-                // Update our state with the fresh authorization
                 this.authToken = authorizationResult.auth_token;
-                this.connected = true;
-                
-                // Update public key from the fresh authorization
                 const account = authorizationResult.accounts[0];
-                const decoded = Buffer.from(account.address, 'base64');
-                const base58Address = bs58.encode(decoded);
-                this.publicKey = new PublicKey(base58Address);
+                this.updateAuthorizedAccount(account);
                 
                 console.log('📱 Updated wallet public key:', this.publicKey.toString());
                 

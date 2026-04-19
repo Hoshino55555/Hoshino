@@ -1,0 +1,19 @@
+[toolchain]
+anchor_version = "0.31.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+hoshino_vrf_consumer = "CSQ7mu1XoBv171bXFBhYCFNcLHp2Xbpa9voExh8qfBbp"
+
+[programs.devnet]
+hoshino_vrf_consumer = "CSQ7mu1XoBv171bXFBhYCFNcLHp2Xbpa9voExh8qfBbp"
+
+[provider]
+cluster = "Devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "anchor test"

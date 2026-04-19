@@ -1,0 +1,12 @@
+[workspace]
+members = ["programs/*"]
+resolver = "2"
+
+[workspace.dependencies]
+anchor-lang = "0.31.1"
+ephemeral-vrf-sdk = { version = "0.2.3", features = ["anchor"] }
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+overflow-checks = true

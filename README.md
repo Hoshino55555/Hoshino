@@ -1,182 +1,173 @@
-# Hoshino - Cosmic Moonoko Game
+# Hoshino
 
-A React Native game where you care for cosmic creatures called moonokos.
+Hoshino is an Expo/React Native game built around Moonokos, Solana wallet login, and Privy auth.
 
-## Prerequisites
+This branch is set up for real device testing on Android, especially Solana Seeker. It does not use Expo Go for the main auth flow.
 
-Before you begin, you'll need:
-- **Node.js** (v16 or higher)
-- **npm** or **yarn**
-- **Expo CLI** (`npm install -g @expo/cli`)
-- **Expo Go app** on your phone (available on App Store/Google Play)
+## What You Need
 
-## Setup Instructions
+- Node.js 20+
+- npm
+- Android Studio
+- Android SDK + platform tools
+- Java 17
+- A real Android device or emulator
+- A Privy app + client ID
 
-### 1. Clone the Repository
+For Seeker/native wallet testing, use a real Solana Seeker device.
+
+## Quick Start
+
+### 1. Clone and install
+
 ```bash
-git clone https://github.com/your-repo/hoshino.git
-cd hoshino
-```
-
-### 2. Install Dependencies
-```bash
+git clone <your-repo-url>
+cd Hoshino
 npm install
 ```
 
-### 3. Environment Setup
+### 2. Create your env file
 
-#### Option A: Use Shared Firebase (Recommended)
-The project uses a shared Firebase project. Get the Firebase configuration from your team lead and create a `.env` file with the provided values.
-
-#### Option B: Use Your Own Firebase
-If you want to use your own Firebase project:
 ```bash
 cp env.example .env
-# Fill in your own Firebase configuration
 ```
 
-### 4. Backend Setup (Firebase Functions) - Optional
+At minimum, set:
 
-Only needed if you want to deploy Firebase Functions or modify the backend:
-
-Set up the backend API keys (each developer needs their own):
 ```bash
-cd backend/firebase
-firebase login
-firebase use hoshino-996d0
-firebase functions:config:set openai.key="your_openai_api_key"
-firebase functions:config:set gemini.key="your_gemini_api_key"
-firebase deploy --only functions
+EXPO_PUBLIC_PRIVY_APP_ID=...
+EXPO_PUBLIC_PRIVY_CLIENT_ID=...
+EXPO_PUBLIC_ENABLE_VRF_DEV_SCREEN=0
 ```
 
-**Note**: Most developers only need the frontend setup. The backend is already deployed and working.
+If you need backend features, also fill in the Firebase and model keys from `env.example`.
 
-### 5. Run the App
+### 3. Configure Privy correctly
 
-#### For Development (Recommended)
+In the Privy dashboard, the mobile app client must allow this app:
+
+- Android package: `com.socks.hoshino`
+- URL scheme: `hoshino`
+
+If you want wallet login:
+
+- enable Solana wallet auth
+- enable the login methods you want to support
+
+For the current app flow, the important paths are:
+
+- `Native Wallet` for Seeker / Mobile Wallet Adapter
+- `Phantom`
+- `Backpack`
+- `Email`
+- `Google`
+
+### 4. Start Android
+
+Use a dev build, not Expo Go:
+
 ```bash
-npm start
+npx expo run:android
 ```
 
-This will:
-- Start the Expo development server
-- Open the Expo DevTools in your browser
-- Show a QR code for mobile testing
+That installs the native app and starts Metro if needed.
 
-#### For Mobile Testing
+If you want a clean rebuild after dependency or Metro changes:
 
-1. **Install Expo Go** on your phone:
-   - **iOS**: Download from App Store
-   - **Android**: Download from Google Play Store
-
-2. **Connect to Development Server**:
-   - **iOS**: Open Camera app and scan the QR code
-   - **Android**: Open Expo Go app and scan the QR code
-   - **Alternative**: Enter the URL manually in Expo Go
-
-3. **Test the App**:
-   - The app will load on your phone
-   - Changes will automatically reload (hot reload)
-   - You can shake your phone to open the developer menu
-
-#### For Production Build
-
-**Prerequisites for Production Build:**
-1. **Expo Account**: Sign up at [expo.dev](https://expo.dev)
-2. **EAS CLI**: Install with `npm install -g @expo/eas-cli`
-3. **Login**: Run `eas login` and follow the prompts
-
-**Configure EAS Build:**
 ```bash
-# Initialize EAS Build configuration
-eas build:configure
-
-# This creates an eas.json file with build profiles
+npx expo start -c
+npx expo run:android
 ```
 
-**Build Commands:**
+## Real Device Flow
+
+### Android phone
+
+1. Enable developer options and USB debugging.
+2. Plug the device into your computer.
+3. Confirm `adb devices` shows the phone.
+4. Run `npx expo run:android`.
+
+### Solana Seeker
+
+1. Install the Hoshino dev build on the Seeker.
+2. Open the app.
+3. Tap `Connect Wallet`.
+4. Choose `Native Wallet`.
+5. Approve the wallet connection in Seeker.
+6. Sign the Privy SIWS login message.
+
+After first login, the app now restores the same wallet's saved Moonoko/profile on relogin.
+
+## Important Notes
+
+- Do not use Expo Go for this branch. Privy native extensions and wallet flows require a dev build.
+- Cold launch, logout, and relogin were tested against the current Privy + wallet flow.
+- Wallet identity and gameplay profile are stored locally per wallet address.
+- If you log out and log back in with the same wallet, the app should restore your saved character state.
+
+## Troubleshooting
+
+### `Embedded wallet proxy not initialized`
+
+This branch should no longer hit that on startup. If it does, rebuild the dev client:
+
 ```bash
-# Build for iOS
-eas build --platform ios
-
-# Build for Android
-eas build --platform android
-
-# Build for both platforms
-eas build --platform all
+npx expo run:android
 ```
 
-**Accessing Your Built App:**
+### `Native app ID com.socks.hoshino has not been set as an allowed...`
 
-1. **Go to Expo Dashboard**:
-   - Visit [expo.dev](https://expo.dev)
-   - Sign in to your Expo account
-   - Navigate to your project
+Your Privy mobile client is missing the Android allowlist entry. Add:
 
-2. **Find Your Build**:
-   - Click on "Builds" in the left sidebar
-   - Find your latest build in the list
-   - Click on the build to see details
+- package: `com.socks.hoshino`
+- scheme: `hoshino`
 
-3. **Download Your App**:
-   - **For Android**: Click "Download" to get the APK file
-   - **For iOS**: Click "Download" to get the IPA file (requires Apple Developer account)
-   - **Install on Device**: Transfer the file to your phone and install
+### Wallet login opens but never completes
 
-**Build Status Tracking:**
-- Builds typically take 10-30 minutes
-- You'll receive email notifications when builds complete
-- Check the Expo dashboard for real-time build status
-- Failed builds will show error details for debugging
+Check:
 
-**Advanced Build Options:**
+- Solana wallet auth is enabled in Privy
+- the app client is a mobile client, not just a web client
+- you are using a dev build, not Expo Go
+
+### Metro or bundling issues
+
+Clear Metro and rebuild:
+
 ```bash
-# Build with specific profile (development, preview, production)
-eas build --profile production --platform android
-
-# Build for internal testing
-eas build --profile preview --platform all
-
-# Build with custom configuration
-eas build --platform android --local
+npx expo start -c
+npx expo run:android
 ```
 
-**Note**: 
-- iOS builds require an Apple Developer account ($99/year)
-- Android builds are free and can be distributed via APK
-- For app store distribution, you'll need to configure app store credentials
+## Files That Matter
 
-### 6. Troubleshooting
+- `src/components/LoginScreen.tsx` - login UI and wallet auth entry points
+- `src/contexts/PrivyContext.tsx` - Privy provider
+- `src/contexts/WalletContext.tsx` - active wallet identity and signer handling
+- `src/services/MobileWalletService.ts` - Mobile Wallet Adapter flow for Seeker/native wallet
+- `App.tsx` - profile restore, logout behavior, app routing
+- `env.example` - required environment variables
 
-#### Common Issues:
-- **"Metro bundler not found"**: Run `npm install` again
-- **"Cannot connect to development server"**: Make sure your phone and computer are on the same WiFi network
-- **"App not loading"**: Check that your `.env` file is properly configured
-- **"Firebase errors"**: Verify your Firebase configuration
+## If You Want To Hand This To An AI
 
-#### Development Tips:
-- Use Expo DevTools for debugging
-- Enable "Debug Remote JS" in Expo Go for console logs
-- Use React Native Debugger for advanced debugging
+Give your AI this prompt:
 
-## Development
+```text
+Set up this Hoshino repo on my Android device using the repo README only.
 
-- **Frontend**: React Native with Expo
-- **Backend**: Firebase Functions with OpenAI/Gemini
-- **Database**: Firestore
-- **Authentication**: Solana wallet integration
+Constraints:
+- Use a real Expo dev build, not Expo Go.
+- Read env.example and create .env from it.
+- Make sure Privy is configured for Android package com.socks.hoshino and URL scheme hoshino.
+- Make sure wallet login works for Native Wallet, Phantom, and Backpack.
+- Use npx expo run:android for install/build.
+- If Metro gets weird, clear it with npx expo start -c before rebuilding.
+- Do not change app code unless setup is actually broken.
+```
 
-## Security
+## Backend
 
-- Firebase config is shared across all developers
-- OpenAI/Gemini keys are set individually per developer
-- See `SECURITY.md` for detailed security setup
+Most frontend/device work does not require redeploying backend services.
 
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Set up environment variables
-4. Make your changes
-5. Test on your phone using Expo Go
-6. Submit a pull request 
+If you need Firebase Functions locally or want to redeploy them, handle that separately from device setup.

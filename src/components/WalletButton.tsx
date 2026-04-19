@@ -14,8 +14,10 @@ const WalletButton: React.FC<WalletButtonProps> = ({
     onConnect,
     onDisconnect
 }) => {
+    const hasWalletIdentity = connected || Boolean(publicKey);
+
     const getWalletDisplay = () => {
-        if (!connected || !publicKey) {
+        if (!hasWalletIdentity || !publicKey) {
             return 'Connect';
         }
         // Display the base58 address properly
@@ -24,7 +26,7 @@ const WalletButton: React.FC<WalletButtonProps> = ({
 
     return (
         <View style={styles.container}>
-            {connected && publicKey ? (
+            {hasWalletIdentity ? (
                 <TouchableOpacity 
                     style={styles.connectedButton}
                     onPress={onDisconnect}

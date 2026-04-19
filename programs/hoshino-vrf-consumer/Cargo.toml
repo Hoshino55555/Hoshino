@@ -1,0 +1,21 @@
+[package]
+name = "hoshino-vrf-consumer"
+version = "0.1.0"
+description = "MagicBlock VRF consumer program for Hoshino"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "hoshino_vrf_consumer"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+
+[dependencies]
+anchor-lang = { workspace = true }
+ephemeral-vrf-sdk = { workspace = true, features = ["anchor"] }

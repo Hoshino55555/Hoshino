@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -34,7 +35,8 @@ import { Connection, PublicKey } from '@solana/web3.js';
 // NEW: Programmable NFT Integration
 // New services and configs
 import { LocalGameEngine } from './src/services/local/LocalGameEngine';
-import { getGameCharacters } from './src/data/moonokos';
+import { getGameCharacters, MOONOKOS_BY_ID, toGameCharacter } from './src/data/moonokos';
+import { ENABLE_VRF_DEV_SCREEN } from './src/config/vrf';
 
 interface Character {
     id: string;
@@ -54,6 +56,96 @@ interface Character {
 
 const RPC_URL = 'https://api.devnet.solana.com';
 const connection = new Connection(RPC_URL, 'confirmed');
+const PLAYER_PROFILE_STORAGE_PREFIX = 'player_profile_';
+
+interface StoredPlayerProfile {
+    version: 1;
+    playerName: string;
+    ownedCharacterIds: string[];
+    selectedCharacterId: string | null;
+    updatedAt: number;
+}
+
+const getPlayerProfileStorageKey = (walletAddress: string) =>
+    `${PLAYER_PROFILE_STORAGE_PREFIX}${walletAddress}`;
+
+const normalizeOwnedCharacterIds = (ids: Array<string | null | undefined>) =>
+    Array.from(
+        new Set(ids.filter((id): id is string => Boolean(id && MOONOKOS_BY_ID[id])))
+    );
+
+const restoreCharacterFromId = (
+    characterId: string | null | undefined,
+    ownedIds: string[]
+): Character | null => {
+    if (!characterId) {
+        return null;
+    }
+
+    const moonoko = MOONOKOS_BY_ID[characterId];
+
+    if (!moonoko) {
+        return null;
+    }
+
+    return toGameCharacter(
+        moonoko,
+        normalizeOwnedCharacterIds([...ownedIds, characterId]),
+        'gif'
+    );
+};
+
+const loadStoredPlayerProfile = async (
+    walletAddress: string
+): Promise<StoredPlayerProfile | null> => {
+    try {
+        const storedValue = await AsyncStorage.getItem(
+            getPlayerProfileStorageKey(walletAddress)
+        );
+
+        if (!storedValue) {
+            return null;
+        }
+
+        const parsed = JSON.parse(storedValue) as Partial<StoredPlayerProfile>;
+        const ownedCharacterIds = normalizeOwnedCharacterIds(
+            parsed.ownedCharacterIds ?? []
+        );
+        const selectedCharacterId =
+            parsed.selectedCharacterId && MOONOKOS_BY_ID[parsed.selectedCharacterId]
+                ? parsed.selectedCharacterId
+                : null;
+
+        return {
+            version: 1,
+            playerName: typeof parsed.playerName === 'string' ? parsed.playerName : '',
+            ownedCharacterIds: normalizeOwnedCharacterIds([
+                ...ownedCharacterIds,
+                selectedCharacterId,
+            ]),
+            selectedCharacterId,
+            updatedAt:
+                typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now(),
+        };
+    } catch (error) {
+        console.error('❌ Error loading stored player profile:', error);
+        return null;
+    }
+};
+
+const saveStoredPlayerProfile = async (
+    walletAddress: string,
+    profile: StoredPlayerProfile
+) => {
+    try {
+        await AsyncStorage.setItem(
+            getPlayerProfileStorageKey(walletAddress),
+            JSON.stringify(profile)
+        );
+    } catch (error) {
+        console.error('❌ Error saving player profile:', error);
+    }
+};
 
 const validateCharacterInput = (character: Character): boolean => {
     if (
@@ -126,6 +218,10 @@ function App() {
     const [showDeploymentBanner, setShowDeploymentBanner] = useState(true)
 
     const [localGameEngine, setLocalGameEngine] = useState<LocalGameEngine | null>(null);
+    const [playerName, setPlayerName] = useState<string>('');
+    const [profileHydratedWallet, setProfileHydratedWallet] = useState<string | null>(
+        null
+    );
 
     const addNotification = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => {
         const id = Date.now().toString();
@@ -136,9 +232,45 @@ function App() {
         setNotifications(prev => prev.filter(n => n.id !== id));
     }, []);
 
-    // Initialize services when wallet connects
+    const persistPlayerProfile = useCallback(
+        (
+            walletAddress: string,
+            nextProfile: Partial<
+                Pick<
+                    StoredPlayerProfile,
+                    'playerName' | 'ownedCharacterIds' | 'selectedCharacterId'
+                >
+            > = {}
+        ) => {
+            const ownedCharacterIds = normalizeOwnedCharacterIds(
+                nextProfile.ownedCharacterIds ?? [
+                    ...ownedCharacters,
+                    selectedCharacter?.id,
+                ]
+            );
+            const selectedCharacterId =
+                nextProfile.selectedCharacterId !== undefined
+                    ? nextProfile.selectedCharacterId
+                    : selectedCharacter?.id ?? null;
+            const profile: StoredPlayerProfile = {
+                version: 1,
+                playerName:
+                    nextProfile.playerName !== undefined
+                        ? nextProfile.playerName.trim()
+                        : playerName.trim(),
+                ownedCharacterIds,
+                selectedCharacterId,
+                updatedAt: Date.now(),
+            };
+
+            void saveStoredPlayerProfile(walletAddress, profile);
+        },
+        [ownedCharacters, playerName, selectedCharacter?.id]
+    );
+
+    // Initialize local services when a Solana wallet identity is known.
     useEffect(() => {
-        if (connected && publicKey) {
+        if (publicKey) {
             const gameEngine = new LocalGameEngine(publicKey.toString());
             setLocalGameEngine(gameEngine);
             
@@ -149,7 +281,7 @@ function App() {
         } else {
             setLocalGameEngine(null);
         }
-    }, [connected, publicKey]);
+    }, [publicKey]);
 
     useEffect(() => {
         return () => {
@@ -217,11 +349,8 @@ function App() {
             console.log('🔌 Disconnecting wallet...');
             await disconnect();
             setStatusMessage('Wallet disconnected');
-            setSelectedCharacter(null);
             setAchievements([]);
-            setPlayerName('');
-            setCurrentView('welcome');
-            console.log('✅ Wallet disconnected successfully, cleared state');
+            console.log('✅ Wallet disconnected successfully');
             setTimeout(() => setStatusMessage(''), 3000);
         } catch (error) {
             console.error('❌ Error disconnecting wallet:', error);
@@ -247,7 +376,21 @@ function App() {
         );
         setStatusMessage(`${character.name} selected! Preparing your companion...`);
 
-        setSelectedCharacter(character);
+        const nextOwnedCharacters = normalizeOwnedCharacterIds([
+            ...ownedCharacters,
+            character.id,
+        ]);
+        const restoredCharacter =
+            restoreCharacterFromId(character.id, nextOwnedCharacters) ?? character;
+
+        setOwnedCharacters(nextOwnedCharacters);
+        setSelectedCharacter(restoredCharacter);
+        if (publicKey) {
+            persistPlayerProfile(publicKey.toString(), {
+                ownedCharacterIds: nextOwnedCharacters,
+                selectedCharacterId: restoredCharacter.id,
+            });
+        }
         setCharacterStats({
             mood: 3,
             hunger: 2,
@@ -256,70 +399,145 @@ function App() {
         setCurrentView('interaction');
     };
 
-    const [playerName, setPlayerName] = useState<string>('');
+    useEffect(() => {
+        let isCancelled = false;
 
-    const savePlayerName = (name: string, walletAddress: string) => {
-        try {
-            const nameData = {
-                name,
+        const hydrateStoredProfile = async () => {
+            if (!publicKey) {
+                setProfileHydratedWallet(null);
+                setPlayerName('');
+                setOwnedCharacters([]);
+                setSelectedCharacter(null);
+                return;
+            }
+
+            const walletAddress = publicKey.toString();
+            const storedProfile = await loadStoredPlayerProfile(walletAddress);
+
+            if (isCancelled) {
+                return;
+            }
+
+            if (!storedProfile) {
+                console.log(
+                    '🔍 No stored player profile for wallet:',
+                    walletAddress.slice(0, 8) + '...'
+                );
+                setPlayerName('');
+                setOwnedCharacters([]);
+                setSelectedCharacter(null);
+                setCurrentView('welcome');
+                setProfileHydratedWallet(walletAddress);
+                return;
+            }
+
+            const restoredOwnedCharacters = normalizeOwnedCharacterIds(
+                storedProfile.ownedCharacterIds
+            );
+            const restoredCharacter = restoreCharacterFromId(
+                storedProfile.selectedCharacterId,
+                restoredOwnedCharacters
+            );
+            const hasStoredCompanion =
+                restoredOwnedCharacters.length > 0 || Boolean(restoredCharacter);
+
+            console.log('✅ Restored player profile:', {
                 walletAddress,
-                timestamp: Date.now()
-            };
-            // TODO: Use React Native AsyncStorage instead of localStorage
-            console.log('💾 Saved player name:', { name, walletAddress: walletAddress.slice(0, 8) + '...' });
-        } catch (error) {
-            console.error('❌ Error saving player name:', error);
-        }
-    };
+                playerName: storedProfile.playerName,
+                ownedCharacters: restoredOwnedCharacters,
+                selectedCharacterId: restoredCharacter?.id ?? null,
+            });
 
-    const getStoredPlayerName = (walletAddress: string): string | null => {
-        try {
-            // TODO: Use React Native AsyncStorage instead of localStorage
-            console.log('🔍 Checking for stored name for wallet:', walletAddress.slice(0, 8) + '...');
-            return null; // For now, return null
-        } catch (error) {
-            console.error('❌ Error retrieving stored name:', error);
-        }
-        return null;
-    };
+            setPlayerName(storedProfile.playerName);
+            setOwnedCharacters(restoredOwnedCharacters);
+            setSelectedCharacter(restoredCharacter);
+            setCharacterStats({
+                mood: 3,
+                hunger: 2,
+                energy: 4,
+            });
+
+            if (hasStoredCompanion) {
+                setCurrentView(restoredCharacter ? 'interaction' : 'selection');
+                if (storedProfile.playerName.trim()) {
+                    addNotification(
+                        `🌟 Welcome back, ${storedProfile.playerName}!`,
+                        'success'
+                    );
+                }
+            } else if (storedProfile.playerName.trim()) {
+                setCurrentView('selection');
+                addNotification(
+                    `🌟 Welcome back, ${storedProfile.playerName}!`,
+                    'success'
+                );
+            } else {
+                setCurrentView('welcome');
+            }
+
+            setProfileHydratedWallet(walletAddress);
+        };
+
+        hydrateStoredProfile();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [addNotification, publicKey]);
 
     useEffect(() => {
-        if (connected && publicKey) {
-            const storedName = getStoredPlayerName(publicKey.toString());
-            console.log('🔍 Checking for stored name:', { walletAddress: publicKey.toString(), storedName });
-            if (storedName) {
-                console.log('✅ Found stored name, setting player name:', storedName);
-                setPlayerName(storedName);
-                if (currentView === 'welcome') {
-                    console.log('📱 Skipping welcome screen, going to selection');
-                    setCurrentView('selection');
-                    addNotification(`🌟 Welcome back, ${storedName}!`, 'success');
-                } else {
-                    console.log('📱 Not on welcome screen, name set but view unchanged. Current view:', currentView);
-                    addNotification(`🌟 Welcome back, ${storedName}!`, 'success');
-                }
-            } else {
-                console.log('❌ No stored name found for wallet:', publicKey.toString().slice(0, 8) + '...');
-            }
-        } else {
-            console.log('🔌 Wallet disconnected, clearing player name');
-            setPlayerName('');
+        if (!publicKey) {
+            return;
         }
-    }, [connected, publicKey]);
+
+        const walletAddress = publicKey.toString();
+
+        if (profileHydratedWallet !== walletAddress) {
+            return;
+        }
+
+        const ownedCharacterIds = normalizeOwnedCharacterIds([
+            ...ownedCharacters,
+            selectedCharacter?.id,
+        ]);
+        const storedProfile: StoredPlayerProfile = {
+            version: 1,
+            playerName: playerName.trim(),
+            ownedCharacterIds,
+            selectedCharacterId: selectedCharacter?.id ?? null,
+            updatedAt: Date.now(),
+        };
+
+        void saveStoredPlayerProfile(walletAddress, storedProfile);
+    }, [
+        ownedCharacters,
+        playerName,
+        profileHydratedWallet,
+        publicKey,
+        selectedCharacter?.id,
+    ]);
 
     const handleContinueFromWelcome = (name?: string) => {
-        if (name && publicKey) {
+        if (name) {
             setPlayerName(name);
-            savePlayerName(name, publicKey.toString());
             addNotification(`✨ Welcome, ${name}! Ready to start your stellar adventure!`, 'success');
+            if (publicKey) {
+                persistPlayerProfile(publicKey.toString(), {
+                    playerName: name,
+                });
+            }
         }
         setCurrentView('selection');
     };
 
     const handleGoToInteraction = (name?: string) => {
-        if (name && publicKey) {
+        if (name) {
             setPlayerName(name);
-            savePlayerName(name, publicKey.toString());
+            if (publicKey) {
+                persistPlayerProfile(publicKey.toString(), {
+                    playerName: name,
+                });
+            }
         }
         setShouldFadeInInteraction(true);
         setCurrentView('interaction');
@@ -327,14 +545,27 @@ function App() {
 
     const handleGoToCongratulations = (character?: Character) => {
         if (character) {
-            // Store the minted character
-            setSelectedCharacter(character);
+            const nextOwnedCharacters = normalizeOwnedCharacterIds([
+                ...ownedCharacters,
+                character.id,
+            ]);
+            const restoredCharacter =
+                restoreCharacterFromId(character.id, nextOwnedCharacters) ?? character;
+
+            setOwnedCharacters(nextOwnedCharacters);
+            setSelectedCharacter(restoredCharacter);
+            if (publicKey) {
+                persistPlayerProfile(publicKey.toString(), {
+                    ownedCharacterIds: nextOwnedCharacters,
+                    selectedCharacterId: restoredCharacter.id,
+                });
+            }
             setCharacterStats({
                 mood: 3,
                 hunger: 2,
                 energy: 4
             });
-            console.log('🎉 Setting selected character:', character.name);
+            console.log('🎉 Setting selected character:', restoredCharacter.name);
         }
         setShouldGoToCongratulations(true);
         setCurrentView('welcome');
@@ -485,6 +716,16 @@ function App() {
                 );
             case 'settings':
                 return null;
+            case 'vrf-dev': {
+                const VRFTest = require('./src/components/_dev/VRFTest').default;
+                return (
+                    <VRFTest
+                        onClose={() =>
+                            setCurrentView(previousView === 'vrf-dev' ? 'welcome' : previousView)
+                        }
+                    />
+                );
+            }
             default:
                 return (
                     <WelcomeScreen
@@ -573,6 +814,15 @@ function App() {
             )}
             {!miMounted && renderContent()}
             <DeviceButtons />
+
+            {ENABLE_VRF_DEV_SCREEN && currentView !== 'vrf-dev' && (
+                <TouchableOpacity
+                    style={styles.vrfDevButton}
+                    onPress={() => navigateToView('vrf-dev')}
+                >
+                    <Text style={styles.vrfDevButtonText}>VRF</Text>
+                </TouchableOpacity>
+            )}
 
             <WalletButton
                 connected={connected}
@@ -666,6 +916,21 @@ const styles = StyleSheet.create({
     gameText: {
         fontSize: 10,
         color: '#5D4E37',
+    },
+    vrfDevButton: {
+        position: 'absolute',
+        left: 18,
+        bottom: 42,
+        zIndex: 1000,
+        backgroundColor: 'rgba(17, 24, 39, 0.9)',
+        borderRadius: 999,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    vrfDevButtonText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
     },
 
 });

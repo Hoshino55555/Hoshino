@@ -29,13 +29,6 @@ export const HoshinoPrivyProvider: React.FC<Props> = ({ children }) => {
         <PrivyProvider
             appId={PRIVY_APP_ID}
             clientId={PRIVY_CLIENT_ID}
-            config={{
-                embedded: {
-                    solana: {
-                        createOnLogin: 'users-without-wallets',
-                    },
-                },
-            }}
         >
             {children}
         </PrivyProvider>
