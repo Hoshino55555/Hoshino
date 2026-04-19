@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image, Keyboard } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image, Keyboard, Animated, Easing } from 'react-native';
+import { useChromeConfig } from '../contexts/ChromeContext';
 
 // Get screen dimensions for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -29,6 +30,10 @@ interface InnerScreenProps {
     allowOverflow?: boolean; // New prop to allow overflow for menu bars
     isTransitioning?: boolean; // New prop for transition animation
     transitionOpacity?: number; // New prop for transition opacity
+    expanded?: boolean; // Bigger screen dimensions for content-heavy pages
+    animateIn?: boolean; // Zoom-in mount animation
+    exiting?: boolean; // Trigger zoom-out animation (caller should mount until onExitComplete fires)
+    onExitComplete?: () => void;
 }
 
 const InnerScreen: React.FC<InnerScreenProps> = ({
@@ -54,17 +59,75 @@ const InnerScreen: React.FC<InnerScreenProps> = ({
     onCloseButtonPress,
     allowOverflow = false,
     isTransitioning = false,
-    transitionOpacity = 0
+    transitionOpacity = 0,
+    expanded = false,
+    animateIn = false,
+    exiting = false,
+    onExitComplete
 }) => {
-    return (
-        <View style={styles.tamagotchiScreenContainer}>
-            {/* Background casing image */}
-            <Image
-                source={require('../../assets/images/casing.png')}
-                style={[styles.mainBackground, overlayMode && styles.darkenedBackground]}
-                resizeMode="cover"
-            />
+    const zoomScale = useRef(new Animated.Value(animateIn ? 0.6 : 1)).current;
+    const zoomOpacity = useRef(new Animated.Value(animateIn ? 0 : 1)).current;
 
+    useEffect(() => {
+        if (!animateIn) return;
+        Animated.parallel([
+            Animated.spring(zoomScale, {
+                toValue: 1,
+                tension: 22,
+                friction: 5.5,
+                useNativeDriver: true,
+            }),
+            Animated.timing(zoomOpacity, {
+                toValue: 1,
+                duration: 520,
+                easing: Easing.out(Easing.quad),
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [animateIn]);
+
+    useEffect(() => {
+        if (!exiting) return;
+        Animated.parallel([
+            Animated.timing(zoomScale, {
+                toValue: 0.6,
+                duration: 560,
+                easing: Easing.in(Easing.back(1.8)),
+                useNativeDriver: true,
+            }),
+            Animated.timing(zoomOpacity, {
+                toValue: 0,
+                duration: 500,
+                easing: Easing.in(Easing.quad),
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            onExitComplete?.();
+        });
+    }, [exiting]);
+
+    const useLargeLayout = isSelectionPage || expanded;
+    const useAnimatedWrapper = animateIn || exiting;
+    const ShadowWrapper: any = useAnimatedWrapper ? Animated.View : View;
+    const animatedStyle = useAnimatedWrapper
+        ? { opacity: zoomOpacity, transform: [{ scale: zoomScale }] }
+        : null;
+
+    useChromeConfig({
+        leftButtonText,
+        centerButtonText,
+        rightButtonText,
+        leftButtonDisabled,
+        centerButtonDisabled,
+        rightButtonDisabled,
+        onLeftButtonPress,
+        onCenterButtonPress,
+        onRightButtonPress,
+        overlayMode,
+    });
+
+    return (
+        <View style={styles.tamagotchiScreenContainer} pointerEvents="box-none">
             {/* Top Status Bar */}
             {topStatusContent && (
                 <View style={styles.topStatus}>
@@ -73,22 +136,23 @@ const InnerScreen: React.FC<InnerScreenProps> = ({
             )}
 
             {/* Shadow container with overflow visible */}
-            <View style={[
+            <ShadowWrapper style={[
                 styles.shadowContainer,
-                isSelectionPage && styles.shadowContainerLarge
+                useLargeLayout && styles.shadowContainerLarge,
+                animatedStyle
             ]}>
                 {/* Gradient shadow layers - only for non-selection pages */}
-                {!isSelectionPage && (
+                {!useLargeLayout && (
                     <>
                         <View style={styles.gradientShadowOuter} />
                         <View style={styles.gradientShadowInner} />
                     </>
                 )}
-                
+
                 {/* Inner screen with rounded borders */}
                 <View style={[
                     styles.innerScreen,
-                    isSelectionPage && styles.innerScreenLarge,
+                    useLargeLayout && styles.innerScreenLarge,
                     overlayMode && styles.overlayInnerScreen,
                     keyboardVisible && styles.innerScreenWithKeyboard,
                     allowOverflow && styles.innerScreenAllowOverflow
@@ -147,48 +211,7 @@ const InnerScreen: React.FC<InnerScreenProps> = ({
                         </TouchableOpacity>
                     )}
                 </View>
-            </View>
-
-            {/* Bottom Navigation Buttons */}
-            <View style={[styles.bottomButtonContainer, overlayMode && styles.darkenedButtons]}>
-                <TouchableOpacity
-                    style={[styles.bottomButton, styles.left, leftButtonDisabled && styles.disabled]}
-                    onPress={!leftButtonDisabled ? onLeftButtonPress : undefined}
-                >
-                    <Image source={require('../../assets/images/button.png')} style={styles.buttonImage} />
-                    <Text style={[styles.buttonText, leftButtonText === 'YES' && styles.yesButtonText]}>{leftButtonText}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.bottomButton, styles.center, centerButtonDisabled && styles.disabled]}
-                    onPress={!centerButtonDisabled ? onCenterButtonPress : undefined}
-                >
-                    <Image source={require('../../assets/images/button.png')} style={styles.buttonImage} />
-                    <Text style={styles.buttonText}>{centerButtonText}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.bottomButton, styles.right, rightButtonDisabled && styles.disabled]}
-                    onPress={!rightButtonDisabled ? onRightButtonPress : undefined}
-                >
-                    <Image source={require('../../assets/images/button.png')} style={styles.buttonImage} />
-                    <Text style={[styles.buttonText, rightButtonText === 'NO' && styles.noButtonText]}>{rightButtonText}</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Physical Device Buttons - overlaid on background image */}
-            <TouchableOpacity
-                style={[styles.deviceButton, styles.leftPhysical]}
-                onPress={!leftButtonDisabled ? onLeftButtonPress : undefined}
-            />
-            <TouchableOpacity
-                style={[styles.deviceButton, styles.centerPhysical]}
-                onPress={!centerButtonDisabled ? onCenterButtonPress : undefined}
-            />
-            <TouchableOpacity
-                style={[styles.deviceButton, styles.rightPhysical]}
-                onPress={!rightButtonDisabled ? onRightButtonPress : undefined}
-            />
+            </ShadowWrapper>
         </View>
     );
 };
@@ -196,7 +219,7 @@ const InnerScreen: React.FC<InnerScreenProps> = ({
 const styles = StyleSheet.create({
     tamagotchiScreenContainer: {
         flex: 1,
-        backgroundColor: 'black',
+        backgroundColor: 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
     },

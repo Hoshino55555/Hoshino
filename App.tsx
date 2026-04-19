@@ -24,6 +24,8 @@ import Settings from './src/components/Settings';
 
 // React Native compatible wallet integration
 import { useWallet, WalletProvider } from './src/contexts/WalletContext';
+import { ChromeProvider } from './src/contexts/ChromeContext';
+import { DeviceCasing, DeviceButtons } from './src/components/DeviceChrome';
 import { Connection, PublicKey } from '@solana/web3.js';
 
 // NEW: Programmable NFT Integration
@@ -85,6 +87,7 @@ function App() {
     const [welcomePhase, setWelcomePhase] = useState<string>('intro');
     const [shouldGoToCongratulations, setShouldGoToCongratulations] = useState(false);
     const [shouldFadeInInteraction, setShouldFadeInInteraction] = useState(false);
+    const [shopExiting, setShopExiting] = useState(false);
 
     const navigateToView = (view: string) => {
         setPreviousView(currentView);
@@ -372,6 +375,34 @@ function App() {
         }
     }, [currentView]);
 
+    const moonokoInteractionElement = (
+        <MoonokoInteraction
+            selectedCharacter={selectedCharacter}
+            onSelectCharacter={() => {
+                setShouldFadeInInteraction(false);
+                navigateToView('selection');
+            }}
+            onFeed={() => setCurrentView('feeding')}
+            connected={connected}
+            walletAddress={publicKey?.toString()}
+            playerName={playerName}
+            onNotification={addNotification}
+            onRefreshNFTs={() => {
+                addNotification('🔍 Checking wallet for NFTs...', 'info');
+            }}
+            onGame={() => setCurrentView('game')}
+            onMemoryGame={() => setCurrentView('memory-game')}
+            onStarGame={() => setCurrentView('star-game')}
+            onShop={() => setCurrentView('shop')}
+            onInventory={() => setCurrentView('inventory')}
+            onChat={() => setCurrentView('chat')}
+            onSettings={() => setCurrentView('settings')}
+            localGameEngine={localGameEngine}
+            shouldFadeIn={shouldFadeInInteraction}
+            onFadeInComplete={() => setShouldFadeInInteraction(false)}
+        />
+    );
+
     const renderContent = () => {
         switch (currentView) {
             case 'welcome':
@@ -427,31 +458,11 @@ function App() {
                 );
             case 'interaction':
                 return (
-                    <MoonokoInteraction
-                        selectedCharacter={selectedCharacter}
-                        onSelectCharacter={() => {
-                            setShouldFadeInInteraction(false);
-                            navigateToView('selection');
-                        }}
-                        onFeed={() => setCurrentView('feeding')}
-                        connected={connected}
-                        walletAddress={publicKey?.toString()}
-                        playerName={playerName}
-                        onNotification={addNotification}
-                        onRefreshNFTs={() => {
-                            addNotification('🔍 Checking wallet for NFTs...', 'info');
-                        }}
-                        onGame={() => setCurrentView('game')}
-                        onMemoryGame={() => setCurrentView('memory-game')}
-                        onStarGame={() => setCurrentView('star-game')}
-                        onShop={() => setCurrentView('shop')}
-                        onInventory={() => setCurrentView('inventory')}
-                        onChat={() => setCurrentView('chat')}
-                        onSettings={() => setCurrentView('settings')}
-                        localGameEngine={localGameEngine}
-                        shouldFadeIn={shouldFadeInInteraction}
-                        onFadeInComplete={() => setShouldFadeInInteraction(false)}
-                    />
+                    <>
+                        <View key="mi-layer" style={StyleSheet.absoluteFill}>
+                            {moonokoInteractionElement}
+                        </View>
+                    </>
                 );
             case 'feeding':
                 return (
@@ -490,11 +501,22 @@ function App() {
                 );
             case 'shop':
                 return (
-                    <Shop
-                        connection={connection}
-                        onNotification={addNotification}
-                        onClose={() => setCurrentView('interaction')}
-                    />
+                    <>
+                        <View key="mi-layer" style={[StyleSheet.absoluteFill, { zIndex: 1 }]}>
+                            {moonokoInteractionElement}
+                        </View>
+                        <View key="shop-layer" style={[StyleSheet.absoluteFill, { zIndex: 2 }]}>
+                            <Shop
+                                connection={connection}
+                                onNotification={addNotification}
+                                onCloseStart={() => setShopExiting(true)}
+                                onClose={() => {
+                                    setShopExiting(false);
+                                    setCurrentView('interaction');
+                                }}
+                            />
+                        </View>
+                    </>
                 );
             case 'gallery':
                 return (
@@ -547,8 +569,10 @@ function App() {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="light" hidden={true} />
+            <DeviceCasing />
             {renderContent()}
-            
+            <DeviceButtons />
+
             <WalletButton
                 connected={connected}
                 publicKey={publicKey}
@@ -577,7 +601,7 @@ function App() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: 'black',
     },
 
     statusMessage: {
@@ -649,7 +673,9 @@ const styles = StyleSheet.create({
 function AppWrapper() {
     return (
         <WalletProvider>
-            <App />
+            <ChromeProvider>
+                <App />
+            </ChromeProvider>
         </WalletProvider>
     );
 }

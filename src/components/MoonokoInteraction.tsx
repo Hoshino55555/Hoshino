@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, Modal, StyleSheet, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Image, TouchableOpacity, Modal, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
 import Shop from './Shop';
 import Gallery from './Gallery';
 import FeedingAnimation from './FeedingAnimation';
@@ -12,7 +12,7 @@ import Frame from './Frame';
 import GamesList from './GamesList';
 import Starburst from './Starburst';
 import { useWallet } from '../contexts/WalletContext';
-import { StatDecayService, MoodState } from '../services/StatDecayService';
+import { StatDecayService } from '../services/StatDecayService';
 import { LocalGameEngine, GameStats } from '../services/local/LocalGameEngine';
 import SettingsService, { MenuButton } from '../services/SettingsService';
 import SleepOverlay from './SleepOverlay';
@@ -105,7 +105,6 @@ const MoonokoInteraction: React.FC<Props> = ({
         level: 1,
         experience: 0
     });
-    const [moodState, setMoodState] = useState<MoodState | null>(null);
     const [statDecayService] = useState(() => new StatDecayService());
 
     const [showShop, setShowShop] = useState(false);
@@ -213,6 +212,18 @@ const MoonokoInteraction: React.FC<Props> = ({
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuBarLayout, setMenuBarLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+    const frameOpacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (menuBarLayout.width > 0) {
+            Animated.timing(frameOpacity, {
+                toValue: 1,
+                duration: 150,
+                easing: Easing.out(Easing.quad),
+                useNativeDriver: true,
+            }).start();
+        }
+    }, [menuBarLayout.width]);
 
     // Navigation functions for physical device buttons
     const goToPreviousMenu = () => {
@@ -271,7 +282,6 @@ const MoonokoInteraction: React.FC<Props> = ({
                     hunger: updatedStats.hunger,
                     energy: updatedStats.energy
                 }));
-                setMoodState(updatedStats.moodState);
 
                 // Only show mood state notification if character is in a concerning state
                 if (updatedStats.moodState.state === 'sad' || updatedStats.moodState.state === 'angry') {
@@ -303,8 +313,6 @@ const MoonokoInteraction: React.FC<Props> = ({
                     energy: updatedStats.energy
                 };
             });
-
-            setMoodState(updatedStats.moodState);
         }, 45000); // Increased to 45s for better mobile performance
 
         return () => clearInterval(interval);
@@ -501,7 +509,7 @@ const MoonokoInteraction: React.FC<Props> = ({
             statsBarContent={
                 <>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>Mood {moodState ? `(${moodState.state})` : ''}</Text>
+                        <Text style={styles.statLabel}>Mood</Text>
                         <View style={styles.starContainer}>
                             {[...Array(5)].map((_, index) => (
                                 <Image
@@ -561,44 +569,53 @@ const MoonokoInteraction: React.FC<Props> = ({
             </View>
 
             {/* Navigation Menu - Inside Main Screen */}
-            {/* Menu Bar at Bottom */}
-            <View
-                style={styles.integratedMenuBar}
-                onLayout={(e) => setMenuBarLayout(e.nativeEvent.layout)}
-            >
-                <View style={styles.integratedMenuBarInner}>
-                    {/* Dynamic Menu Buttons */}
-                    {menuButtons.length > 0 && (
-                        <>
-                            {/* First Row - First 4 buttons */}
+            {/* Menu Bar at Bottom — gated on buttons being loaded so onLayout reports final size */}
+            {menuButtons.length > 0 && (
+                <View
+                    style={styles.integratedMenuBar}
+                    onLayout={(e) => {
+                        const next = e.nativeEvent.layout;
+                        setMenuBarLayout(prev => (prev.width === 0 ? next : prev));
+                    }}
+                >
+                    <View style={styles.integratedMenuBarInner}>
+                        <View style={styles.menuRow}>
+                            {menuButtons.slice(0, 4).map(renderMenuButton)}
+                        </View>
+                        {menuButtons.length > 4 && (
                             <View style={styles.menuRow}>
-                                {menuButtons.slice(0, 4).map(renderMenuButton)}
+                                {menuButtons.slice(4, 8).map(renderMenuButton)}
                             </View>
-
-                            {/* Second Row - Remaining buttons */}
-                            {menuButtons.length > 4 && (
-                                <View style={styles.menuRow}>
-                                    {menuButtons.slice(4, 8).map(renderMenuButton)}
-                                </View>
-                            )}
-                        </>
-                    )}
+                        )}
+                    </View>
                 </View>
-            </View>
+            )}
 
             {/* Decorative Frame Overlay - dims sync to menu bar via onLayout */}
             {menuBarLayout.width > 0 && (
-                <Frame
-                    width={menuBarLayout.width - 30}
-                    height={menuBarLayout.height - 30}
-                    top={menuBarLayout.y + 15}
-                    left={menuBarLayout.x + 15}
-                    position="absolute"
-                    showBackgroundImage={false}
-                    pixelSize={3}
+                <Animated.View
+                    pointerEvents="box-none"
+                    style={{
+                        position: 'absolute',
+                        top: menuBarLayout.y + 15,
+                        left: menuBarLayout.x + 15,
+                        width: menuBarLayout.width - 30,
+                        height: menuBarLayout.height - 30,
+                        opacity: frameOpacity,
+                    }}
                 >
-                    <View style={{ width: '100%', height: '100%' }} />
-                </Frame>
+                    <Frame
+                        width={menuBarLayout.width - 30}
+                        height={menuBarLayout.height - 30}
+                        top={0}
+                        left={0}
+                        position="absolute"
+                        showBackgroundImage={false}
+                        pixelSize={3}
+                    >
+                        <View style={{ width: '100%', height: '100%' }} />
+                    </Frame>
+                </Animated.View>
             )}
 
             </InnerScreen>

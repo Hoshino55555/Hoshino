@@ -4,6 +4,7 @@ import MarketplaceService, { MarketplaceItem, ItemCategory, ItemRarity } from '.
 import { GlobalPointSystem } from '../services/GlobalPointSystem';
 import { useWallet } from '../contexts/WalletContext';
 import { Connection } from '@solana/web3.js';
+import InnerScreen from './InnerScreen';
 import PinkSugar from '../../assets/images/Pink Sugar.png';
 import NovaEgg from '../../assets/images/Nova Egg.png';
 import MiraBerry from '../../assets/images/Mira Berry.png';
@@ -12,15 +13,23 @@ interface ShopProps {
     connection: Connection;
     onNotification?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
     onClose: () => void;
+    onCloseStart?: () => void;
     onItemsPurchased?: (items: MarketplaceItem[]) => void;
 }
 
-const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItemsPurchased }) => {
+const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onCloseStart, onItemsPurchased }) => {
     const [selectedCategory, setSelectedCategory] = useState<string>('food');
     const [items, setItems] = useState<MarketplaceItem[]>([]);
     const [dust, setDust] = useState<number>(100);
     const [cart, setCart] = useState<{ item: MarketplaceItem, quantity: number }[]>([]);
     const [flashingItem, setFlashingItem] = useState<string | null>(null);
+    const [isClosing, setIsClosing] = useState(false);
+
+    const handleClose = () => {
+        if (isClosing) return;
+        setIsClosing(true);
+        onCloseStart?.();
+    };
 
     const getTotalPrice = () => {
         return cart.reduce((total, cartItem) => total + (cartItem.item.priceStarFragments * cartItem.quantity), 0);
@@ -178,11 +187,17 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     }, [items, selectedCategory]);
 
     return (
-        <View style={styles.outerContainer}>
-            <View style={styles.headerBox}>
-                <Text style={styles.headerText}>SHOP</Text>
-            </View>
-
+        <InnerScreen
+            onLeftButtonPress={handleClose}
+            leftButtonText=""
+            centerButtonText=""
+            rightButtonText=""
+            expanded
+            animateIn
+            exiting={isClosing}
+            onExitComplete={onClose}
+        >
+            <View style={styles.shopContent}>
             <View style={styles.balanceRow}>
                 <View style={styles.dustIconContainer}>
                     <Image
@@ -333,68 +348,16 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 )}
             </View>
 
-            <View style={styles.bottomButtonRow}>
-                <TouchableOpacity style={styles.footerButton} onPress={onClose}>
-                    <Text style={styles.footerButtonText}>BACK</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.footerButton}>
-                    <Text style={styles.footerButtonText}>VIEW</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.footerButton}>
-                    <Text style={styles.footerButtonText}>HELP</Text>
-                </TouchableOpacity>
             </View>
-        </View>
+        </InnerScreen>
     );
 };
 
 const styles = StyleSheet.create({
-    outerContainer: {
+    shopContent: {
         flex: 1,
-        backgroundColor: '#e9f5e9',
+        width: '100%',
         padding: 8,
-        borderColor: '#003300',
-        borderWidth: 3,
-        margin: 4,
-        borderTopLeftRadius: 0,
-        borderTopRightRadius: 0,
-        borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 0,
-        borderTopColor: '#006600',
-        borderLeftColor: '#006600',
-        borderRightColor: '#001100',
-        borderBottomColor: '#001100',
-        shadowColor: '#001100',
-        shadowOffset: { width: 2, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 0,
-        elevation: 0,
-    },
-    headerBox: {
-        borderWidth: 3,
-        borderColor: '#003300',
-        padding: 6,
-        marginBottom: 8,
-        alignItems: 'center',
-        backgroundColor: '#f0fff0',
-        borderTopLeftRadius: 0,
-        borderTopRightRadius: 0,
-        borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 0,
-        borderTopColor: '#006600',
-        borderLeftColor: '#006600',
-        borderRightColor: '#001100',
-        borderBottomColor: '#001100',
-        shadowColor: '#001100',
-        shadowOffset: { width: 2, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 0,
-        elevation: 0,
-    },
-    headerText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#003300',
     },
     balanceRow: {
         flexDirection: 'row',
@@ -795,31 +758,6 @@ const styles = StyleSheet.create({
         textShadowColor: 'rgba(0, 0, 0, 0.6)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 0,
-    },
-    bottomButtonRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 8,
-    },
-    footerButton: {
-        borderWidth: 3,
-        borderColor: '#003300',
-        backgroundColor: '#ffffffaa',
-        padding: 10,
-        flex: 1,
-        marginHorizontal: 2,
-        alignItems: 'center',
-        borderRadius: 0,
-        shadowColor: '#001100',
-        shadowOffset: { width: 2, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 0,
-        elevation: 0,
-    },
-    footerButtonText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#003300',
     },
 });
 
