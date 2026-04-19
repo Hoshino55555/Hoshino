@@ -29,7 +29,10 @@
     },
     "plugins": [
       "expo-font",
-      "expo-dev-client"
-    ]
+      "expo-dev-client",
+      "expo-web-browser",
+      "expo-secure-store"
+    ],
+    "scheme": "hoshino"
   }
 }

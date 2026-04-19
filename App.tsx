@@ -25,6 +25,9 @@ import Settings from './src/components/Settings';
 // React Native compatible wallet integration
 import { useWallet, WalletProvider } from './src/contexts/WalletContext';
 import { ChromeProvider } from './src/contexts/ChromeContext';
+import { HoshinoPrivyProvider } from './src/contexts/PrivyContext';
+import { usePrivy } from '@privy-io/expo';
+import LoginScreen from './src/components/LoginScreen';
 import { DeviceCasing, DeviceButtons } from './src/components/DeviceChrome';
 import { Connection, PublicKey } from '@solana/web3.js';
 
@@ -667,14 +670,39 @@ const styles = StyleSheet.create({
 
 });
 
-// Main App component with WalletProvider wrapper
+function AuthGate() {
+    const { user, isReady } = usePrivy();
+
+    if (!isReady) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#e5dcf5', fontFamily: 'monospace' }}>Loading…</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (!user) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <LoginScreen />
+            </SafeAreaView>
+        );
+    }
+
+    return <App />;
+}
+
 function AppWrapper() {
     return (
-        <WalletProvider>
-            <ChromeProvider>
-                <App />
-            </ChromeProvider>
-        </WalletProvider>
+        <HoshinoPrivyProvider>
+            <WalletProvider>
+                <ChromeProvider>
+                    <AuthGate />
+                </ChromeProvider>
+            </WalletProvider>
+        </HoshinoPrivyProvider>
     );
 }
 
