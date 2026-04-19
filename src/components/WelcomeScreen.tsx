@@ -38,6 +38,7 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
     const [charIndex, setCharIndex] = useState(0);
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [transitionOpacity, setTransitionOpacity] = useState(0);
+    const [dialogContainerWidth, setDialogContainerWidth] = useState(0);
 
     
     // Use refs to track current state in intervals
@@ -602,9 +603,13 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                     <View style={styles.storySection}>
                         {/* Dialog shadow that extends to bottom of screen */}
                         <View style={styles.dialogShadow} />
-                        <View style={styles.storyDialogBottom}>
+                        <View
+                            style={styles.storyDialogBottom}
+                            onLayout={(e) => setDialogContainerWidth(e.nativeEvent.layout.width)}
+                        >
+                            {dialogContainerWidth > 0 && (
                             <Frame
-                                width={280}
+                                width={dialogContainerWidth - 16}
                                 height={62}
                                 top={-26}
                                 left={8}
@@ -632,6 +637,7 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                                     )}
                                 </View>
                             </Frame>
+                            )}
                         </View>
                     </View>
                 </>

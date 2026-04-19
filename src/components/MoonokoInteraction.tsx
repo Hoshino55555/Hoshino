@@ -212,6 +212,7 @@ const MoonokoInteraction: React.FC<Props> = ({
     const [craftedFoodName, setCraftedFoodName] = useState<string>('');
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
     const [settingsService] = useState(() => SettingsService.getInstance());
+    const [menuBarLayout, setMenuBarLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
     // Navigation functions for physical device buttons
     const goToPreviousMenu = () => {
@@ -561,7 +562,10 @@ const MoonokoInteraction: React.FC<Props> = ({
 
             {/* Navigation Menu - Inside Main Screen */}
             {/* Menu Bar at Bottom */}
-            <View style={styles.integratedMenuBar}>
+            <View
+                style={styles.integratedMenuBar}
+                onLayout={(e) => setMenuBarLayout(e.nativeEvent.layout)}
+            >
                 {/* Dynamic Menu Buttons */}
                 {menuButtons.length > 0 && (
                     <>
@@ -580,18 +584,20 @@ const MoonokoInteraction: React.FC<Props> = ({
                 )}
             </View>
 
-            {/* Decorative Frame Overlay */}
-            <Frame
-                width={281}
-                height={75}
-                top={155}
-                left={8}
-                position="absolute"
-                showBackgroundImage={false}
-                pixelSize={3}
-            >
-                <View style={{ width: '100%', height: '100%' }} />
-            </Frame>
+            {/* Decorative Frame Overlay - dims sync to menu bar via onLayout */}
+            {menuBarLayout.width > 0 && (
+                <Frame
+                    width={menuBarLayout.width}
+                    height={menuBarLayout.height}
+                    top={menuBarLayout.y}
+                    left={menuBarLayout.x}
+                    position="absolute"
+                    showBackgroundImage={false}
+                    pixelSize={3}
+                >
+                    <View style={{ width: '100%', height: '100%' }} />
+                </Frame>
+            )}
 
             </InnerScreen>
             {showSleepMode && (
