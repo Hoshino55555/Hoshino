@@ -566,31 +566,33 @@ const MoonokoInteraction: React.FC<Props> = ({
                 style={styles.integratedMenuBar}
                 onLayout={(e) => setMenuBarLayout(e.nativeEvent.layout)}
             >
-                {/* Dynamic Menu Buttons */}
-                {menuButtons.length > 0 && (
-                    <>
-                        {/* First Row - First 4 buttons */}
-                        <View style={styles.menuRow}>
-                            {menuButtons.slice(0, 4).map(renderMenuButton)}
-                        </View>
-                        
-                        {/* Second Row - Remaining buttons */}
-                        {menuButtons.length > 4 && (
+                <View style={styles.integratedMenuBarInner}>
+                    {/* Dynamic Menu Buttons */}
+                    {menuButtons.length > 0 && (
+                        <>
+                            {/* First Row - First 4 buttons */}
                             <View style={styles.menuRow}>
-                                {menuButtons.slice(4, 8).map(renderMenuButton)}
+                                {menuButtons.slice(0, 4).map(renderMenuButton)}
                             </View>
-                        )}
-                    </>
-                )}
+
+                            {/* Second Row - Remaining buttons */}
+                            {menuButtons.length > 4 && (
+                                <View style={styles.menuRow}>
+                                    {menuButtons.slice(4, 8).map(renderMenuButton)}
+                                </View>
+                            )}
+                        </>
+                    )}
+                </View>
             </View>
 
             {/* Decorative Frame Overlay - dims sync to menu bar via onLayout */}
             {menuBarLayout.width > 0 && (
                 <Frame
-                    width={menuBarLayout.width}
-                    height={menuBarLayout.height}
-                    top={menuBarLayout.y}
-                    left={menuBarLayout.x}
+                    width={menuBarLayout.width - 30}
+                    height={menuBarLayout.height - 30}
+                    top={menuBarLayout.y + 15}
+                    left={menuBarLayout.x + 15}
                     position="absolute"
                     showBackgroundImage={false}
                     pixelSize={3}
@@ -680,13 +682,22 @@ const styles = StyleSheet.create({
     integratedMenuBar: {
         flexDirection: 'column',
         justifyContent: 'flex-end',
-        padding: 8,
-        backgroundColor: '#E8F5E8',
+        backgroundColor: 'transparent',
         width: '98%',
         position: 'absolute',
-        bottom: 5,
+        bottom: 3,
         left: 3,
         right: 0,
+    },
+    integratedMenuBarInner: {
+        flexDirection: 'column',
+        justifyContent: 'flex-end',
+        backgroundColor: '#E8F5E8',
+        marginHorizontal: 3,
+        marginTop: 4,
+        marginBottom: 3,
+        paddingTop: 15,
+        paddingBottom: 15,
     },
     menuRow: {
         flexDirection: 'row',

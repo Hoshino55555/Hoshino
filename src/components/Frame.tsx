@@ -42,10 +42,10 @@ const Frame: React.FC<FrameProps> = ({
 
     const frameWidth = resolveAxis(width, 'width');
     const frameHeight = resolveAxis(height, 'height');
-    const frameTop = resolveAxis(top, 'height');
-    const frameLeft = typeof left === 'string' && left.includes('%')
-        ? (screenWidth * parseFloat(left) / 100) - (frameWidth / 2)
-        : resolveAxis(left, 'width');
+    // Pixel coordinates are local to the outer container (origin 0,0).
+    // The outer container's top/left style handles on-screen placement.
+    const frameLeft = 0;
+    const frameTop = 0;
 
     const pixelSize = customPixelSize || 4;
     const pixels: React.ReactNode[] = [];
@@ -101,15 +101,15 @@ const Frame: React.FC<FrameProps> = ({
         get glowLineVerticalHeight() { return frameHeight + (this.pixelSize * 4); }, // 5 pixel lengths (was 4)
 
         // Inner lines use 1-2 pattern
-        get innerLineLeft() { return frameLeft + this.positionOffsetX - this.pixelSize; }, // 1 pixel length
+        get innerLineLeft() { return frameLeft + this.positionOffsetX - this.innerGlowPx; }, // 2 pixel lengths (extended to meet outer glow verticals)
         get innerLineTop() { return frameTop + this.positionOffsetY - this.innerGlowPx; }, // 2 pixel lengths
-        get innerLineWidth() { return frameWidth + (this.pixelSize * 2); }, // 2 pixel lengths
+        get innerLineWidth() { return frameWidth + (this.pixelSize * 4) - 0.5; }, // 4 pixel lengths (extended to meet outer glow verticals; -0.5 trims subpixel overhang on right)
         get innerLineHeight() { return frameHeight + (this.pixelSize * 2); }, // 2 pixel lengths
 
         // Inner lines vertical (swapped pattern)
         get innerLineVerticalLeft() { return frameLeft + this.positionOffsetX - this.innerGlowPx; }, // 2 pixel lengths
         get innerLineVerticalTop() { return frameTop + this.positionOffsetY - this.pixelSize; }, // 1 pixel length
-        get innerLineVerticalHeight() { return frameHeight + (this.pixelSize * 2.25); }, // 3 pixel lengths (was 2)
+        get innerLineVerticalHeight() { return frameHeight + (this.pixelSize * 2); }, // 2 pixel lengths
 
         // Inner glow lines use 1-1 pattern
         get topInnerGlowLeft() { return frameLeft + this.positionOffsetX - this.pixelSize; }, // 1 pixel length
@@ -126,6 +126,7 @@ const Frame: React.FC<FrameProps> = ({
         pixels.push(
             <View
                 key={key}
+                pointerEvents="none"
                 style={[
                     style,
                     {
@@ -245,7 +246,7 @@ const Frame: React.FC<FrameProps> = ({
             type: 'vertical',
             left: borderConfig.glowLineVerticalLeft,
             top: borderConfig.glowLineVerticalTop,
-            width: pixelSize,
+            width: pixelSize + 1,
             height: borderConfig.glowLineVerticalHeight,
         },
     ];
@@ -253,10 +254,10 @@ const Frame: React.FC<FrameProps> = ({
     // Generate all 4 glow border lines from 2 base lines
     baseGlowLines.forEach((line, lineIndex) => {
         // Create original glow line
-        createPixel(`glow-line-${lineIndex}-original`, styles.glowPixel, line.left, line.top + (pixelSize * 0.25), line.width, line.height);
+        createPixel(`glow-line-${lineIndex}-original`, styles.glowPixel, line.left, line.top, line.width, line.height);
 
         // Create mirrored glow line
-        const mirroredLeft = line.type === 'horizontal' ? line.left : frameLeft + frameWidth + borderConfig.pixelSize + pixelSize;
+        const mirroredLeft = line.type === 'horizontal' ? line.left : frameLeft + frameWidth + borderConfig.pixelSize + pixelSize - 1;
         const mirroredTop = line.type === 'horizontal' ? frameTop + frameHeight + borderConfig.pixelSize + pixelSize : line.top;
         createPixel(`glow-line-${lineIndex}-mirrored`, styles.glowPixel, mirroredLeft, mirroredTop, line.width, line.height);
     });
@@ -293,22 +294,24 @@ const Frame: React.FC<FrameProps> = ({
 
     // Inner glow lines (one pixel length inside inner dark lines)
     // Top inner glow line
-    createPixel("top-inner-glow-line", styles.glowPixel, borderConfig.topInnerGlowLeft, borderConfig.topInnerGlowTop + (pixelSize * 0.25), borderConfig.topInnerGlowWidth, pixelSize);
+    createPixel("top-inner-glow-line", styles.glowPixel, borderConfig.topInnerGlowLeft, borderConfig.topInnerGlowTop, borderConfig.topInnerGlowWidth, pixelSize);
 
     // Left inner glow line
     createPixel("left-inner-glow-line", styles.glowPixel, borderConfig.leftInnerGlowLeft, borderConfig.leftInnerGlowTop, pixelSize, borderConfig.leftInnerGlowHeight);
 
     return (
-        <View style={[
-            styles.frameContainer,
-            {
-                width: width as any,
-                height: height as any,
-                top: top as any,
-                left: left as any,
-                position,
-            }
-        ]}>
+        <View
+            pointerEvents="box-none"
+            style={[
+                styles.frameContainer,
+                {
+                    width: width as any,
+                    height: height as any,
+                    top: top as any,
+                    left: left as any,
+                    position,
+                }
+            ]}>
             {/* Pixelated borders */}
             {pixels}
 
@@ -331,6 +334,7 @@ const styles = StyleSheet.create({
     frameContainer: {
         overflow: 'visible',
         backgroundColor: 'transparent',
+        pointerEvents: 'box-none',
     },
     backgroundContainer: {
         position: 'absolute',
@@ -350,6 +354,7 @@ const styles = StyleSheet.create({
         zIndex: 2,
         justifyContent: 'flex-start',
         alignItems: 'center',
+        pointerEvents: 'box-none',
     },
     outerPixel: {
         position: 'absolute',

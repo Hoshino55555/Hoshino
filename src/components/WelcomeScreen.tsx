@@ -609,10 +609,10 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                         >
                             {dialogContainerWidth > 0 && (
                             <Frame
-                                width={dialogContainerWidth * 0.9}
-                                height={62}
-                                top={-26}
-                                left={dialogContainerWidth * 0.05}
+                                width={dialogContainerWidth - 50}
+                                height={70}
+                                top={-34}
+                                left={25}
                                 position="absolute"
                                 pixelSize={2}
                             >
@@ -741,12 +741,12 @@ const styles = StyleSheet.create({
     },
     storyDialogBottom: {
         position: 'absolute',
-        bottom: 20,
+        bottom: 45,
         left: 0,
         right: 0,
         width: '100%',
         padding: 5,
-        backgroundColor: 'transparent', // Remove background since we have separate shadow
+        backgroundColor: 'transparent',
         zIndex: 2,
     },
     storyDialogueLargeBox: {
@@ -960,17 +960,16 @@ const styles = StyleSheet.create({
     },
     dialogContentContainer: {
         position: 'absolute',
-        top: 10,
-        left: -3,
-        right: -19,
-        bottom: 15,
+        top: -9,
+        left: -11,
+        right: -11,
+        bottom: -11,
         justifyContent: 'flex-start',
-        alignItems: 'flex-start', // Left align the text
-        marginTop: -45,
-        paddingLeft: 10, // Add 3px padding to move text right
-        paddingTop: 5, // Add 5px padding to move text down
+        alignItems: 'flex-start',
+        paddingLeft: 10,
+        paddingTop: 5,
         paddingRight: 10,
-        backgroundColor: '#E8F5E8', // Match the inner box background
+        backgroundColor: '#E8F5E8',
     },
     dialogTextContainer: {
         flex: 1, // Take up available space for text
