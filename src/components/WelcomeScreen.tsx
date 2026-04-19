@@ -595,7 +595,7 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                 <>
                     <View style={styles.storyCharacterCentered}>
                         <Image
-                            source={require('../../assets/images/hoshino star.gif')}
+                            source={require('../../assets/images/anim/hoshino star.gif')}
                             style={styles.starCharacterImage}
                         />
                     </View>
