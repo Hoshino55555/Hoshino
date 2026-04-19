@@ -1,23 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Switch, StyleSheet, ScrollView, Alert, Image, PanResponder, Animated } from 'react-native';
 import SettingsService, { MenuButton } from '../services/SettingsService';
+import InnerScreen from './InnerScreen';
 
 interface Props {
     onBack: () => void;
+    onCloseStart?: () => void;
     onNotification?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
     onSettingsChanged?: () => void;
 }
 
-const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }) => {
+const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSettingsChanged }) => {
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [theme, setTheme] = useState('default');
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    const [isClosing, setIsClosing] = useState(false);
     const panRefs = useRef<{ [key: string]: Animated.Value }>({});
 
-    // Initialize pan values for each button
     useEffect(() => {
         menuButtons.forEach(button => {
             if (!panRefs.current[button.id]) {
@@ -26,7 +28,6 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
         });
     }, [menuButtons]);
 
-    // Helper function to get image source based on icon name
     const getImageSource = (iconName: string) => {
         switch (iconName) {
             case 'feed': return require('../../assets/images/feed.png');
@@ -45,6 +46,12 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
         loadSettings();
     }, []);
 
+    const handleClose = () => {
+        if (isClosing) return;
+        setIsClosing(true);
+        onCloseStart?.();
+    };
+
     const loadSettings = async () => {
         await settingsService.initialize();
         const buttons = settingsService.getMenuButtons();
@@ -52,40 +59,6 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
         setSoundEnabled(settingsService.isSoundEnabled());
         setNotificationsEnabled(settingsService.isNotificationsEnabled());
         setTheme(settingsService.getTheme());
-    };
-
-
-
-    const moveButton = async (buttonId: string, direction: 'up' | 'down') => {
-        const button = menuButtons.find(b => b.id === buttonId);
-        if (!button) return;
-
-        const currentIndex = menuButtons.findIndex(b => b.id === buttonId);
-        const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-
-        if (newIndex >= 0 && newIndex < menuButtons.length) {
-            // Create a new array with the reordered buttons
-            const newMenuButtons = [...menuButtons];
-            const targetButton = newMenuButtons[newIndex];
-            
-            // Swap the buttons in the array
-            newMenuButtons[currentIndex] = targetButton;
-            newMenuButtons[newIndex] = button;
-            
-            // Update the order values to match the new positions
-            newMenuButtons.forEach((btn, index) => {
-                btn.order = index;
-            });
-            
-            // Update the settings service with the new order
-            settingsService.settings.menuButtons = newMenuButtons;
-            await settingsService.saveSettings();
-            
-            // Reload settings to reflect the change
-            await loadSettings();
-            onNotification?.(`Moved ${button.name} ${direction}`, 'success');
-            onSettingsChanged?.();
-        }
     };
 
     const resetToDefault = async () => {
@@ -126,97 +99,88 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
     };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity style={styles.backButton} onPress={onBack}>
-                    <Text style={styles.backButtonText}>← Back</Text>
-                </TouchableOpacity>
-                <Text style={styles.title}>Settings</Text>
-            </View>
-
+        <InnerScreen
+            expanded
+            animateIn
+            exiting={isClosing}
+            onExitComplete={onBack}
+            showBackgroundImage={false}
+            leftButtonText=""
+            centerButtonText=""
+            rightButtonText=""
+            onLeftButtonPress={handleClose}
+        >
             <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-                {/* Menu Button Configuration */}
+                <Text style={styles.title}>Settings</Text>
+
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Menu Buttons</Text>
                     <Text style={styles.sectionDescription}>
-                        Configure which buttons appear in the interaction menu and their order. Use ↑ to move a button earlier in the list, ↓ to move it later.
+                        Drag to reorder which buttons appear in the interaction menu.
                     </Text>
-                    
-                    {/* Mini Menu Preview */}
+
                     <View style={styles.miniMenuPreview}>
                         <View style={styles.miniMenuBar}>
                             <View style={styles.miniMenuRow}>
-                                {menuButtons.slice(0, 4).map((button, index) => (
+                                {menuButtons.slice(0, 4).map((button) => (
                                     <View key={`preview-${button.id}`} style={styles.miniButton}>
-                                        <Image 
-                                            source={getImageSource(button.icon)} 
-                                            style={styles.miniButtonImage} 
-                                        />
+                                        <Image source={getImageSource(button.icon)} style={styles.miniButtonImage} />
                                     </View>
                                 ))}
                             </View>
                             {menuButtons.length > 4 && (
                                 <View style={styles.miniMenuRow}>
-                                    {menuButtons.slice(4, 8).map((button, index) => (
+                                    {menuButtons.slice(4, 8).map((button) => (
                                         <View key={`preview-${button.id}`} style={styles.miniButton}>
-                                            <Image 
-                                                source={getImageSource(button.icon)} 
-                                                style={styles.miniButtonImage} 
-                                            />
+                                            <Image source={getImageSource(button.icon)} style={styles.miniButtonImage} />
                                         </View>
                                     ))}
                                 </View>
                             )}
                         </View>
                     </View>
-                    
+
                     {menuButtons.map((button, index) => {
                         const pan = panRefs.current[button.id];
-                        
+
                         const panResponder = PanResponder.create({
                             onStartShouldSetPanResponder: () => true,
                             onPanResponderGrant: () => {
                                 setDraggedIndex(index);
                                 pan?.setValue(0);
                             },
-                            onPanResponderMove: (evt, gestureState) => {
+                            onPanResponderMove: (_evt, gestureState) => {
                                 if (pan) {
                                     pan.setValue(gestureState.dy);
-                                    
-                                    // Only update the list if dragged a significant distance
                                     const itemHeight = 60;
                                     const dragDistance = gestureState.dy;
-                                    const threshold = itemHeight; // Must drag the full height of an item
-                                    
+                                    const threshold = itemHeight;
+
                                     if (Math.abs(dragDistance) > threshold) {
-                                        const targetIndex = Math.max(0, Math.min(menuButtons.length - 1, 
+                                        const targetIndex = Math.max(0, Math.min(menuButtons.length - 1,
                                             index + Math.round(dragDistance / itemHeight)));
-                                        
-                                        // Update the list to show the shift
+
                                         if (targetIndex !== index) {
                                             const newMenuButtons = [...menuButtons];
                                             const [movedItem] = newMenuButtons.splice(index, 1);
                                             newMenuButtons.splice(targetIndex, 0, movedItem);
                                             setMenuButtons(newMenuButtons);
-                                            // Update the dragged index to track the moved item
                                             setDraggedIndex(targetIndex);
                                         }
                                     }
                                 }
                             },
-                            onPanResponderRelease: (evt, gestureState) => {
+                            onPanResponderRelease: () => {
                                 if (pan) {
-                                    // Update order values for the current state
                                     menuButtons.forEach((btn, idx) => {
                                         btn.order = idx;
                                     });
-                                    
-                                    // Save changes
+
                                     settingsService.settings.menuButtons = menuButtons;
                                     settingsService.saveSettings();
                                     onSettingsChanged?.();
                                     onNotification?.(`Moved ${button.name}`, 'success');
-                                    
+
                                     Animated.spring(pan, {
                                         toValue: 0,
                                         useNativeDriver: false,
@@ -227,15 +191,15 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
                         });
 
                         return (
-                            <Animated.View 
-                                key={button.id} 
+                            <Animated.View
+                                key={button.id}
                                 style={[
                                     styles.buttonRow,
                                     draggedIndex === index && styles.draggedItem,
                                     {
                                         transform: pan ? [{ translateY: pan }] : [],
-                                        elevation: draggedIndex === index ? 10 : 0, // Android
-                                        zIndex: draggedIndex === index ? 1000 : 1, // iOS
+                                        elevation: draggedIndex === index ? 10 : 0,
+                                        zIndex: draggedIndex === index ? 1000 : 1,
                                     }
                                 ]}
                                 {...panResponder.panHandlers}
@@ -243,30 +207,24 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
                                 <View style={styles.dragHandle}>
                                     <Text style={styles.dragHandleText}>⋮⋮</Text>
                                 </View>
-                                
-                                <Image 
-                                    source={getImageSource(button.icon)} 
-                                    style={styles.buttonIcon} 
-                                />
-                                
+                                <Image source={getImageSource(button.icon)} style={styles.buttonIcon} />
                                 <View style={styles.buttonInfo}>
                                     <Text style={styles.buttonName}>{button.name}</Text>
                                 </View>
                             </Animated.View>
                         );
                     })}
-                    
+
                     <TouchableOpacity style={styles.resetButton} onPress={resetToDefault}>
                         <Text style={styles.resetButtonText}>Reset to Default</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* General Settings */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>General Settings</Text>
-                    
+                    <Text style={styles.sectionTitle}>General</Text>
+
                     <View style={styles.settingRow}>
-                        <Text style={styles.settingLabel}>Sound Effects</Text>
+                        <Text style={styles.settingLabel}>Sound</Text>
                         <Switch
                             value={soundEnabled}
                             onValueChange={updateSoundSetting}
@@ -274,7 +232,7 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
                             thumbColor={soundEnabled ? '#f5dd4b' : '#f4f3f4'}
                         />
                     </View>
-                    
+
                     <View style={styles.settingRow}>
                         <Text style={styles.settingLabel}>Notifications</Text>
                         <Switch
@@ -286,110 +244,70 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
                     </View>
                 </View>
 
-                {/* Theme Settings */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Theme</Text>
-                    
+
                     <View style={styles.themeButtons}>
-                        <TouchableOpacity
-                            style={[styles.themeButton, theme === 'default' && styles.activeThemeButton]}
-                            onPress={() => updateTheme('default')}
-                        >
-                            <Text style={[styles.themeButtonText, theme === 'default' && styles.activeThemeButtonText]}>
-                                Default
-                            </Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                            style={[styles.themeButton, theme === 'mint' && styles.activeThemeButton]}
-                            onPress={() => updateTheme('mint')}
-                        >
-                            <Text style={[styles.themeButtonText, theme === 'mint' && styles.activeThemeButtonText]}>
-                                Mint
-                            </Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                            style={[styles.themeButton, theme === 'dark' && styles.activeThemeButton]}
-                            onPress={() => updateTheme('dark')}
-                        >
-                            <Text style={[styles.themeButtonText, theme === 'dark' && styles.activeThemeButtonText]}>
-                                Dark
-                            </Text>
-                        </TouchableOpacity>
+                        {(['default', 'mint', 'dark'] as const).map((t) => (
+                            <TouchableOpacity
+                                key={t}
+                                style={[styles.themeButton, theme === t && styles.activeThemeButton]}
+                                onPress={() => updateTheme(t)}
+                            >
+                                <Text style={[styles.themeButtonText, theme === t && styles.activeThemeButtonText]}>
+                                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
                     </View>
                 </View>
             </ScrollView>
-        </View>
+        </InnerScreen>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#E8F5E8',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1000,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#2E5A3E',
-        backgroundColor: '#d4f5c4',
-    },
-    backButton: {
-        padding: 8,
-    },
-    backButtonText: {
-        fontSize: 16,
-        color: '#2E5A3E',
-        fontWeight: 'bold',
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#2E5A3E',
-        marginLeft: 16,
-    },
     content: {
         flex: 1,
-        padding: 16,
+        paddingHorizontal: 12,
     },
     scrollContent: {
-        flexGrow: 1,
+        paddingVertical: 12,
         paddingBottom: 20,
     },
+    title: {
+        fontSize: 16,
+        color: '#2E5A3E',
+        fontFamily: 'PressStart2P',
+        textAlign: 'center',
+        marginBottom: 14,
+    },
     section: {
-        marginBottom: 24,
+        marginBottom: 16,
         backgroundColor: '#f0fff0',
-        borderRadius: 8,
-        padding: 16,
+        borderRadius: 6,
+        padding: 12,
         borderWidth: 2,
         borderColor: '#2E5A3E',
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 12,
         color: '#2E5A3E',
-        marginBottom: 8,
+        fontFamily: 'PressStart2P',
+        marginBottom: 6,
     },
     sectionDescription: {
-        fontSize: 14,
+        fontSize: 9,
         color: '#2E5A3E',
-        marginBottom: 16,
-        opacity: 0.8,
+        fontFamily: 'PressStart2P',
+        marginBottom: 12,
+        opacity: 0.75,
+        lineHeight: 14,
     },
     buttonRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 10,
         borderBottomWidth: 1,
         borderBottomColor: '#2E5A3E',
         backgroundColor: '#f0fff0',
@@ -399,9 +317,9 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     buttonName: {
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 11,
         color: '#2E5A3E',
+        fontFamily: 'PressStart2P',
     },
     dragHandle: {
         width: 24,
@@ -414,9 +332,9 @@ const styles = StyleSheet.create({
         borderColor: '#2E5A3E',
     },
     dragHandleText: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#2E5A3E',
-        fontWeight: 'bold',
+        fontFamily: 'PressStart2P',
     },
     buttonIcon: {
         width: 20,
@@ -432,41 +350,38 @@ const styles = StyleSheet.create({
         elevation: 8,
         backgroundColor: '#f0fff0',
     },
-
     resetButton: {
         backgroundColor: '#2E5A3E',
-        padding: 12,
-        borderRadius: 6,
+        padding: 10,
+        borderRadius: 4,
         alignItems: 'center',
-        marginTop: 16,
+        marginTop: 12,
     },
     resetButtonText: {
         color: '#E8F5E8',
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 10,
+        fontFamily: 'PressStart2P',
     },
     settingRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#2E5A3E',
+        paddingVertical: 8,
     },
     settingLabel: {
-        fontSize: 16,
+        fontSize: 11,
         color: '#2E5A3E',
-        fontWeight: '500',
+        fontFamily: 'PressStart2P',
     },
     themeButtons: {
         flexDirection: 'row',
         justifyContent: 'space-around',
-        marginTop: 8,
+        marginTop: 4,
     },
     themeButton: {
         paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 6,
+        paddingHorizontal: 14,
+        borderRadius: 4,
         borderWidth: 2,
         borderColor: '#2E5A3E',
         backgroundColor: '#E8F5E8',
@@ -475,16 +390,16 @@ const styles = StyleSheet.create({
         backgroundColor: '#2E5A3E',
     },
     themeButtonText: {
-        fontSize: 14,
+        fontSize: 10,
         color: '#2E5A3E',
-        fontWeight: 'bold',
+        fontFamily: 'PressStart2P',
     },
     activeThemeButtonText: {
         color: '#E8F5E8',
     },
     miniMenuPreview: {
-        marginBottom: 16,
-        padding: 8,
+        marginBottom: 12,
+        padding: 6,
         backgroundColor: '#f0fff0',
         borderRadius: 4,
         borderWidth: 1,
@@ -522,4 +437,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default Settings; 
+export default Settings;

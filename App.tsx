@@ -87,7 +87,6 @@ function App() {
     const [welcomePhase, setWelcomePhase] = useState<string>('intro');
     const [shouldGoToCongratulations, setShouldGoToCongratulations] = useState(false);
     const [shouldFadeInInteraction, setShouldFadeInInteraction] = useState(false);
-    const [shopExiting, setShopExiting] = useState(false);
 
     const navigateToView = (view: string) => {
         setPreviousView(currentView);
@@ -509,20 +508,21 @@ function App() {
                             <Shop
                                 connection={connection}
                                 onNotification={addNotification}
-                                onCloseStart={() => setShopExiting(true)}
-                                onClose={() => {
-                                    setShopExiting(false);
-                                    setCurrentView('interaction');
-                                }}
+                                onClose={() => setCurrentView('interaction')}
                             />
                         </View>
                     </>
                 );
             case 'gallery':
                 return (
-                    <Gallery
-                        onBack={() => setCurrentView('interaction')}
-                    />
+                    <>
+                        <View key="mi-layer" style={[StyleSheet.absoluteFill, { zIndex: 1 }]}>
+                            {moonokoInteractionElement}
+                        </View>
+                        <View key="gallery-layer" style={[StyleSheet.absoluteFill, { zIndex: 2 }]}>
+                            <Gallery onBack={() => setCurrentView('interaction')} />
+                        </View>
+                    </>
                 );
             case 'inventory':
                 return (
@@ -545,10 +545,17 @@ function App() {
                 );
             case 'settings':
                 return (
-                    <Settings
-                        onBack={() => setCurrentView('interaction')}
-                        onNotification={addNotification}
-                    />
+                    <>
+                        <View key="mi-layer" style={[StyleSheet.absoluteFill, { zIndex: 1 }]}>
+                            {moonokoInteractionElement}
+                        </View>
+                        <View key="settings-layer" style={[StyleSheet.absoluteFill, { zIndex: 2 }]}>
+                            <Settings
+                                onBack={() => setCurrentView('interaction')}
+                                onNotification={addNotification}
+                            />
+                        </View>
+                    </>
                 );
             default:
                 return (
