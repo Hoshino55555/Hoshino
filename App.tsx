@@ -466,11 +466,18 @@ function App() {
                 );
             case 'feeding':
                 return (
-                    <FeedingPage
-                        onBack={() => setCurrentView('interaction')}
-                        onFeed={handleFeed}
-                        currentHunger={characterStats.hunger}
-                    />
+                    <>
+                        <View key="mi-layer" style={[StyleSheet.absoluteFill, { zIndex: 1 }]}>
+                            {moonokoInteractionElement}
+                        </View>
+                        <View key="feeding-layer" style={[StyleSheet.absoluteFill, { zIndex: 2 }]}>
+                            <FeedingPage
+                                onBack={() => setCurrentView('interaction')}
+                                onFeed={handleFeed}
+                                currentHunger={characterStats.hunger}
+                            />
+                        </View>
+                    </>
                 );
             case 'game':
             case 'memory-game':

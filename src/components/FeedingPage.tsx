@@ -15,6 +15,7 @@ interface Props {
     onBack: () => void;
     onFeed: (foodType: string, hungerBoost: number, moodBoost: number) => void;
     currentHunger: number;
+    onCloseStart?: () => void;
 }
 
 const FOOD_ITEMS: FoodItem[] = [
@@ -44,7 +45,6 @@ const FOOD_ITEMS: FoodItem[] = [
     }
 ];
 
-// Helper function to get image source based on food image name
 const getFoodImageSource = (imageName: string) => {
     switch (imageName) {
         case 'Pink Sugar.png':
@@ -54,13 +54,14 @@ const getFoodImageSource = (imageName: string) => {
         case 'Mira Berry.png':
             return require('../../assets/images/Mira Berry.png');
         default:
-            return require('../../assets/images/Pink Sugar.png'); // fallback
+            return require('../../assets/images/Pink Sugar.png');
     }
 };
 
-const FeedingPage = ({ onBack, onFeed, currentHunger }: Props) => {
+const FeedingPage = ({ onBack, onFeed, currentHunger, onCloseStart }: Props) => {
     const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
     const [feedingAnimation, setFeedingAnimation] = useState(false);
+    const [isClosing, setIsClosing] = useState(false);
     const bounceAnim = React.useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -86,10 +87,14 @@ const FeedingPage = ({ onBack, onFeed, currentHunger }: Props) => {
         }
     }, [feedingAnimation]);
 
+    const handleClose = () => {
+        if (isClosing) return;
+        setIsClosing(true);
+        onCloseStart?.();
+    };
+
     const handleFeed = (food: FoodItem) => {
-        if (currentHunger >= 5) {
-            return;
-        }
+        if (currentHunger >= 5) return;
 
         setSelectedFood(food);
         setFeedingAnimation(true);
@@ -101,48 +106,63 @@ const FeedingPage = ({ onBack, onFeed, currentHunger }: Props) => {
         }, 1500);
     };
 
+    const full = currentHunger >= 5;
+
     return (
         <InnerScreen
+            expanded
+            animateIn
+            exiting={isClosing}
+            onExitComplete={onBack}
+            showBackgroundImage={false}
             showStatsBar={false}
-            onLeftButtonPress={onBack}
-            onCenterButtonPress={() => {
-                if (currentHunger < 5) {
-                    onFeed('generic', 1, 1);
-                }
-            }}
-            onRightButtonPress={() => {
-                // Help button - could show feeding tips
-            }}
             leftButtonText=""
             centerButtonText=""
             rightButtonText=""
+            onLeftButtonPress={handleClose}
         >
-            {/* Main Display Area */}
-            <View style={styles.mainDisplayArea}>
+            <View style={styles.content}>
+                <View style={styles.header}>
+                    <Text style={styles.headerText}>MENU</Text>
+                </View>
 
-                <View style={styles.characterSelectionGrid}>
+                <View style={styles.grid}>
                     {FOOD_ITEMS.map((food) => {
-                        const isDisabled = currentHunger >= 5;
-
+                        const isSelected = selectedFood?.id === food.id;
                         return (
                             <TouchableOpacity
                                 key={food.id}
                                 style={[
-                                    styles.characterCard,
-                                    {
-                                        opacity: isDisabled ? 0.5 : 1,
-                                        backgroundColor: isDisabled ? 'rgba(100,100,100,0.3)' : 'rgba(255,255,255,0.95)',
-                                    },
+                                    styles.card,
+                                    isSelected && styles.cardSelected,
+                                    full && styles.cardDisabled,
                                 ]}
-                                onPress={() => !isDisabled && handleFeed(food)}
-                                activeOpacity={isDisabled ? 1 : 0.7}
+                                onPress={() => !full && handleFeed(food)}
+                                activeOpacity={full ? 1 : 0.7}
                             >
-                                <Image source={getFoodImageSource(food.image)} style={styles.foodImage} />
-                                <Text style={styles.characterName}>{food.name}</Text>
+                                <View style={styles.cardHeader}>
+                                    <Text style={styles.cardHeaderText} numberOfLines={1}>
+                                        {food.name}
+                                    </Text>
+                                </View>
+                                <View style={styles.cardBody}>
+                                    <Image
+                                        source={getFoodImageSource(food.image)}
+                                        style={styles.foodImage}
+                                    />
+                                </View>
+                                <View style={styles.cardFooter}>
+                                    <Text style={styles.effectText}>+{food.hungerBoost} HUNGER</Text>
+                                    <Text style={styles.effectText}>+{food.moodBoost} MOOD</Text>
+                                </View>
                             </TouchableOpacity>
                         );
                     })}
                 </View>
+
+                {full && (
+                    <Text style={styles.fullText}>TOO FULL TO EAT</Text>
+                )}
 
                 {feedingAnimation && selectedFood && (
                     <View style={styles.feedingOverlay}>
@@ -164,46 +184,85 @@ const FeedingPage = ({ onBack, onFeed, currentHunger }: Props) => {
 };
 
 const styles = StyleSheet.create({
-    statItem: {
-        alignItems: 'center',
-    },
-    statLabel: {
-        fontSize: 10,
-        fontFamily: 'PressStart2P',
-    },
-    statStars: {
-        fontSize: 12,
-        fontFamily: 'PressStart2P',
-    },
-    mainDisplayArea: {
+    content: {
         flex: 1,
-        position: 'relative',
-        justifyContent: 'center',
-        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 8,
     },
-    characterSelectionGrid: {
+    header: {
+        alignSelf: 'center',
+        backgroundColor: '#F4B6A4',
+        paddingVertical: 6,
+        paddingHorizontal: 24,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#2E5A3E',
+        marginBottom: 10,
+    },
+    headerText: {
+        fontSize: 14,
+        color: '#2E5A3E',
+        fontFamily: 'PressStart2P',
+    },
+    grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'center',
-        alignItems: 'center',
-        padding: 10,
     },
-    characterCard: {
-        alignItems: 'center',
-        padding: 10,
+    card: {
+        width: '46%',
+        margin: '2%',
+        backgroundColor: '#F5F9EC',
         borderWidth: 2,
-        borderRadius: 5,
-        margin: 5,
-        width: 100,
+        borderColor: '#2E5A3E',
+        borderRadius: 6,
+        overflow: 'hidden',
+    },
+    cardSelected: {
+        borderColor: '#E8B84A',
+        backgroundColor: '#FFF6D6',
+    },
+    cardDisabled: {
+        opacity: 0.5,
+    },
+    cardHeader: {
+        backgroundColor: '#BEE3C4',
+        paddingVertical: 4,
+        paddingHorizontal: 6,
+        alignItems: 'center',
+    },
+    cardHeaderText: {
+        fontSize: 8,
+        color: '#2E5A3E',
+        fontFamily: 'PressStart2P',
+    },
+    cardBody: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
     },
     foodImage: {
-        width: 40,
-        height: 40,
-        marginBottom: 4,
+        width: 48,
+        height: 48,
         resizeMode: 'contain',
     },
-    characterName: {
+    cardFooter: {
+        backgroundColor: '#DDEED5',
+        paddingVertical: 4,
+        paddingHorizontal: 4,
+        alignItems: 'center',
+    },
+    effectText: {
+        fontSize: 7,
+        color: '#2E5A3E',
+        fontFamily: 'PressStart2P',
+        lineHeight: 10,
+    },
+    fullText: {
+        marginTop: 10,
+        textAlign: 'center',
         fontSize: 10,
+        color: '#B84A4A',
         fontFamily: 'PressStart2P',
     },
     feedingOverlay: {
@@ -224,12 +283,11 @@ const styles = StyleSheet.create({
     },
     feedingText: {
         color: '#FFD700',
-        fontSize: 12,
+        fontSize: 10,
         fontFamily: 'PressStart2P',
         marginTop: 10,
         textAlign: 'center',
     },
-
 });
 
 export default FeedingPage;
