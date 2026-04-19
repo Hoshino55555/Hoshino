@@ -468,14 +468,7 @@ function App() {
                     </View>
                 );
             case 'chat':
-                return selectedCharacter ? (
-                    <CharacterChat
-                        character={selectedCharacter}
-                        onExit={() => setCurrentView('interaction')}
-                        playerName={playerName}
-                        onNotification={addNotification}
-                    />
-                ) : (
+                return selectedCharacter ? null : (
                     <View style={styles.noCharacterContainer}>
                         <Text style={styles.noCharacterText}>Please select a character first!</Text>
                         <TouchableOpacity
@@ -516,7 +509,7 @@ function App() {
         return null; // or a loading screen
     }
 
-    const miRoutes = ['interaction', 'feeding', 'shop', 'gallery', 'inventory', 'settings'];
+    const miRoutes = ['interaction', 'feeding', 'shop', 'gallery', 'inventory', 'settings', 'chat'];
     const miMounted = miRoutes.includes(currentView);
 
     return (
@@ -572,6 +565,16 @@ function App() {
                 <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
                     <Settings
                         onBack={() => setCurrentView('interaction')}
+                        onNotification={addNotification}
+                    />
+                </View>
+            )}
+            {currentView === 'chat' && selectedCharacter && (
+                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                    <CharacterChat
+                        character={selectedCharacter}
+                        onExit={() => setCurrentView('interaction')}
+                        playerName={playerName}
                         onNotification={addNotification}
                     />
                 </View>

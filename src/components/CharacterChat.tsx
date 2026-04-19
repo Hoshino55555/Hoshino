@@ -39,6 +39,12 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     const [isThinking, setIsThinking] = useState(false);
     const [showChat, setShowChat] = useState(true);
     const [keyboardVisible, setKeyboardVisible] = useState(false);
+    const [isClosing, setIsClosing] = useState(false);
+
+    const handleClose = () => {
+        if (isClosing) return;
+        setIsClosing(true);
+    };
     const messagesEndRef = useRef<ScrollView>(null);
 
     // Keyboard event listeners
@@ -143,7 +149,12 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
 
     return (
         <InnerScreen
-            onLeftButtonPress={onExit}
+            expanded
+            animateIn
+            exiting={isClosing}
+            onExitComplete={onExit}
+            showBackgroundImage={false}
+            onLeftButtonPress={handleClose}
             onCenterButtonPress={toggleChat}
             onRightButtonPress={() => onNotification?.('💬 Chat Tips: Ask questions, share thoughts, or just chat naturally!', 'info')}
             leftButtonText=""
