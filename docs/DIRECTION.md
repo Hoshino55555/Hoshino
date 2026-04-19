@@ -160,7 +160,7 @@ Practical implications:
 
 ### Known inconsistencies to resolve
 
-- Border styles and shadows vary across [Shop.tsx](src/components/Shop.tsx), [Gallery.tsx](src/components/Gallery.tsx), [FeedingPage.tsx](src/components/FeedingPage.tsx), [IngredientSelection.tsx](src/components/IngredientSelection.tsx)
+- Border styles and shadows vary across [Shop.tsx](../src/components/Shop.tsx), [Gallery.tsx](../src/components/Gallery.tsx), [FeedingPage.tsx](../src/components/FeedingPage.tsx), [IngredientSelection.tsx](../src/components/IngredientSelection.tsx)
 - Some screens bleed into safe areas; some respect them
 - Font usage drifts; PressStart2P should be universal
 
@@ -180,7 +180,7 @@ Minimum MVP:
 ## 8. Minigames
 
 **Starburst (Voltorb Flip clone)**
-- Current state: proof-of-concept playable, see [Starburst.tsx](src/components/Starburst.tsx) and [TODO.md](TODO.md)
+- Current state: proof-of-concept playable, see [Starburst.tsx](../src/components/Starburst.tsx) and [TODO.md](TODO.md)
 - Polish priorities for MVP:
   - Memo pad for marking squares
   - Grid solvability guarantee
@@ -421,6 +421,6 @@ Playable end-to-end loop: login via Privy → free gacha → feed (cook) → pla
   - `Hoshino_Beta_Doc2_Execution_Plan.pdf` — protocols, go/no-go criteria
   - `Hoshino_Beta_Doc3_Budget_Allocation.pdf` — Phase 1 budget
 - Existing in-repo notes:
-  - [README.md](README.md) — setup
-  - [DEV_NOTES.md](DEV_NOTES.md) — feature requests + limitations
-  - [TODO.md](TODO.md) — Starburst implementation notes
+  - [README.md](../README.md) — setup
+  - [DEV_NOTES.md](DEV_NOTES.md) — stale, archived feature requests + limitations
+  - [TODO.md](TODO.md) — stale, archived Starburst implementation notes

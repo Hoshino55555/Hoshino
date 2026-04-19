@@ -1,5 +1,7 @@
 # Starburst Game Implementation - TODO
 
+> **STALE — archived for reference only.** This is the original Starburst implementation log. The game has shipped and evolved past this checklist. For current scope and priorities, see [DIRECTION.md](DIRECTION.md).
+
 ## Game Overview
 
 Starburst (also known as Voltorb Flip in Pokémon HeartGold/SoulSilver) is a logic puzzle minigame that replaces slot machines. The game is now integrated into the Hoshino project's character menu system.

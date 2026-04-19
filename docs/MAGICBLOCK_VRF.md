@@ -1,6 +1,6 @@
 # MagicBlock VRF Integration — Spec for Parallel Work
 
-> Scope: plug MagicBlock VRF into Hoshino as the provable-randomness source for gacha, foraging, and Starburst grid seeds. Ephemeral Rollups are **out of scope** for the hackathon build ([DIRECTION.md §2](../DIRECTION.md)).
+> Scope: plug MagicBlock VRF into Hoshino as the provable-randomness source for gacha, foraging, and Starburst grid seeds. Ephemeral Rollups are **out of scope** for the hackathon build ([DIRECTION.md §2](DIRECTION.md)).
 >
 > Owner: Codex (parallel track while Privy integration happens on the main branch).
 >
@@ -18,7 +18,7 @@ Three places in the app need auditable randomness:
 | **Foraging** — per-interval ingredient rolls (stat-gated) | Not built yet; Phase C of DIRECTION.md | Result is valuable (rare ingredients → rare recipes); resolves offline so server-authoritative PRNG isn't enough for "provable" claim |
 | **Starburst** — grid seeding | `Math.random()` in [Starburst.tsx:38,61-76](../src/components/Starburst.tsx) | Minigame rewards feed soft currency; grid solvability guarantee depends on seed integrity |
 
-The product framing from [DIRECTION.md §10](../DIRECTION.md): "Blockchain is invisible infrastructure for randomness, ownership, and optional on-chain capability — never the product." VRF is the randomness half.
+The product framing from [DIRECTION.md §10](DIRECTION.md): "Blockchain is invisible infrastructure for randomness, ownership, and optional on-chain capability — never the product." VRF is the randomness half.
 
 ---
 
@@ -130,7 +130,7 @@ That way the Privy work plugs in without touching your code.
 
 ## 6. Out of scope
 
-- Ephemeral Rollups / delegated accounts (Phase 2 per [DIRECTION.md §10](../DIRECTION.md))
+- Ephemeral Rollups / delegated accounts (Phase 2 per [DIRECTION.md §10](DIRECTION.md))
 - Mainnet deployment (devnet-only for hackathon)
 - Any refactor of existing `Math.random()` call sites (that's a downstream task after the service exists)
 - UI for VRF status / "rolling" animations — that's a design surface, not infra
@@ -145,7 +145,7 @@ Answer by updating this doc or in commit messages:
 2. **Fee model:** does the oracle charge per request? If yes, who pays — embedded wallet, a sponsored relayer, or the user directly? Implications for UX.
 3. **Fulfillment latency:** what's the typical end-to-end latency on devnet? If >5 seconds, gacha UX needs a "rolling" state.
 4. **Retry posture:** if fulfillment never lands, is the user's intent lost? How do we reconcile?
-5. **Is on-chain VRF overkill for Starburst grids?** Arguable that provable randomness for a local minigame is performative. Decision: ship it anyway for consistency, or use a server-side HMAC-seeded PRNG for Starburst only? (Recommendation: ship VRF for consistency — it's what [DIRECTION.md §10](../DIRECTION.md) promises.)
+5. **Is on-chain VRF overkill for Starburst grids?** Arguable that provable randomness for a local minigame is performative. Decision: ship it anyway for consistency, or use a server-side HMAC-seeded PRNG for Starburst only? (Recommendation: ship VRF for consistency — it's what [DIRECTION.md §10](DIRECTION.md) promises.)
 
 ---
 

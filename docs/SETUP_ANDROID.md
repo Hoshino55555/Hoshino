@@ -1,190 +1,322 @@
-# Android Setup
+# Cold-Start Android Setup (Mac)
 
-This is the canonical setup guide for running Hoshino on an Android device or emulator.
+Build Hoshino from source on a Mac that has nothing installed, install it on a connected Android device, and end with Metro connected for live development.
 
-If you are a human skimming quickly, read `README.md` first and come here second.
+This is for people who need to build and run from source. If you just want to install and play the app, see [INSTALL_APK.md](INSTALL_APK.md) — that path does not need any of this.
 
-If you are another AI working in this repo, start with:
+If you are an AI helping a non-technical user through this, read this whole file before answering, then walk them through one section at a time. After each terminal command, ask the user what output they saw before continuing. Do not skip steps, do not assume any prior install.
 
-1. `README.md`
-2. `docs/SETUP_ANDROID.md`
-3. `env.example`
+## What you will end up with
 
-## What This Branch Assumes
+- Node.js 20, Java 17, Android Studio, Android SDK, `adb`, and a GitHub auth set up
+- The Hoshino repo cloned locally
+- A connected Seeker or Android phone visible to `adb`
+- The Hoshino dev build installed on the device
+- Metro running in a terminal with the phone app connected to it
 
-- Expo/React Native app
-- Android dev build
-- Privy mobile auth
-- Solana wallet login
-- Mobile Wallet Adapter support for Seeker/native wallet
+Expect 60-90 minutes the first time, most of it waiting on downloads and the first gradle build.
 
-This branch does not assume Expo Go.
+## 0. Hardware checklist
 
-## Prerequisites
+- A Mac with 20GB free disk space
+- An Android phone (Seeker, Pixel, Samsung, etc.) running Android 9+
+- A USB-C data cable that supports data transfer. Some cables are charge-only — if `adb devices` shows nothing in step 9, swap cables before anything else.
 
-- Node.js 20+
-- npm
-- Java 17
-- Android Studio
-- Android SDK installed
-- `adb` available in your shell
-- A real Android device or emulator
+## 1. Install Homebrew
 
-For Seeker-specific testing, use a real Solana Seeker.
+Homebrew is the Mac package manager. Open `Terminal` (Cmd+Space, type `Terminal`, Enter) and paste this:
 
-## 1. Install Dependencies
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Follow the prompts. It will ask for your Mac password — type it (the cursor won't move, that's normal) and press Enter.
+
+At the very end, it prints two lines that start with `echo`. Copy both, paste into terminal, press Enter. Those lines add `brew` to your shell PATH.
+
+Verify:
+
+```bash
+brew --version
+```
+
+You should see `Homebrew X.Y.Z`.
+
+## 2. Install Node.js 20
+
+```bash
+brew install node@20
+brew link --force --overwrite node@20
+```
+
+Verify:
+
+```bash
+node --version
+```
+
+Should print `v20.x.x`. If it prints `v18` or `v21`, run `brew link --force --overwrite node@20` again and restart Terminal.
+
+## 3. Install Java 17
+
+Android builds need Java 17 specifically. Not 21, not 11.
+
+```bash
+brew install openjdk@17
+sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
+```
+
+On Intel Macs replace `/opt/homebrew` with `/usr/local` in both commands.
+
+Add Java to your shell:
+
+```bash
+echo 'export JAVA_HOME=$(/usr/libexec/java_home -v 17)' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Verify:
+
+```bash
+java -version
+```
+
+Should include `17.0.x`.
+
+## 4. Install Android Studio
+
+1. Download from https://developer.android.com/studio
+2. Open the downloaded `.dmg`, drag `Android Studio` to `Applications`.
+3. Open Android Studio from Applications.
+4. On the setup wizard, choose `Standard` install. Accept all license prompts. It will download ~3GB of SDK components. Let it finish.
+5. On the "Welcome" window, click `More Actions` → `SDK Manager`.
+6. In the `SDK Platforms` tab, check `Android 14 (API 34)` if not already. Click `Apply`.
+7. In the `SDK Tools` tab, make sure `Android SDK Build-Tools`, `Android SDK Platform-Tools`, and `Android SDK Command-line Tools (latest)` are checked. Click `Apply`.
+
+Now add the SDK to your shell PATH. The SDK lives at `~/Library/Android/sdk`.
+
+```bash
+cat >> ~/.zshrc <<'EOF'
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+EOF
+source ~/.zshrc
+```
+
+Accept all Android SDK licenses (required for gradle builds to run):
+
+```bash
+yes | sdkmanager --licenses
+```
+
+Verify:
+
+```bash
+adb --version
+```
+
+Should print `Android Debug Bridge version 1.x.x`. If `adb: command not found`, the PATH export did not take — close and reopen Terminal, then re-try.
+
+## 5. Install Git and GitHub CLI
+
+```bash
+brew install git gh
+```
+
+Authenticate with GitHub (needed to clone the repo, even though it is public, because the CLI gives you HTTPS credentials):
+
+```bash
+gh auth login
+```
+
+Choose: `GitHub.com` → `HTTPS` → `Y` (yes, authenticate git) → `Login with a web browser`. It prints a one-time code, opens a browser, and you paste the code.
+
+## 6. Clone the Hoshino repo
+
+Pick where to put the code. A common choice:
+
+```bash
+mkdir -p ~/dev
+cd ~/dev
+gh repo clone Hoshino55555/Hoshino
+cd Hoshino
+```
+
+From now on, all commands should run from the `Hoshino` directory.
+
+## 7. Install project dependencies
 
 ```bash
 npm install
 ```
 
-## 2. Create `.env`
+This takes 2-5 minutes the first time. It will print warnings about peer deps — those are expected, ignore them. It is done when the prompt returns.
+
+## 8. Set up the `.env` file
+
+Copy the example file:
 
 ```bash
 cp env.example .env
 ```
 
-At minimum, fill in:
+Open `.env` in a text editor:
 
 ```bash
-EXPO_PUBLIC_PRIVY_APP_ID=...
-EXPO_PUBLIC_PRIVY_CLIENT_ID=...
-EXPO_PUBLIC_ENABLE_VRF_DEV_SCREEN=0
+open -e .env
 ```
 
-Other values in `env.example` are only needed if you are also exercising Firebase/backend paths.
+Fill in the values. For device-side testing you need:
 
-## 3. Configure Privy
+- `EXPO_PUBLIC_PRIVY_APP_ID`
+- `EXPO_PUBLIC_PRIVY_CLIENT_ID`
+- `REACT_APP_FIREBASE_*` (all six)
 
-Create or use a mobile Privy client and make sure it allows this app:
+The `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `XAI_API_KEY` values are only used by the backend and are not needed on the device.
 
-- Android package: `com.socks.hoshino`
-- URL scheme: `hoshino`
+Save and close the editor.
 
-Enable the auth methods you want to use:
+Get the actual values from whoever owns this project. Don't commit `.env` — it is already in `.gitignore`.
 
-- Solana wallet auth
-- Email
-- Google
+## 9. Connect the phone
 
-The current login screen supports:
+On the phone:
 
-- `Native Wallet`
-- `Phantom`
-- `Backpack`
-- `Email`
-- `Google`
+1. Open `Settings` → `About phone`.
+2. Tap `Build number` seven times. It will say "You are now a developer."
+3. Go back to `Settings` → `System` → `Developer options`.
+4. Turn on `USB debugging`.
+5. Plug the phone into the Mac with a USB-C data cable.
+6. If a prompt says "Use USB for", choose `File Transfer` (not `Charging`).
+7. If a prompt says "Allow USB debugging from this computer?", tap `Allow`. Check `Always allow` so you don't see this again.
 
-## 4. Build and Install
-
-Use a dev build:
+On the Mac:
 
 ```bash
-npx expo run:android
+adb devices
 ```
 
-This is the expected path for the current repo state.
+You should see one line with a serial and the word `device`. If it says `unauthorized`, the "Allow USB debugging" dialog was missed on the phone — unplug, replug, and accept the dialog. If you see nothing at all, swap the USB cable.
 
-Do not use Expo Go for auth or wallet testing.
+## 10. Build and install the dev client
 
-## 5. Real Device Steps
-
-### Android phone
-
-1. Enable developer options.
-2. Enable USB debugging.
-3. Connect the phone to your computer.
-4. Verify the phone appears in `adb devices`.
-5. Run `npx expo run:android`.
-
-### Solana Seeker
-
-1. Install the Hoshino dev build.
-2. Open the app.
-3. Tap `Connect Wallet`.
-4. Choose `Native Wallet`.
-5. Approve connection in Seeker.
-6. Sign the Privy SIWS message.
-
-## 6. Expected Behavior
-
-After setup is correct:
-
-- app launches without Expo Go
-- Privy login screen loads
-- wallet login works for `Native Wallet`, `Phantom`, and `Backpack`
-- logout returns to login
-- same-wallet relogin restores saved Moonoko/profile state
-
-## 7. Troubleshooting
-
-### `Embedded wallet proxy not initialized`
-
-Rebuild the dev client:
+From the `Hoshino` directory:
 
 ```bash
 npx expo run:android
 ```
 
-This branch no longer intentionally boots the embedded wallet path at startup.
+Expect:
 
-### `Native app ID com.socks.hoshino has not been set as an allowed...`
+- 10-20 minutes of gradle output on the first run. It looks stuck when it's building native modules. It's not. Let it finish.
+- Metro starts in the same terminal after the build finishes.
+- The phone installs the app and launches it automatically.
 
-Fix the Privy mobile client configuration:
+The terminal now has Metro running. Do not close it. If you close it, the app on the phone will show a red error screen when you reopen it.
 
-- Android package: `com.socks.hoshino`
-- URL scheme: `hoshino`
+If the app opens to the login screen, setup is done. Proceed to the expected behavior check below.
 
-### Wallet login opens but never finishes
+## 11. Expected behavior after first launch
 
-Check:
+- The Hoshino login screen appears. It offers `Native Wallet`, `Phantom`, `Backpack`, `Email`, and `Google`.
+- Email login opens a code input screen. A verification code is sent to the address.
+- Google login opens a browser sheet for account selection.
+- Native Wallet (Seeker only) opens the Seeker wallet UI to approve a Sign-In-With-Solana message.
+- Logout returns to the login screen.
+- Same-wallet relogin restores the saved Moonoko/profile state.
 
-- Privy app client is a mobile client
-- Solana wallet auth is enabled
-- you are using a dev build
-- you are not using Expo Go
+## Troubleshooting
 
-### Metro cache feels stale
+### `adb: command not found`
+
+Your PATH is missing the Android platform-tools directory. Run:
 
 ```bash
-npx expo start -c
-npx expo run:android
+echo 'export PATH=$PATH:$HOME/Library/Android/sdk/platform-tools' >> ~/.zshrc
+source ~/.zshrc
 ```
 
-### App still behaves like an old build
+Then try `adb --version` again.
 
-Uninstall the app from the device, then rebuild:
+### `Failed to install the app`
+
+Uninstall the old version from the phone and retry:
 
 ```bash
 adb uninstall com.socks.hoshino
 npx expo run:android
 ```
 
-## 8. Files To Check If Setup Breaks
+### App opens but shows a red error screen
 
-- `README.md`
-- `env.example`
-- `src/components/LoginScreen.tsx`
-- `src/contexts/PrivyContext.tsx`
-- `src/contexts/WalletContext.tsx`
-- `src/services/MobileWalletService.ts`
-- `App.tsx`
+Metro is probably not running, or the phone cannot reach the Mac over USB. In the Metro terminal, press `r` to reload. If that doesn't help, close the app on the phone, then run:
 
-## 9. Teammate Environment Sharing
+```bash
+npx expo start --dev-client --clear
+```
 
-The safest team pattern is:
+And reopen the app.
 
-1. Keep `env.example` in git with placeholder keys only.
-2. Share real `.env` values through a password manager or secure secret vault.
-3. Keep one shared note that explains what each variable is for.
-4. Never commit the real `.env`.
+### `Embedded wallet proxy not initialized`
 
-Good options:
+This happens when the dev client's native modules don't match what's in `node_modules`. Rebuild:
 
-- 1Password shared vault
-- Bitwarden organization vault
-- Doppler
-- Infisical
-- Firebase/Google Secret Manager if your team already uses GCP
+```bash
+npx expo run:android
+```
 
-For this repo, Privy IDs are usually safe enough to share internally, but API keys and backend secrets should still go through a real secret-sharing tool, not chat.
+### `Native app ID com.socks.hoshino has not been set as an allowed...`
+
+The Privy dashboard config is missing this app. In the Privy dashboard:
+
+- Open the mobile client used by this app
+- Under allowed identifiers, add Android package `com.socks.hoshino`
+- Add URL scheme `hoshino`
+- Save
+
+Then reopen the app.
+
+### Metro cache feels stale (old UI, missing features)
+
+```bash
+npx expo start --dev-client --clear
+```
+
+Leave it running. Reopen the app on the phone.
+
+### Gradle build fails with a Java error
+
+Confirm Java 17 is the active version:
+
+```bash
+java -version
+echo $JAVA_HOME
+```
+
+If either shows Java 21 or 11, go back to step 3 and redo the `JAVA_HOME` export.
+
+### `adb devices` shows `unauthorized`
+
+The phone never showed or never accepted the "Allow USB debugging" prompt. Unplug the cable, plug it back in, watch the phone for a popup, tap `Allow` with `Always allow from this computer` checked.
+
+### `adb devices` shows nothing
+
+In order of likelihood:
+
+1. USB cable is charge-only — try a different cable.
+2. Phone's USB mode is `Charging only` — pull down the notification shade, tap the USB notification, set to `File Transfer`.
+3. USB debugging not enabled — redo step 9.
+
+## Prompt for Claude
+
+If you hand this repo to Claude Code, paste this prompt and let it drive:
+
+```text
+Set up Hoshino on my Android device. I am non-technical.
+
+Work through docs/SETUP_ANDROID.md one section at a time. After every terminal command, stop and ask me what output I see. Do not move on until I confirm the previous step worked. Do not skip sections. Do not assume any prior install.
+
+If any step fails, check the Troubleshooting section at the bottom of SETUP_ANDROID.md before suggesting anything custom.
+```

@@ -1,5 +1,7 @@
 # 📋 Feature Requests & Limitations
 
+> **STALE — archived for reference only.** This file predates the current direction and the team's move to Privy + MagicBlock VRF. Individual checkboxes may no longer reflect reality. For current scope and priorities, see [DIRECTION.md](DIRECTION.md).
+
 ## 🎯 **Feature Requests**
 
 - [ ] Create inventory state controller for shop purchases

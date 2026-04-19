@@ -1,71 +1,67 @@
 # Hoshino
 
-Hoshino is an Expo/React Native game built around Moonokos, Privy auth, and Solana wallet login.
+Hoshino is an Expo/React Native virtual-pet game built around Moonokos, Privy auth, and Solana wallet login.
 
-This branch is intended for Android dev builds on real devices. Do not use Expo Go for the main auth or wallet flow.
+This branch targets Android dev builds on real devices. Do not use Expo Go for auth or wallet flows.
 
-## 5 Minute Setup
+## Pick your path
 
-1. Clone the repo and install packages.
-2. Copy `env.example` to `.env`.
-3. Set `EXPO_PUBLIC_PRIVY_APP_ID` and `EXPO_PUBLIC_PRIVY_CLIENT_ID`.
-4. In Privy, allow Android package `com.socks.hoshino` and URL scheme `hoshino`.
-5. Run `npx expo run:android`.
+Two ways to get Hoshino running:
 
-Quick commands:
+### Just want to play/test it on a device
+
+You do not need to install anything on a computer.
+
+Go to [docs/INSTALL_APK.md](docs/INSTALL_APK.md). Open that guide on the phone, download the latest `.apk` release, tap to install. ~5 minutes.
+
+### Building from source
+
+You need a Mac, 20GB free disk, and about 60-90 minutes the first time.
+
+Go to [docs/SETUP_ANDROID.md](docs/SETUP_ANDROID.md) for a cold-start guide that assumes nothing is installed. It walks through Node, Java, Android SDK, GitHub auth, Privy config, device debugging, and the first build.
+
+If your machine is already set up, the short version is:
 
 ```bash
-git clone <your-repo-url>
+gh repo clone Hoshino55555/Hoshino
 cd Hoshino
 npm install
-cp env.example .env
+cp env.example .env   # fill in Privy + Firebase values
 npx expo run:android
 ```
 
-If Metro gets weird:
+## Docs index
 
-```bash
-npx expo start -c
-npx expo run:android
-```
+Everything else lives in [docs/](docs/).
 
-## Read This Next
+- [docs/INSTALL_APK.md](docs/INSTALL_APK.md) — sideload the release APK on a phone (no computer needed)
+- [docs/SETUP_ANDROID.md](docs/SETUP_ANDROID.md) — cold-start build-from-source guide for Mac
+- [docs/DIRECTION.md](docs/DIRECTION.md) — **canonical** MVP scope, mechanics, architecture, open questions
+- [docs/MAGICBLOCK_VRF.md](docs/MAGICBLOCK_VRF.md) — VRF integration spec
+- [docs/MAGICBLOCK_VRF_OPS.md](docs/MAGICBLOCK_VRF_OPS.md) — VRF deploy/ops notes (program IDs, redeploy steps)
+- [docs/DEV_NOTES.md](docs/DEV_NOTES.md) — **stale**, archived for reference
+- [docs/TODO.md](docs/TODO.md) — **stale**, archived for reference
 
-- Start here for full device setup: `docs/SETUP_ANDROID.md`
-- VRF branch notes: `docs/MAGICBLOCK_VRF.md`
-- VRF ops notes: `docs/MAGICBLOCK_VRF_OPS.md`
-- Required environment variables: `env.example`
+When doc content disagrees, [docs/DIRECTION.md](docs/DIRECTION.md) wins.
 
-## AI Setup
+## Prompt for Claude
 
-If you hand this repo to another AI, tell it to read these in order:
-
-1. `README.md`
-2. `docs/SETUP_ANDROID.md`
-3. `env.example`
-
-Use this prompt:
+If you hand this repo to Claude Code, paste this to start:
 
 ```text
-Set up this Hoshino repo on my Android device.
+Set up Hoshino on my device.
 
-Read these files first and follow them in order:
-1. README.md
-2. docs/SETUP_ANDROID.md
-3. env.example
+If I want to install and play the app without building, follow docs/INSTALL_APK.md.
+If I want to build from source, follow docs/SETUP_ANDROID.md.
 
-Constraints:
-- Use a real Expo dev build, not Expo Go.
-- Configure Privy for Android package com.socks.hoshino and URL scheme hoshino.
-- Support wallet login for Native Wallet, Phantom, and Backpack.
-- Use npx expo run:android for install/build.
-- If Metro acts stale, clear it with npx expo start -c before rebuilding.
-- Do not change app code unless setup is actually broken.
+Work through the chosen guide one section at a time. After every terminal command or tap, ask me what I see before moving to the next step. Do not assume any prior install. Do not skip sections.
+
+If anything fails, check the Troubleshooting section of the chosen guide before suggesting anything custom.
 ```
 
 ## Notes
 
-- Seeker testing should use the `Native Wallet` path in-app.
+- Seeker testing uses the `Native Wallet` login option in-app.
 - Wallet identity and local gameplay state are stored per wallet address.
 - Same-wallet relogin should restore the saved Moonoko/profile state.
-- Backend redeploy is separate from device setup and is not required for normal frontend testing.
+- Backend redeploy is separate from device setup and is not required for frontend testing.

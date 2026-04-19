@@ -40,6 +40,5 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 backend/firebase/functions/solana-transactions copy.js
-DEV_NOTES.md
 target/
 test-ledger/
