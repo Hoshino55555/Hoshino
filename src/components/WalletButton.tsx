@@ -4,43 +4,48 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 interface WalletButtonProps {
     connected: boolean;
     publicKey?: string | null;
+    playerName?: string;
     onConnect: () => void;
-    onDisconnect: () => void;
+    onOpenProfile?: () => void;
 }
+
+const truncateAddress = (address: string) => `${address.slice(0, 4)}...${address.slice(-4)}`;
 
 const WalletButton: React.FC<WalletButtonProps> = ({
     connected,
     publicKey,
+    playerName,
     onConnect,
-    onDisconnect
+    onOpenProfile,
 }) => {
     const hasWalletIdentity = connected || Boolean(publicKey);
 
-    const getWalletDisplay = () => {
-        if (!hasWalletIdentity || !publicKey) {
-            return 'Connect';
-        }
-        // Display the base58 address properly
-        return `${publicKey.slice(0, 4)}...${publicKey.slice(-4)}`;
-    };
+    if (!hasWalletIdentity) {
+        return (
+            <View style={styles.container}>
+                <TouchableOpacity style={styles.connectButton} onPress={onConnect}>
+                    <Text style={styles.connectText}>Connect</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    const trimmedName = playerName?.trim();
+    const label = trimmedName && trimmedName.length > 0
+        ? trimmedName
+        : publicKey
+            ? truncateAddress(publicKey)
+            : 'Wallet';
 
     return (
         <View style={styles.container}>
-            {hasWalletIdentity ? (
-                <TouchableOpacity 
-                    style={styles.connectedButton}
-                    onPress={onDisconnect}
-                >
-                    <Text style={styles.connectedText}>{getWalletDisplay()}</Text>
-                </TouchableOpacity>
-            ) : (
-                <TouchableOpacity 
-                    style={styles.connectButton}
-                    onPress={onConnect}
-                >
-                    <Text style={styles.connectText}>Connect</Text>
-                </TouchableOpacity>
-            )}
+            <TouchableOpacity
+                style={styles.connectedPill}
+                onPress={onOpenProfile}
+                disabled={!onOpenProfile}
+            >
+                <Text style={styles.connectedText} numberOfLines={1}>{label}</Text>
+            </TouchableOpacity>
         </View>
     );
 };
@@ -72,7 +77,7 @@ const styles = StyleSheet.create({
         fontFamily: 'PressStart2P',
         transform: [{ translateY: 3 }],
     },
-    connectedButton: {
+    connectedPill: {
         backgroundColor: 'rgba(232, 245, 232, 0.65)',
         paddingVertical: 6,
         paddingHorizontal: 12,
@@ -84,6 +89,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.15,
         shadowRadius: 3,
         elevation: 3,
+        maxWidth: 160,
     },
     connectedText: {
         color: '#2E5A3E',
@@ -94,4 +100,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default WalletButton; 
+export default WalletButton;

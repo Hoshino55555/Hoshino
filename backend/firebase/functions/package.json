@@ -11,10 +11,11 @@
     "logs": "firebase functions:log"
   },
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "dependencies": {
-    "@google/genai": "^0.2.0",
+    "@google/genai": "^1.50.1",
+    "@privy-io/server-auth": "^1.32.5",
     "@solana/web3.js": "^1.87.6",
     "firebase-admin": "^13.4.0",
     "firebase-functions": "^6.4.0",

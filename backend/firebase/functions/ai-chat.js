@@ -3,17 +3,241 @@ const admin = require('firebase-admin');
 const { GoogleGenAI } = require('@google/genai');
 const OpenAI = require('openai');
 
-// Initialize Grok API using OpenAI-compatible format
-const grokConfig = {
-  apiKey: process.env.XAI_API_KEY || '',
-  baseURL: 'https://api.x.ai/v1',
-};
-
 // Initialize Firebase Admin
 admin.initializeApp();
+const db = admin.firestore();
+
+// Max prior turns (user+model combined) sent back to the model each request
+const HISTORY_LIMIT = 10;
+// How many facts we pull from Firestore to rank against (ceiling)
+const FACTS_POOL_SIZE = 200;
+// Max ranked facts injected into the system prompt per request
+const FACTS_LIMIT = 50;
+const FACT_TYPES = ['preference', 'detail', 'event', 'relationship', 'goal'];
+
+// Type-weighted decay profiles. Durable info (detail/relationship) should
+// basically never fall out of the prompt; transient events should age quickly
+// so they stop crowding out stable memory.
+// floor    = minimum score, score never falls below it
+// halfLife = days until a fact loses half its "above floor" weight
+const FACT_DECAY = {
+  detail:       { floor: 1.0, halfLife: Infinity },
+  relationship: { floor: 0.9, halfLife: 365 },
+  preference:   { floor: 0.6, halfLife: 90 },
+  goal:         { floor: 0.5, halfLife: 60 },
+  event:        { floor: 0.2, halfLife: 14 },
+};
+
+const scoreFact = (fact, nowMs) => {
+  const profile = FACT_DECAY[fact.type] || FACT_DECAY.detail;
+  if (profile.halfLife === Infinity) return profile.floor;
+  const createdMs = fact.createdAt?.toMillis?.() || nowMs;
+  const ageDays = Math.max(0, (nowMs - createdMs) / (1000 * 60 * 60 * 24));
+  const decay = Math.pow(0.5, ageDays / profile.halfLife);
+  return profile.floor + (1 - profile.floor) * decay;
+};
+
+const conversationRef = (userId, moonokoId) =>
+  db.collection('conversations').doc(`${userId}_${moonokoId}`);
+
+const getHistory = async (userId, moonokoId) => {
+  const snap = await conversationRef(userId, moonokoId)
+    .collection('messages')
+    .orderBy('timestamp', 'desc')
+    .limit(HISTORY_LIMIT)
+    .get();
+  return snap.docs.map(d => d.data()).reverse();
+};
+
+const saveTurn = async (userId, moonokoId, userMessage, aiMessage) => {
+  const convRef = conversationRef(userId, moonokoId);
+  const msgsRef = convRef.collection('messages');
+  const now = Date.now();
+  const batch = db.batch();
+  batch.set(convRef, {
+    userId,
+    moonokoId,
+    lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  batch.set(msgsRef.doc(), {
+    role: 'user',
+    content: userMessage,
+    timestamp: admin.firestore.Timestamp.fromMillis(now),
+  });
+  batch.set(msgsRef.doc(), {
+    role: 'model',
+    content: aiMessage,
+    timestamp: admin.firestore.Timestamp.fromMillis(now + 1),
+  });
+  await batch.commit();
+};
+
+const getFacts = async (userId, moonokoId) => {
+  const snap = await conversationRef(userId, moonokoId)
+    .collection('facts')
+    .orderBy('createdAt', 'desc')
+    .limit(FACTS_POOL_SIZE)
+    .get();
+  const pool = snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter(f => !f.supersededAt);
+  const nowMs = Date.now();
+  pool.sort((a, b) => scoreFact(b, nowMs) - scoreFact(a, nowMs));
+  return pool.slice(0, FACTS_LIMIT);
+};
+
+// Persist newly extracted facts AND mark contradicted ones as superseded.
+// existingFacts is the ranked window we showed the extractor; supersededIds
+// must match one of those ids — anything else is rejected as a fabrication.
+const persistFactExtraction = async (
+  userId,
+  moonokoId,
+  existingFacts,
+  newFacts,
+  supersededIds,
+) => {
+  const factsRef = conversationRef(userId, moonokoId).collection('facts');
+  const batch = db.batch();
+  const now = admin.firestore.Timestamp.now();
+  let hasWrites = false;
+
+  const existingIds = new Set(existingFacts.map(f => f.id));
+  const supersededSet = new Set();
+  for (const id of supersededIds || []) {
+    if (typeof id !== 'string' || !existingIds.has(id)) continue;
+    if (supersededSet.has(id)) continue;
+    batch.update(factsRef.doc(id), { supersededAt: now });
+    supersededSet.add(id);
+    hasWrites = true;
+  }
+
+  // Dedup safety net — drop any new fact whose value already exists verbatim
+  // on a still-active fact. Excludes ones we just superseded so the model
+  // can replace "is a Pisces" with "is a Virgo" on the same turn.
+  const activeValues = new Set(
+    existingFacts
+      .filter(f => !supersededSet.has(f.id))
+      .map(f => String(f.value || '').toLowerCase().trim()),
+  );
+
+  const saved = [];
+  for (const fact of newFacts || []) {
+    const value = String(fact?.value || '').trim();
+    const type = FACT_TYPES.includes(fact?.type) ? fact.type : 'detail';
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (activeValues.has(key)) continue;
+    activeValues.add(key);
+    batch.set(factsRef.doc(), {
+      type,
+      value,
+      source: 'user',
+      createdAt: now,
+    });
+    saved.push({ type, value });
+    hasWrites = true;
+  }
+
+  if (hasWrites) await batch.commit();
+  return { saved, superseded: Array.from(supersededSet) };
+};
+
+// Ask Gemini to extract durable facts from the user's latest message, and
+// flag any existing facts the message contradicts.
+// Returns { facts: Array<{type, value}>, superseded: Array<string id> }.
+const extractFacts = async (userMessage, existingFacts, moonokoName) => {
+  try {
+    const existingSerialized = existingFacts.length
+      ? existingFacts.map(f => `- [id:${f.id}] [${f.type}] ${f.value}`).join('\n')
+      : '(none yet)';
+
+    const extractionPrompt = `You are analyzing a user's message in a casual chat with a character named ${moonokoName}. Extract any NEW, specific, durable facts about the user that would be useful to remember across future conversations (over weeks).
+
+Only extract things the user explicitly reveals about themselves. Avoid greetings, questions, moods, opinions about the character, or anything transient.
+
+Categories:
+- preference: likes, dislikes, taste (e.g. "loves 90s anime", "hates mornings")
+- detail: personal info (e.g. "name is Alex", "is a CS student", "lives in Tokyo")
+- event: specific things that happened (e.g. "had a job interview today", "finished their thesis")
+- relationship: people in their life (e.g. "has a sister named Mia", "dating someone named Sam")
+- goal: aspirations or projects (e.g. "building a game called Hoshino")
+
+Already known facts (with ids):
+${existingSerialized}
+
+Rules:
+1. Do NOT return a new fact that duplicates or near-duplicates one already known. Only return genuinely new information.
+2. If the user's message CONTRADICTS an existing fact (e.g. existing says "is a Pisces" but the user says "actually I'm a Virgo"; or existing "loves coffee" and the user says "I hate coffee now"), put that fact's id in the "superseded" array AND include the corrected version in "facts".
+3. Only supersede on a real contradiction — not when the user is just adding detail or the topic is loosely related.
+4. Never invent or guess an id. Only use ids that appear in the list above.
+
+User message:
+"""
+${userMessage}
+"""
+
+Return JSON only.`;
+
+    const response = await genAI.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents: extractionPrompt,
+      config: {
+        thinkingConfig: { thinkingBudget: 0 },
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'object',
+          properties: {
+            facts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type: { type: 'string', enum: FACT_TYPES },
+                  value: { type: 'string' },
+                },
+                required: ['type', 'value'],
+              },
+            },
+            superseded: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+          },
+          required: ['facts'],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    return {
+      facts: Array.isArray(parsed.facts) ? parsed.facts : [],
+      superseded: Array.isArray(parsed.superseded) ? parsed.superseded : [],
+    };
+  } catch (error) {
+    console.error('Fact extraction failed:', error.message);
+    return { facts: [], superseded: [] };
+  }
+};
 
 // Helper function to detect safety filter violations in errors
 const isSafetyFilterViolation = (error) => {
+  const errorMessage = error.message?.toLowerCase() || '';
+  const errorDetails = error.details?.toLowerCase() || '';
+  const errorResponse = error.response?.data?.error?.message?.toLowerCase() || '';
+  const allText = `${errorMessage} ${errorDetails} ${errorResponse}`;
+
+  // Short-circuit rate-limit / quota errors. Gemini's quota payload contains
+  // "QuotaFailure.violations" in its structured details, which used to
+  // false-match the "violation" keyword below.
+  if (
+    error.status === 429 ||
+    allText.includes('resource_exhausted') ||
+    allText.includes('rate limit') ||
+    allText.includes('quota')
+  ) {
+    return false;
+  }
+
   const safetyKeywords = [
     'safety',
     'content policy',
@@ -28,18 +252,10 @@ const isSafetyFilterViolation = (error) => {
     'hate speech',
     'discriminatory content',
     'goes against my purpose',
-    'can\'t engage'
+    "can't engage"
   ];
-  
-  const errorMessage = error.message?.toLowerCase() || '';
-  const errorDetails = error.details?.toLowerCase() || '';
-  const errorResponse = error.response?.data?.error?.message?.toLowerCase() || '';
-  
-  return safetyKeywords.some(keyword => 
-    errorMessage.includes(keyword) || 
-    errorDetails.includes(keyword) || 
-    errorResponse.includes(keyword)
-  );
+
+  return safetyKeywords.some(keyword => allText.includes(keyword));
 };
 
 // Helper function to detect safety filter violations in response content
@@ -53,46 +269,10 @@ const isSafetyFilteredResponse = (response) => {
     'i can\'t engage with',
     'my purpose to be helpful'
   ];
-  
+
   const responseText = response?.toLowerCase() || '';
-  
+
   return safetyIndicators.some(indicator => responseText.includes(indicator));
-};
-
-// Helper function to call Grok API
-const callGrokAPI = async (systemPrompt, userMessage) => {
-  if (!grokConfig.apiKey) {
-    throw new Error('Grok API key not configured');
-  }
-  
-  try {
-    const client = new OpenAI({
-      apiKey: grokConfig.apiKey,
-      baseURL: grokConfig.baseURL,
-      timeout: 360000, // Longer timeout for reasoning models
-    });
-
-    const completion = await client.chat.completions.create({
-      model: 'grok-3-fast',
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: userMessage,
-        },
-      ],
-      max_tokens: 200,
-      temperature: 0.8,
-    });
-
-    return completion.choices[0].message.content;
-  } catch (error) {
-    console.error('Grok API call failed:', error);
-    throw error;
-  }
 };
 
 // Initialize OpenAI
@@ -139,83 +319,98 @@ exports.chat = onRequest({
   cors: ['*'],
   invoker: 'public'
 }, async (req, res) => {
-  let moonokoId; // Declare at function level for catch block access
-  let moonoko; // Declare at function level for catch block access
-  
+  let moonokoId; // hoisted for catch block access
+  let moonoko;
+  let userId;
+  let message;
+
   try {
-    // Validate request
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { message, moonokoId: reqMoonokoId, userId, conversationId } = req.body;
-    moonokoId = reqMoonokoId; // Assign to function-level variable
+    ({ message, moonokoId, userId } = req.body);
 
     if (!message || !moonokoId || !userId) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: message, moonokoId, userId' 
+      return res.status(400).json({
+        error: 'Missing required fields: message, moonokoId, userId'
       });
     }
 
-    // Get moonoko personality
-    moonoko = MOONOKO_PERSONALITIES[moonokoId]; // Assign to function-level variable
+    moonoko = MOONOKO_PERSONALITIES[moonokoId];
     if (!moonoko) {
       return res.status(400).json({ error: 'Invalid moonoko ID' });
     }
 
-    // Create system prompt for the moonoko (optimized for token usage)
+    // Load prior turns + durable facts for this user+moonoko pair in parallel
+    const [history, facts] = await Promise.all([
+      getHistory(userId, moonokoId),
+      getFacts(userId, moonokoId),
+    ]);
+
+    const factsBlock = facts.length
+      ? `\n\nWhat you remember about this user (use naturally, don't list them back):\n${facts.map(f => `- [${f.type}] ${f.value}`).join('\n')}`
+      : '';
+
     const systemPrompt = `You are ${moonoko.name}. ${moonoko.personality}
 
 Key traits: ${moonoko.traits.join(', ')}
 
-Keep responses under 50 words.`;
+Keep responses under 50 words.${factsBlock}`;
+
+    // Kick off fact extraction in parallel with the main generation.
+    // It only needs the user message + existing facts, not the model's reply.
+    const extractionPromise = extractFacts(message, facts, moonoko.name);
 
     let aiResponse;
     let usedProvider = 'none';
-    
+
     // Try Gemini first
     try {
       console.log('Trying Gemini API...');
-      
-      // Call Gemini API with proper systemInstruction format
+
+      const geminiContents = [
+        ...history.map(m => ({ role: m.role, parts: [{ text: m.content }] })),
+        { role: 'user', parts: [{ text: message }] },
+      ];
+
       const response = await genAI.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: message,
+        model: "gemini-2.5-flash-lite",
+        contents: geminiContents,
         config: {
           systemInstruction: systemPrompt,
           thinkingConfig: {
-            thinkingBudget: 0, // Disables thinking
+            thinkingBudget: 0,
           },
         }
       });
       aiResponse = response.text;
-      
-      // Check if the response was safety filtered
+
       if (isSafetyFilteredResponse(aiResponse)) {
         console.log('Gemini response was safety filtered, trying OpenAI...');
         throw new Error('SAFETY_FILTER_VIOLATION');
       }
-      
+
       usedProvider = 'gemini';
       console.log('Gemini API successful!');
     } catch (geminiError) {
       console.log('Gemini failed:', geminiError.message);
-      
-      // Check if it's a safety filter violation
+
       if (isSafetyFilterViolation(geminiError) || geminiError.message === 'SAFETY_FILTER_VIOLATION') {
         console.log('Gemini safety filter triggered, trying OpenAI...');
       }
-      
-      // Fall back to OpenAI
+
       try {
         console.log('Trying OpenAI API...');
-        // Prepare messages for OpenAI
         const messages = [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
+          ...history.map(m => ({
+            role: m.role === 'model' ? 'assistant' : 'user',
+            content: m.content,
+          })),
+          { role: 'user', content: message },
         ];
 
-        // Call OpenAI
         const completion = await openai.chat.completions.create({
           model: 'gpt-3.5-turbo',
           messages: messages,
@@ -228,41 +423,51 @@ Keep responses under 50 words.`;
         console.log('OpenAI API successful!');
       } catch (openaiError) {
         console.log('OpenAI failed:', openaiError.message);
-        
-        // Check if it's a safety filter violation
-        if (isSafetyFilterViolation(openaiError)) {
-          console.log('OpenAI safety filter triggered, trying Grok...');
-          
-          // Try Grok as final fallback for safety filter violations
-          try {
-            console.log('Trying Grok API...');
-            aiResponse = await callGrokAPI(systemPrompt, message);
-            usedProvider = 'grok';
-            console.log('Grok API successful!');
-          } catch (grokError) {
-            console.log('All AI providers failed:', grokError.message);
-            throw grokError; // This will trigger the fallback responses
-          }
-        } else {
-          // If it's not a safety filter violation, just throw the error
-          throw openaiError;
-        }
+        throw openaiError;
       }
     }
 
-    // Return response
+    // Persist turn + newly extracted facts + supersessions
+    let savedFacts = [];
+    let supersededIds = [];
+    try {
+      const extracted = await extractionPromise;
+      const [, persistResult] = await Promise.all([
+        saveTurn(userId, moonokoId, message, aiResponse),
+        persistFactExtraction(
+          userId,
+          moonokoId,
+          facts,
+          extracted.facts,
+          extracted.superseded,
+        ),
+      ]);
+      savedFacts = persistResult.saved;
+      supersededIds = persistResult.superseded;
+      if (savedFacts.length > 0 || supersededIds.length > 0) {
+        console.log(
+          `Facts updated — saved ${savedFacts.length}, superseded ${supersededIds.length}:`,
+          { saved: savedFacts, superseded: supersededIds },
+        );
+      }
+    } catch (saveError) {
+      console.error('Failed to persist conversation state:', saveError);
+    }
+
     res.json({
       success: true,
       message: aiResponse,
       moonokoName: moonoko.name,
-      conversationId: conversationId || 'new-conversation',
+      conversationId: `${userId}_${moonokoId}`,
       timestamp: new Date().toISOString(),
-      provider: usedProvider
+      provider: usedProvider,
+      newFacts: savedFacts.length,
+      supersededFacts: supersededIds.length,
     });
 
   } catch (error) {
     console.error('Chat function error:', error);
-    
+
     // Check if it's a safety filter violation
     if (isSafetyFilterViolation(error)) {
       const safetyFilterResponses = {
@@ -272,9 +477,9 @@ Keep responses under 50 words.`;
         sirius: "My dad jokes got flagged! (◕‿◕) Let me reboot with cleaner humor!",
         zaniah: "The astral plane is being protective! (´･ω･`) Let me align with better vibes!"
       };
-      
+
       const fallbackResponse = safetyFilterResponses[moonokoId] || "My cosmic filters are being extra careful! Let me adjust my energy! 😊";
-      
+
       return res.json({
         success: true,
         message: fallbackResponse,
@@ -285,7 +490,7 @@ Keep responses under 50 words.`;
         provider: 'fallback'
       });
     }
-    
+
     // Check if it's a quota/rate limit error
     if (error.message && (error.message.includes('quota') || error.message.includes('429'))) {
       // Provide fallback responses when API quota is exceeded
@@ -296,9 +501,9 @@ Keep responses under 50 words.`;
         sirius: "The Dog Star needs a quick rest! (◕‿◕) Try again shortly!",
         zaniah: "The cosmic winds are still... (´･ω･`) We'll connect again soon!"
       };
-      
+
       const fallbackResponse = fallbackResponses[moonokoId] || "I'm taking a quick break! 😊";
-      
+
       return res.json({
         success: true,
         message: fallbackResponse,
@@ -309,35 +514,74 @@ Keep responses under 50 words.`;
         provider: 'fallback'
       });
     }
-    
+
     // For any other error, return a 500
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to process chat request',
       details: error.message
     });
   }
 });
 
-// Get conversation history
+// Get conversation history for a given user+moonoko pair
 exports.getConversation = onRequest({
   cors: ['*'],
   invoker: 'public'
 }, async (req, res) => {
   try {
-    const { conversationId, userId } = req.query;
+    const { moonokoId, userId, limit: limitParam } = req.query;
 
-    if (!conversationId || !userId) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: conversationId, userId' 
+    if (!moonokoId || !userId) {
+      return res.status(400).json({
+        error: 'Missing required fields: moonokoId, userId'
       });
     }
+
+    const limit = Math.min(parseInt(limitParam, 10) || 50, 200);
+
+    const [msgsSnap, factsSnap] = await Promise.all([
+      conversationRef(userId, moonokoId)
+        .collection('messages')
+        .orderBy('timestamp', 'asc')
+        .limit(limit)
+        .get(),
+      conversationRef(userId, moonokoId)
+        .collection('facts')
+        .orderBy('createdAt', 'desc')
+        .limit(FACTS_POOL_SIZE)
+        .get(),
+    ]);
+
+    const messages = msgsSnap.docs.map(d => {
+      const data = d.data();
+      return {
+        role: data.role === 'model' ? 'assistant' : 'user',
+        content: data.content,
+        timestamp: data.timestamp?.toDate?.().toISOString() || new Date().toISOString(),
+        moonokoId,
+      };
+    });
+
+    const nowMs = Date.now();
+    const facts = factsSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(f => !f.supersededAt)
+      .sort((a, b) => scoreFact(b, nowMs) - scoreFact(a, nowMs))
+      .slice(0, FACTS_LIMIT)
+      .map(f => ({
+        type: f.type,
+        value: f.value,
+        createdAt: f.createdAt?.toDate?.().toISOString() || null,
+      }));
 
     res.json({
       success: true,
       conversation: {
-        id: conversationId,
-        userId: userId,
-        messages: []
+        id: `${userId}_${moonokoId}`,
+        userId,
+        moonokoId,
+        messages,
+        facts,
       }
     });
 
@@ -345,4 +589,4 @@ exports.getConversation = onRequest({
     console.error('Get conversation error:', error);
     res.status(500).json({ error: 'Failed to fetch conversation' });
   }
-}); 
+});

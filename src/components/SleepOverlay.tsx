@@ -16,9 +16,21 @@ const { width, height } = Dimensions.get('window');
 interface Props {
     visible: boolean;
     onDismiss?: () => void;
+    remainingMs?: number;
 }
 
-const SleepOverlay: React.FC<Props> = ({ visible, onDismiss }) => {
+const formatRemaining = (ms: number) => {
+    if (ms <= 0) return 'READY';
+    const totalSec = Math.ceil(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${h.toString().padStart(2, '0')}:${m
+        .toString()
+        .padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
+const SleepOverlay: React.FC<Props> = ({ visible, onDismiss, remainingMs = 0 }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const starTwinkleAnim = useRef(new Animated.Value(0)).current;
     const bubbleFloatAnim = useRef(new Animated.Value(0)).current;
@@ -27,6 +39,7 @@ const SleepOverlay: React.FC<Props> = ({ visible, onDismiss }) => {
     const zzzAnim = useRef(new Animated.Value(0)).current;
 
     const [buttonScale] = useState(new Animated.Value(1));
+    const [dismissing, setDismissing] = useState(false);
 
     // Generate random pixel stars - more of them!
     const pixelStars = useMemo(
@@ -55,6 +68,7 @@ const SleepOverlay: React.FC<Props> = ({ visible, onDismiss }) => {
 
     useEffect(() => {
         if (visible) {
+            setDismissing(false);
             // Main fade in
             Animated.timing(fadeAnim, {
                 toValue: 1,
@@ -142,6 +156,7 @@ const SleepOverlay: React.FC<Props> = ({ visible, onDismiss }) => {
                 ])
             ).start();
         } else {
+            setDismissing(false);
             Animated.timing(fadeAnim, {
                 toValue: 0,
                 duration: 600,
@@ -151,21 +166,14 @@ const SleepOverlay: React.FC<Props> = ({ visible, onDismiss }) => {
     }, [visible]);
 
     const handleDismiss = () => {
-        if (typeof onDismiss === 'function') {
-            Animated.timing(fadeAnim, {
-                toValue: 0,
-                duration: 600,
-                useNativeDriver: true,
-            }).start(() => {
-                onDismiss();
-            });
-        } else {
-            Animated.timing(fadeAnim, {
-                toValue: 0,
-                duration: 600,
-                useNativeDriver: true,
-            }).start();
-        }
+        if (dismissing) return;
+        setDismissing(true);
+        Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 600,
+            useNativeDriver: true,
+        }).start();
+        onDismiss?.();
     };
 
     const handleButtonPress = () => {
@@ -193,12 +201,13 @@ const SleepOverlay: React.FC<Props> = ({ visible, onDismiss }) => {
         });
     };
 
-    if (!visible) {
+    if (!visible || dismissing) {
         return null;
     }
 
     return (
         <Animated.View
+            pointerEvents={dismissing ? 'none' : 'auto'}
             style={[
                 styles.overlay,
                 {
@@ -320,7 +329,11 @@ const SleepOverlay: React.FC<Props> = ({ visible, onDismiss }) => {
                         >
                             <Text style={styles.timeText}>{getCurrentTime()}</Text>
                             <View style={styles.pixelUnderline} />
-                            <Text style={styles.trackingText}>• • • TRACKING SLEEP • • •</Text>
+                            <Text style={styles.trackingText}>
+                                {remainingMs > 0
+                                    ? `RESTING • ${formatRemaining(remainingMs)} TO FULL`
+                                    : '• • • FULLY RESTED • • •'}
+                            </Text>
                         </Animated.View>
 
                         {/* Pixel Art Sleep Box */}
@@ -396,7 +409,7 @@ const SleepOverlay: React.FC<Props> = ({ visible, onDismiss }) => {
                                 activeOpacity={0.8}
                             >
                                 <View style={styles.pixelButtonInner}>
-                                    <Text style={styles.pixelButtonText}>End{'\n'}Sleep{'\n'}Session</Text>
+                                    <Text style={styles.pixelButtonText}>Wake{'\n'}Up</Text>
                                 </View>
                             </TouchableOpacity>
                         </Animated.View>

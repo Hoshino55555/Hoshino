@@ -4,15 +4,11 @@ import Shop from './Shop';
 import Gallery from './Gallery';
 import SleepMode from './SleepMode';
 import InnerScreen from './InnerScreen';
-import WalletButton from './WalletButton';
 import Settings from './Settings';
 import Frame from './Frame';
 import Starburst from './Starburst';
-import { useWallet } from '../contexts/WalletContext';
-import { StatDecayService } from '../services/StatDecayService';
-import { LocalGameEngine, GameStats } from '../services/local/LocalGameEngine';
 import SettingsService, { MenuButton } from '../services/SettingsService';
-import SleepOverlay from './SleepOverlay';
+import { useGameStateContext } from '../contexts/GameStateContext';
 
 const { height } = Dimensions.get('window');
 
@@ -61,8 +57,6 @@ interface Props {
     onBack?: () => void;
     onSettings?: () => void;
     onGallery?: () => void;
-    // ✅ New props for local game engine
-    localGameEngine?: LocalGameEngine | null;
     // Transition animation control
     shouldFadeIn?: boolean;
     onFadeInComplete?: () => void;
@@ -70,61 +64,27 @@ interface Props {
 
 const MoonokoInteraction: React.FC<Props> = ({
     selectedCharacter,
-    onSelectCharacter,
     onFeed,
-    connected,
-    walletAddress,
-    playerName,
-    onRefreshNFTs,
     onNotification,
-    onGame,
-    onMemoryGame,
-    onStarGame,
     onShop,
     onInventory,
     onChat,
     onBack,
     onSettings,
     onGallery,
-    // ✅ New props
-    localGameEngine,
     shouldFadeIn = false,
     onFadeInComplete
 }) => {
-    const { connected: walletConnected, publicKey, connect, disconnect } = useWallet();
-    // ✅ Use GameStats from LocalGameEngine instead of simple stats
-    const [currentStats, setCurrentStats] = useState<GameStats>({
-        mood: 3,
-        hunger: 2,
-        energy: 4,
-        totalFeedings: 0,
-        totalPlays: 0,
-        totalSleeps: 0,
-        lastPlayed: Date.now(),
-        level: 1,
-        experience: 0
-    });
-    const [statDecayService] = useState(() => new StatDecayService());
+    const { state: gameState } = useGameStateContext();
+    const currentStats = {
+        mood: gameState?.mood ?? 3,
+        hunger: gameState?.hunger ?? 5,
+        energy: gameState?.energy ?? 3,
+    };
 
     const [currentGame, setCurrentGame] = useState<string | null>(null);
     const [isTransitioning, setIsTransitioning] = useState(true);
     const [transitionOpacity, setTransitionOpacity] = useState(1);
-
-    // ✅ Load stats from LocalGameEngine when available with StatDecayService sync
-    useEffect(() => {
-        if (localGameEngine && selectedCharacter) {
-            (async () => {
-                const stats = await localGameEngine.getLocalStats();
-                await statDecayService.initializeCharacter(selectedCharacter.id, {
-                    mood: stats.mood,
-                    hunger: stats.hunger,
-                    energy: stats.energy
-                });
-                setCurrentStats(stats);
-                console.log('📊 Loaded stats from LocalGameEngine and synced with StatDecayService:', stats);
-            })();
-        }
-    }, [localGameEngine, selectedCharacter]);
 
     // Fade in animation when component mounts (only if shouldFadeIn is true)
     useEffect(() => {
@@ -157,49 +117,6 @@ const MoonokoInteraction: React.FC<Props> = ({
         }
     }, [shouldFadeIn]);
 
-    // ✅ Optimized: Reduced frequency for better mobile performance and conflict prevention
-    useEffect(() => {
-        if (!localGameEngine || !selectedCharacter) return;
-
-        const interval = setInterval(async () => {
-            const engineStats = await localGameEngine.getLocalStats();
-            // Check if StatDecayService has more recent updates
-            const decayStats = await statDecayService.updateCharacterStats(selectedCharacter.id);
-
-            // Use the more recently updated stats (priority to user actions vs time decay)
-            const finalStats = {
-                ...engineStats,
-                // Apply time-based decay from StatDecayService if significant
-                mood: Math.min(engineStats.mood, decayStats.mood),
-                energy: decayStats.energy, // StatDecayService handles energy decay better
-                hunger: decayStats.hunger
-            };
-
-            // Only update if stats actually changed to prevent unnecessary re-renders
-            setCurrentStats(prevStats => {
-                if (prevStats.mood === finalStats.mood &&
-                    prevStats.energy === finalStats.energy &&
-                    prevStats.hunger === finalStats.hunger) {
-                    return prevStats; // No change, prevent re-render
-                }
-                return finalStats;
-            });
-
-            // Sync the final stats back to LocalGameEngine only if needed
-            if (finalStats.mood !== engineStats.mood || finalStats.energy !== engineStats.energy) {
-                await localGameEngine.updateStats({
-                    ...engineStats,
-                    mood: finalStats.mood,
-                    energy: finalStats.energy,
-                    hunger: finalStats.hunger
-                });
-            }
-        }, 15000); // Increased to 15s for better mobile battery life
-
-        return () => clearInterval(interval);
-    }, [localGameEngine, selectedCharacter, statDecayService]);
-    const [showIngredients, setShowIngredients] = useState(false);
-    const [showSleepMode, setShowSleepMode] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
     const [settingsService] = useState(() => SettingsService.getInstance());
@@ -255,61 +172,6 @@ const MoonokoInteraction: React.FC<Props> = ({
         }
     }, [showSettings, settingsService]);
 
-    // Initialize StatDecayService (only if LocalGameEngine is not available)
-    useEffect(() => {
-        if (selectedCharacter && !localGameEngine) {
-            (async () => {
-                // Initialize character in stat decay service with default stats
-                await statDecayService.initializeCharacter(selectedCharacter.id, {
-                    mood: 3,
-                    hunger: 2,
-                    energy: 4
-                });
-
-                // Update stats with current decay
-                const updatedStats = await statDecayService.updateCharacterStats(selectedCharacter.id);
-                setCurrentStats(prev => ({
-                    ...prev,
-                    mood: updatedStats.mood,
-                    hunger: updatedStats.hunger,
-                    energy: updatedStats.energy
-                }));
-
-                // Only show mood state notification if character is in a concerning state
-                if (updatedStats.moodState.state === 'sad' || updatedStats.moodState.state === 'angry') {
-                    const stateDescription = await statDecayService.getCharacterStateDescription(selectedCharacter.id);
-                    onNotification?.(stateDescription, 'warning');
-                }
-            })();
-        }
-    }, [selectedCharacter, localGameEngine]);
-
-    // ✅ Optimized: Mobile-friendly stat decay with performance improvements
-    useEffect(() => {
-        if (!selectedCharacter || localGameEngine) return; // Skip if LocalGameEngine handles sync
-
-        const interval = setInterval(async () => {
-            const updatedStats = await statDecayService.updateCharacterStats(selectedCharacter.id);
-
-            // Only update if stats actually changed to prevent unnecessary re-renders
-            setCurrentStats(prev => {
-                if (prev.mood === updatedStats.mood &&
-                    prev.hunger === updatedStats.hunger &&
-                    prev.energy === updatedStats.energy) {
-                    return prev; // No change, prevent re-render
-                }
-                return {
-                    ...prev,
-                    mood: updatedStats.mood,
-                    hunger: updatedStats.hunger,
-                    energy: updatedStats.energy
-                };
-            });
-        }, 45000); // Increased to 45s for better mobile performance
-
-        return () => clearInterval(interval);
-    }, [selectedCharacter, localGameEngine, statDecayService]);
-
     // Handle menu button actions
     const handleMenuButtonAction = async (action: string) => {
         if (!selectedCharacter && action !== 'settings' && action !== 'shop') {
@@ -323,8 +185,8 @@ const MoonokoInteraction: React.FC<Props> = ({
                 break;
 
             case 'sleep':
-                console.log('Sleep mode activated for', selectedCharacter!.name);
-                setShowSleepMode(true);
+                // TEMP: sleep is disabled while the UX is being reworked.
+                onNotification?.('😴 Sleep is being reworked — stay tuned.', 'info');
                 break;
 
             case 'shop':
@@ -400,12 +262,6 @@ const MoonokoInteraction: React.FC<Props> = ({
 
     return (
         <>
-            <WalletButton
-                connected={walletConnected}
-                publicKey={publicKey}
-                onConnect={connect}
-                onDisconnect={disconnect}
-            />
             <InnerScreen
             showStatsBar={true}
             isTransitioning={isTransitioning}
@@ -523,12 +379,7 @@ const MoonokoInteraction: React.FC<Props> = ({
             )}
 
             </InnerScreen>
-            {showSleepMode && (
-                <SleepOverlay
-                    visible={showSleepMode}
-                    onDismiss={() => setShowSleepMode(false)}
-                />
-            )}
+            {/* TEMP: SleepOverlay disabled while sleep UX is being reworked. */}
 
             {currentGame === 'starburst' && (
                 <View style={[StyleSheet.absoluteFill, { zIndex: 2, elevation: 12 }]}>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
@@ -22,6 +23,7 @@ import GlobalLeaderboard from './src/components/GlobalLeaderboard';
 import Notification, { DeploymentStatusBanner } from './src/components/Notification';
 import WalletButton from './src/components/WalletButton';
 import Settings from './src/components/Settings';
+import Profile from './src/components/Profile';
 
 // React Native compatible wallet integration
 import { useWallet, WalletProvider } from './src/contexts/WalletContext';
@@ -34,9 +36,10 @@ import { Connection, PublicKey } from '@solana/web3.js';
 
 // NEW: Programmable NFT Integration
 // New services and configs
-import { LocalGameEngine } from './src/services/local/LocalGameEngine';
 import { getGameCharacters, MOONOKOS_BY_ID, toGameCharacter } from './src/data/moonokos';
 import { ENABLE_VRF_DEV_SCREEN } from './src/config/vrf';
+import { FirebaseAuthProvider } from './src/contexts/FirebaseAuthContext';
+import { GameStateProvider } from './src/contexts/GameStateContext';
 
 interface Character {
     id: string;
@@ -176,7 +179,7 @@ function App() {
 
 
 
-    const { connected, publicKey, connect, disconnect } = useWallet();
+    const { connected, publicKey, connect, disconnect, email, walletSource } = useWallet();
     const [currentView, setCurrentView] = useState('welcome');
     const [previousView, setPreviousView] = useState('welcome');
     const [welcomePhase, setWelcomePhase] = useState<string>('intro');
@@ -198,11 +201,6 @@ function App() {
     const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(
         null
     );
-    const [characterStats, setCharacterStats] = useState({
-        mood: 3,
-        hunger: 5,
-        energy: 2
-    });
     const [statusMessage, setStatusMessage] = useState('');
     const [achievements, setAchievements] = useState<string[]>([]);
     const [ownedCharacters, setOwnedCharacters] = useState<string[]>([]);
@@ -217,7 +215,6 @@ function App() {
     const [deploymentStatus, setDeploymentStatus] = useState<string>('')
     const [showDeploymentBanner, setShowDeploymentBanner] = useState(true)
 
-    const [localGameEngine, setLocalGameEngine] = useState<LocalGameEngine | null>(null);
     const [playerName, setPlayerName] = useState<string>('');
     const [profileHydratedWallet, setProfileHydratedWallet] = useState<string | null>(
         null
@@ -267,21 +264,6 @@ function App() {
         },
         [ownedCharacters, playerName, selectedCharacter?.id]
     );
-
-    // Initialize local services when a Solana wallet identity is known.
-    useEffect(() => {
-        if (publicKey) {
-            const gameEngine = new LocalGameEngine(publicKey.toString());
-            setLocalGameEngine(gameEngine);
-            
-            gameEngine.init().then(() => {
-                console.log('🎮 Game engine initialized for wallet:', publicKey.toString().slice(0, 8) + '...');
-            });
-
-        } else {
-            setLocalGameEngine(null);
-        }
-    }, [publicKey]);
 
     useEffect(() => {
         return () => {
@@ -391,11 +373,6 @@ function App() {
                 selectedCharacterId: restoredCharacter.id,
             });
         }
-        setCharacterStats({
-            mood: 3,
-            hunger: 2,
-            energy: 4
-        });
         setCurrentView('interaction');
     };
 
@@ -451,11 +428,6 @@ function App() {
             setPlayerName(storedProfile.playerName);
             setOwnedCharacters(restoredOwnedCharacters);
             setSelectedCharacter(restoredCharacter);
-            setCharacterStats({
-                mood: 3,
-                hunger: 2,
-                energy: 4,
-            });
 
             if (hasStoredCompanion) {
                 setCurrentView(restoredCharacter ? 'interaction' : 'selection');
@@ -517,6 +489,17 @@ function App() {
         selectedCharacter?.id,
     ]);
 
+    const updatePlayerName = useCallback(
+        (name: string) => {
+            const trimmed = name.trim();
+            setPlayerName(trimmed);
+            if (publicKey) {
+                persistPlayerProfile(publicKey.toString(), { playerName: trimmed });
+            }
+        },
+        [persistPlayerProfile, publicKey]
+    );
+
     const handleContinueFromWelcome = (name?: string) => {
         if (name) {
             setPlayerName(name);
@@ -560,11 +543,6 @@ function App() {
                     selectedCharacterId: restoredCharacter.id,
                 });
             }
-            setCharacterStats({
-                mood: 3,
-                hunger: 2,
-                energy: 4
-            });
             console.log('🎉 Setting selected character:', restoredCharacter.name);
         }
         setShouldGoToCongratulations(true);
@@ -573,33 +551,6 @@ function App() {
         setTimeout(() => {
             setShouldGoToCongratulations(false);
         }, 1000);
-    };
-
-    const handleFeed = async (
-        foodType: string,
-        hungerBoost: number,
-        moodBoost: number
-    ) => {
-        if (hungerBoost < 0 || hungerBoost > 5 || moodBoost < 0 || moodBoost > 5) {
-            setStatusMessage('Invalid feeding parameters');
-            return;
-        }
-
-        setCharacterStats((prev) => ({
-            ...prev,
-            hunger: Math.min(5, prev.hunger + hungerBoost),
-            mood: Math.min(5, prev.mood + moodBoost)
-        }));
-
-        // Update game engine if available
-        if (localGameEngine) {
-            try {
-                const newStats = await localGameEngine.feedMoonoko();
-                console.log('🍎 Updated game stats:', newStats);
-            } catch (error) {
-                console.error('❌ Error updating game stats:', error);
-            }
-        }
     };
 
     useEffect(() => {
@@ -631,7 +582,6 @@ function App() {
             onGallery={() => setCurrentView('gallery')}
             onChat={() => setCurrentView('chat')}
             onSettings={() => setCurrentView('settings')}
-            localGameEngine={localGameEngine}
             shouldFadeIn={shouldFadeInInteraction}
             onFadeInComplete={() => setShouldFadeInInteraction(false)}
         />
@@ -715,6 +665,7 @@ function App() {
                     />
                 );
             case 'settings':
+            case 'profile':
                 return null;
             case 'vrf-dev': {
                 const VRFTest = require('./src/components/_dev/VRFTest').default;
@@ -727,14 +678,7 @@ function App() {
                 );
             }
             default:
-                return (
-                    <WelcomeScreen
-                        onContinue={handleContinueFromWelcome}
-                        connected={connected}
-                        onConnectWallet={connectWallet}
-                        playerName={playerName}
-                    />
-                );
+                return null;
         }
     };
 
@@ -742,10 +686,11 @@ function App() {
         return null; // or a loading screen
     }
 
-    const miRoutes = ['interaction', 'feeding', 'shop', 'gallery', 'inventory', 'settings', 'chat'];
+    const miRoutes = ['interaction', 'feeding', 'shop', 'gallery', 'inventory', 'settings', 'chat', 'profile'];
     const miMounted = miRoutes.includes(currentView);
 
     return (
+        <GameStateProvider characterId={selectedCharacter?.id ?? null}>
         <SafeAreaView style={styles.container}>
             <StatusBar style="light" hidden={true} />
             <DeviceCasing />
@@ -762,8 +707,7 @@ function App() {
                 <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
                     <FeedingPage
                         onBack={() => setCurrentView('interaction')}
-                        onFeed={handleFeed}
-                        currentHunger={characterStats.hunger}
+                        onNotification={addNotification}
                     />
                 </View>
             )}
@@ -802,6 +746,20 @@ function App() {
                     />
                 </View>
             )}
+            {currentView === 'profile' && (
+                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                    <Profile
+                        onBack={() => setCurrentView(previousView || 'interaction')}
+                        onNotification={addNotification}
+                        playerName={playerName}
+                        publicKey={publicKey?.toString() ?? null}
+                        email={email}
+                        walletSource={walletSource}
+                        onUpdatePlayerName={updatePlayerName}
+                        onLogout={disconnectWallet}
+                    />
+                </View>
+            )}
             {currentView === 'chat' && selectedCharacter && (
                 <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
                     <CharacterChat
@@ -827,8 +785,9 @@ function App() {
             <WalletButton
                 connected={connected}
                 publicKey={publicKey}
+                playerName={playerName}
                 onConnect={connectWallet}
-                onDisconnect={disconnectWallet}
+                onOpenProfile={() => navigateToView('profile')}
             />
 
             {statusMessage && (
@@ -846,6 +805,7 @@ function App() {
                 />
             ))}
         </SafeAreaView>
+        </GameStateProvider>
     );
 }
 
@@ -961,13 +921,17 @@ function AuthGate() {
 
 function AppWrapper() {
     return (
-        <HoshinoPrivyProvider>
-            <WalletProvider>
-                <ChromeProvider>
-                    <AuthGate />
-                </ChromeProvider>
-            </WalletProvider>
-        </HoshinoPrivyProvider>
+        <SafeAreaProvider>
+            <HoshinoPrivyProvider>
+                <FirebaseAuthProvider>
+                    <WalletProvider>
+                        <ChromeProvider>
+                            <AuthGate />
+                        </ChromeProvider>
+                    </WalletProvider>
+                </FirebaseAuthProvider>
+            </HoshinoPrivyProvider>
+        </SafeAreaProvider>
     );
 }
 

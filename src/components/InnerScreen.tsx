@@ -141,14 +141,6 @@ const InnerScreen: React.FC<InnerScreenProps> = ({
                 useLargeLayout && styles.shadowContainerLarge,
                 animatedStyle
             ]}>
-                {/* Gradient shadow layers - only for non-selection pages */}
-                {!useLargeLayout && (
-                    <>
-                        <View style={styles.gradientShadowOuter} />
-                        <View style={styles.gradientShadowInner} />
-                    </>
-                )}
-
                 {/* Inner screen with rounded borders */}
                 <View style={[
                     styles.innerScreen,
@@ -210,6 +202,18 @@ const InnerScreen: React.FC<InnerScreenProps> = ({
                             <Text style={styles.closeButtonText}>✕</Text>
                         </TouchableOpacity>
                     )}
+
+                    {/* Inset shadow overlays — casing lip casts shadow into
+                        the cavity along the top and left edges. Stepped for
+                        a pixel-art feel and to avoid native gradient deps. */}
+                    <View pointerEvents="none" style={[styles.insetShadowTop, { top: 0, height: 5, backgroundColor: 'rgba(0,0,0,0.38)' }]} />
+                    <View pointerEvents="none" style={[styles.insetShadowTop, { top: 5, height: 6, backgroundColor: 'rgba(0,0,0,0.22)' }]} />
+                    <View pointerEvents="none" style={[styles.insetShadowTop, { top: 11, height: 8, backgroundColor: 'rgba(0,0,0,0.10)' }]} />
+                    <View pointerEvents="none" style={[styles.insetShadowLeft, { left: 0, width: 4, backgroundColor: 'rgba(0,0,0,0.30)' }]} />
+                    <View pointerEvents="none" style={[styles.insetShadowLeft, { left: 4, width: 5, backgroundColor: 'rgba(0,0,0,0.16)' }]} />
+                    <View pointerEvents="none" style={[styles.insetShadowLeft, { left: 9, width: 6, backgroundColor: 'rgba(0,0,0,0.07)' }]} />
+                    {/* Subtle light catches the far edge. */}
+                    <View pointerEvents="none" style={[styles.insetHighlightBottom, { backgroundColor: 'rgba(255,255,255,0.14)' }]} />
                 </View>
             </ShadowWrapper>
         </View>
@@ -261,21 +265,37 @@ const styles = StyleSheet.create({
     innerScreen: {
         width: '100%',
         height: '100%',
-        borderRadius: 20, // More rounded corners
-        overflow: 'hidden', // Clip background image to rounded corners
+        borderRadius: 20,
+        overflow: 'hidden',
         position: 'relative',
-        borderWidth: 4, // Thick border like the reference image
-        borderColor: 'rgba(0, 0, 0, 0.3)', // Black border with opacity
-        backgroundColor: '#E8F5E8', // Light green background matching dialog box
-        // Add shadow for depth effect
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8, // Android shadow
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.35)',
+        backgroundColor: '#E8F5E8',
+        shadowColor: 'transparent',
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 0,
+    },
+    insetShadowTop: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 50,
+    },
+    insetShadowLeft: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        zIndex: 50,
+    },
+    insetHighlightBottom: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 4,
+        zIndex: 50,
     },
     innerScreenLarge: {
         // Remove direct width/height since they're handled by shadowContainer
@@ -312,17 +332,18 @@ const styles = StyleSheet.create({
     },
 
 
-    // Gradient shadow system for depth effect - softer orange tint
+    // Dark halos in the gap between screen and casing — simulate
+    // ambient shadow pooling in the cavity depth, not an outward glow.
     gradientShadowOuter: {
         position: 'absolute',
-        top: -5,
-        left: -5,
-        right: -5,
-        bottom: -5,
-        borderRadius: 25, // Match inner screen radius + 5px
-        backgroundColor: 'rgba(255, 140, 0, 0.15)', // Soft orange tint
+        top: -4,
+        left: -4,
+        right: -4,
+        bottom: -4,
+        borderRadius: 24,
+        backgroundColor: 'rgba(0, 0, 0, 0.28)',
         zIndex: 1,
-        pointerEvents: 'none', // Don't intercept touch events
+        pointerEvents: 'none',
     },
     gradientShadowInner: {
         position: 'absolute',
@@ -330,10 +351,10 @@ const styles = StyleSheet.create({
         left: -2,
         right: -2,
         bottom: -2,
-        borderRadius: 22, // Match inner screen radius + 2px
-        backgroundColor: 'rgba(255, 140, 0, 0.1)', // Softer orange tint
+        borderRadius: 22,
+        backgroundColor: 'rgba(0, 0, 0, 0.18)',
         zIndex: 2,
-        pointerEvents: 'none', // Don't intercept touch events
+        pointerEvents: 'none',
     },
     gradientShadowCorner1: {
         position: 'absolute',

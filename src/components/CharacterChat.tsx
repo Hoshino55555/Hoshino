@@ -62,6 +62,31 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
         };
     }, []);
 
+    // Load prior conversation with this character on mount
+    useEffect(() => {
+        let cancelled = false;
+        const loadHistory = async () => {
+            try {
+                const userId = playerName || 'anonymous';
+                chatService.setUserId(userId);
+                const moonokoId = character.name.toLowerCase();
+                const convo = await chatService.getConversation(moonokoId);
+                if (cancelled) return;
+                const restored: Message[] = (convo.messages || []).map((m, idx) => ({
+                    id: `${m.timestamp}-${idx}`,
+                    text: m.content,
+                    sender: m.role === 'assistant' ? 'character' : 'user',
+                    timestamp: new Date(m.timestamp),
+                }));
+                setMessages(restored);
+            } catch (error) {
+                console.error('Failed to load chat history:', error);
+            }
+        };
+        loadHistory();
+        return () => { cancelled = true; };
+    }, [character.name, playerName]);
+
     // Helper function to get image source based on character image name
     const getImageSource = (imageName: string) => {
         switch (imageName) {

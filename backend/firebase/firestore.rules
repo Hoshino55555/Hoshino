@@ -1,20 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Conversations collection - users can only access their own conversations
+    // Conversations - only the owning user.
     match /conversations/{conversationId} {
-      allow read, write: if request.auth != null && 
+      allow read, write: if request.auth != null &&
         (resource == null || resource.data.userId == request.auth.uid);
     }
-    
-    // User profiles - users can only access their own profile
+
+    // User profile root doc.
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Per-moonoko game state. Client reads only; all writes go through
+      // callable Functions running under the admin SDK (which bypasses rules).
+      match /moonokos/{characterId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false;
+      }
     }
-    
-    // Game data - users can only access their own game data
+
+    // Legacy per-user game data (kept for backwards compat).
     match /gameData/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
-} 
+}

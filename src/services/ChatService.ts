@@ -13,13 +13,21 @@ interface ChatResponse {
   moonokoName: string;
   conversationId: string;
   timestamp: string;
+  newFacts?: number;
+}
+
+interface MemoryFact {
+  type: 'preference' | 'detail' | 'event' | 'relationship' | 'goal';
+  value: string;
+  createdAt: string | null;
 }
 
 interface ConversationData {
+  id: string;
   userId: string;
   moonokoId: string;
   messages: ChatMessage[];
-  lastUpdated: string;
+  facts: MemoryFact[];
 }
 
 class ChatService {
@@ -63,34 +71,30 @@ class ChatService {
   }
 
   async sendMessage(
-    message: string, 
-    moonokoId: string, 
-    conversationId?: string
+    message: string,
+    moonokoId: string
   ): Promise<ChatResponse> {
     if (!this.userId) {
       throw new Error('User ID not set. Call setUserId() first.');
     }
 
-    const payload = {
-      message,
-      moonokoId,
-      userId: this.userId,
-      ...(conversationId && { conversationId }),
-    };
-
     return this.makeRequest('/chat', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        message,
+        moonokoId,
+        userId: this.userId,
+      }),
     });
   }
 
-  async getConversation(conversationId: string): Promise<ConversationData> {
+  async getConversation(moonokoId: string): Promise<ConversationData> {
     if (!this.userId) {
       throw new Error('User ID not set. Call setUserId() first.');
     }
 
     const params = new URLSearchParams({
-      conversationId,
+      moonokoId,
       userId: this.userId,
     });
 
@@ -151,4 +155,4 @@ class ChatService {
 const chatService = new ChatService();
 
 export default chatService;
-export type { ChatMessage, ChatResponse, ConversationData }; 
+export type { ChatMessage, ChatResponse, ConversationData, MemoryFact };

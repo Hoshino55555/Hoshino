@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useMemo } from 'react';
-import { PublicKey, Transaction } from '@solana/web3.js';
-import { usePrivy } from '@privy-io/expo';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { usePrivy, useEmbeddedSolanaWallet } from '@privy-io/expo';
 import {
     useBackpackDeeplinkWalletConnector,
     usePhantomDeeplinkWalletConnector,
@@ -14,13 +14,14 @@ const WALLET_APP_URL = 'https://hoshino.gg';
 const WALLET_REDIRECT_PATH = '/wallet-auth';
 
 export type ExternalWalletProvider = 'phantom' | 'backpack';
-export type WalletSource = 'mwa' | ExternalWalletProvider | null;
+export type WalletSource = 'mwa' | ExternalWalletProvider | 'embedded' | null;
 
 interface WalletContextType {
     connected: boolean;
     publicKey: string | null;
     walletSource: WalletSource;
     signer: VRFSigner | null;
+    email: string | null;
     connect: () => Promise<void>;
     disconnect: () => Promise<void>;
 }
@@ -36,6 +37,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     const [mwaPublicKey, setMwaPublicKey] = useState<string | null>(null);
 
     const { user, logout } = usePrivy();
+    const embeddedSolanaWallet = useEmbeddedSolanaWallet();
     const phantomConnector = usePhantomDeeplinkWalletConnector({
         appUrl: WALLET_APP_URL,
         redirectUri: WALLET_REDIRECT_PATH,
@@ -52,6 +54,31 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
         return linkedSolanaAccount?.address ?? null;
     }, [user]);
+
+    const email = useMemo(() => {
+        const accounts = user?.linked_accounts ?? [];
+        const emailAccount = accounts.find(
+            (account: any) => account?.type === 'email' && typeof account?.address === 'string'
+        ) as { address?: string } | undefined;
+        if (emailAccount?.address) return emailAccount.address;
+
+        const googleAccount = accounts.find(
+            (account: any) => account?.type === 'google_oauth' && typeof account?.email === 'string'
+        ) as { email?: string } | undefined;
+        return googleAccount?.email ?? null;
+    }, [user]);
+
+    // Safety net: if the user logged in before embedded-wallet auto-creation
+    // was enabled, provision one now so they get a canonical solana identity.
+    useEffect(() => {
+        if (!user) return;
+        if (linkedSolanaAddress) return;
+        if (embeddedSolanaWallet.status !== 'not-created') return;
+        if (!embeddedSolanaWallet.create) return;
+        embeddedSolanaWallet.create().catch((err) => {
+            console.warn('Privy embedded wallet create failed:', err);
+        });
+    }, [user, linkedSolanaAddress, embeddedSolanaWallet]);
     const externalWalletSource: ExternalWalletProvider | null = phantomConnector.isConnected && phantomConnector.address
         ? 'phantom'
         : backpackConnector.isConnected && backpackConnector.address
@@ -101,7 +128,9 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         ? 'mwa'
         : externalWalletSource
             ? externalWalletSource
-            : null;
+            : linkedSolanaAddress
+                ? 'embedded'
+                : null;
 
     const publicKey = mwaConnected
         ? mwaPublicKey
@@ -192,12 +221,41 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
             };
         }
 
+        if (walletSource === 'embedded' && linkedSolanaAddress) {
+            const signerPublicKey = new PublicKey(linkedSolanaAddress);
+            return {
+                publicKey: signerPublicKey,
+                signAndSend: async (tx: Transaction) => {
+                    if (embeddedSolanaWallet.status !== 'connected') {
+                        throw new Error('Embedded Solana wallet not ready to sign');
+                    }
+                    const wallet = embeddedSolanaWallet.wallets[0];
+                    if (!wallet) {
+                        throw new Error('No embedded Solana wallet available');
+                    }
+                    const provider = await wallet.getProvider();
+                    // Caller populates tx.recentBlockhash / feePayer; VRFService
+                    // owns its Connection. Keep this branch thin.
+                    const connection = new Connection(
+                        process.env.EXPO_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com',
+                    );
+                    const { signature } = await provider.request({
+                        method: 'signAndSendTransaction',
+                        params: { transaction: tx, connection },
+                    });
+                    return signature;
+                },
+            };
+        }
+
         return null;
     }, [
         walletSource,
         mwaPublicKey,
         phantomConnector,
         backpackConnector,
+        embeddedSolanaWallet,
+        linkedSolanaAddress,
     ]);
 
     return (
@@ -206,6 +264,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
             publicKey,
             walletSource,
             signer,
+            email,
             connect,
             disconnect,
         }}>

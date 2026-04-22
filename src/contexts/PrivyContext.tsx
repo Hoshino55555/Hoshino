@@ -29,6 +29,15 @@ export const HoshinoPrivyProvider: React.FC<Props> = ({ children }) => {
         <PrivyProvider
             appId={PRIVY_APP_ID}
             clientId={PRIVY_CLIENT_ID}
+            config={{
+                embedded: {
+                    // Auto-provision a Solana embedded wallet for social/email
+                    // logins so every user has one canonical solana identity in
+                    // `user.linked_accounts`, regardless of login method.
+                    // Seeker/MWA users who already linked a wallet are skipped.
+                    solana: { createOnLogin: 'users-without-wallets' },
+                },
+            }}
         >
             {children}
         </PrivyProvider>

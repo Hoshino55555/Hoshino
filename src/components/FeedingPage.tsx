@@ -1,68 +1,38 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
-import InnerScreen from './InnerScreen';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, Easing, ImageBackground } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ZoomOutOverlay from './ZoomOutOverlay';
+import { useGameStateContext } from '../contexts/GameStateContext';
 
 interface FoodItem {
     id: string;
     name: string;
-    image: string;
     hungerBoost: number;
     moodBoost: number;
-    description: string;
 }
 
 interface Props {
     onBack: () => void;
-    onFeed: (foodType: string, hungerBoost: number, moodBoost: number) => void;
-    currentHunger: number;
-    onCloseStart?: () => void;
+    onNotification?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
-const FOOD_ITEMS: FoodItem[] = [
-    {
-        id: 'sugar',
-        name: 'Pink Sugar',
-        image: 'Pink Sugar.png',
-        hungerBoost: 1,
-        moodBoost: 1,
-        description: 'Sweet crystalline sugar with a pink hue'
-    },
-    {
-        id: 'nova',
-        name: 'Nova Egg',
-        image: 'Nova Egg.png',
-        hungerBoost: 2,
-        moodBoost: 2,
-        description: 'A mysterious egg that glows with stellar energy'
-    },
-    {
-        id: 'mira',
-        name: 'Mira Berry',
-        image: 'Mira Berry.png',
-        hungerBoost: 3,
-        moodBoost: 3,
-        description: 'A rare berry with stellar properties'
-    }
-];
+const RECIPE_IMAGE = require('../../assets/images/recipe-example.png');
 
-const getFoodImageSource = (imageName: string) => {
-    switch (imageName) {
-        case 'Pink Sugar.png':
-            return require('../../assets/images/Pink Sugar.png');
-        case 'Nova Egg.png':
-            return require('../../assets/images/Nova Egg.png');
-        case 'Mira Berry.png':
-            return require('../../assets/images/Mira Berry.png');
-        default:
-            return require('../../assets/images/Pink Sugar.png');
-    }
-};
+const FOOD_ITEMS: FoodItem[] = Array.from({ length: 8 }, (_, i) => ({
+    id: `recipe-${i + 1}`,
+    name: `Recipe ${i + 1}`,
+    hungerBoost: 1,
+    moodBoost: 1,
+}));
 
-const FeedingPage = ({ onBack, onFeed, currentHunger, onCloseStart }: Props) => {
+const FeedingPage = ({ onBack, onNotification }: Props) => {
+    const { state, feed } = useGameStateContext();
+    const currentHunger = state?.hunger ?? 5;
     const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
     const [feedingAnimation, setFeedingAnimation] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
-    const bounceAnim = React.useRef(new Animated.Value(0)).current;
+    const bounceAnim = useRef(new Animated.Value(0)).current;
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
         if (feedingAnimation) {
@@ -90,7 +60,6 @@ const FeedingPage = ({ onBack, onFeed, currentHunger, onCloseStart }: Props) => 
     const handleClose = () => {
         if (isClosing) return;
         setIsClosing(true);
-        onCloseStart?.();
     };
 
     const handleFeed = (food: FoodItem) => {
@@ -99,8 +68,12 @@ const FeedingPage = ({ onBack, onFeed, currentHunger, onCloseStart }: Props) => 
         setSelectedFood(food);
         setFeedingAnimation(true);
 
-        setTimeout(() => {
-            onFeed(food.name, food.hungerBoost, food.moodBoost);
+        setTimeout(async () => {
+            try {
+                await feed(food.hungerBoost, food.moodBoost);
+            } catch (e: any) {
+                onNotification?.(e?.message || 'Failed to feed', 'error');
+            }
             setFeedingAnimation(false);
             setSelectedFood(null);
         }, 1500);
@@ -109,100 +82,100 @@ const FeedingPage = ({ onBack, onFeed, currentHunger, onCloseStart }: Props) => 
     const full = currentHunger >= 5;
 
     return (
-        <InnerScreen
-            expanded
-            animateIn
-            exiting={isClosing}
-            onExitComplete={onBack}
-            showBackgroundImage={false}
-            showStatsBar={false}
-            leftButtonText=""
-            centerButtonText=""
-            rightButtonText=""
-            onLeftButtonPress={handleClose}
-        >
-            <View style={styles.content}>
-                <View style={styles.header}>
-                    <Text style={styles.headerText}>MENU</Text>
+        <ZoomOutOverlay exiting={isClosing} onExitComplete={onBack} backgroundColor="#1a1033">
+            <ImageBackground
+                source={require('../../assets/images/cooking-bg.png')}
+                style={styles.bg}
+                resizeMode="cover"
+            >
+                <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={handleClose}
+                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                    >
+                        <Text style={styles.backButtonText}>{'<'} Back</Text>
+                    </TouchableOpacity>
                 </View>
 
-                <View style={styles.grid}>
-                    {FOOD_ITEMS.map((food) => {
-                        const isSelected = selectedFood?.id === food.id;
-                        return (
-                            <TouchableOpacity
-                                key={food.id}
-                                style={[
-                                    styles.card,
-                                    isSelected && styles.cardSelected,
-                                    full && styles.cardDisabled,
-                                ]}
-                                onPress={() => !full && handleFeed(food)}
-                                activeOpacity={full ? 1 : 0.7}
-                            >
-                                <View style={styles.cardHeader}>
-                                    <Text style={styles.cardHeaderText} numberOfLines={1}>
-                                        {food.name}
-                                    </Text>
-                                </View>
-                                <View style={styles.cardBody}>
+                <View style={[styles.gridWrap, { paddingBottom: insets.bottom + 16 }]}>
+                    <View style={styles.grid}>
+                        {FOOD_ITEMS.map((food) => {
+                            const isSelected = selectedFood?.id === food.id;
+                            return (
+                                <TouchableOpacity
+                                    key={food.id}
+                                    style={[
+                                        styles.card,
+                                        isSelected && styles.cardSelected,
+                                        full && styles.cardDisabled,
+                                    ]}
+                                    onPress={() => !full && handleFeed(food)}
+                                    activeOpacity={full ? 1 : 0.7}
+                                >
                                     <Image
-                                        source={getFoodImageSource(food.image)}
-                                        style={styles.foodImage}
+                                        source={RECIPE_IMAGE}
+                                        style={styles.cardImage}
+                                        resizeMode="contain"
                                     />
-                                </View>
-                                <View style={styles.cardFooter}>
-                                    <Text style={styles.effectText}>+{food.hungerBoost} HUNGER</Text>
-                                    <Text style={styles.effectText}>+{food.moodBoost} MOOD</Text>
-                                </View>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
 
-                {full && (
-                    <Text style={styles.fullText}>TOO FULL TO EAT</Text>
-                )}
+                    {full && <Text style={styles.fullText}>TOO FULL TO EAT</Text>}
+                </View>
 
                 {feedingAnimation && selectedFood && (
                     <View style={styles.feedingOverlay}>
                         <Animated.Image
-                            source={getFoodImageSource(selectedFood.image)}
+                            source={RECIPE_IMAGE}
                             style={[
                                 styles.feedingImage,
                                 { transform: [{ translateY: bounceAnim }] },
                             ]}
+                            resizeMode="contain"
                         />
                         <Text style={styles.feedingText}>
                             Feeding {selectedFood.name}...
                         </Text>
                     </View>
                 )}
-            </View>
-        </InnerScreen>
+            </ImageBackground>
+        </ZoomOutOverlay>
     );
 };
 
 const styles = StyleSheet.create({
-    content: {
+    bg: {
         flex: 1,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
+        width: '100%',
+        height: '100%',
     },
-    header: {
-        alignSelf: 'center',
-        backgroundColor: '#F4B6A4',
+    topBar: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: {
         paddingVertical: 6,
-        paddingHorizontal: 24,
+        paddingHorizontal: 10,
+        backgroundColor: 'rgba(46, 90, 62, 0.85)',
         borderRadius: 6,
-        borderWidth: 2,
-        borderColor: '#2E5A3E',
-        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#E8F5E8',
     },
-    headerText: {
-        fontSize: 14,
-        color: '#2E5A3E',
+    backButtonText: {
+        color: '#E8F5E8',
         fontFamily: 'PressStart2P',
+        fontSize: 10,
+    },
+    gridWrap: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        paddingHorizontal: 12,
     },
     grid: {
         flexDirection: 'row',
@@ -211,59 +184,31 @@ const styles = StyleSheet.create({
     },
     card: {
         width: '46%',
+        aspectRatio: 4 / 3,
         margin: '2%',
-        backgroundColor: '#F5F9EC',
-        borderWidth: 2,
-        borderColor: '#2E5A3E',
-        borderRadius: 6,
+        borderRadius: 8,
         overflow: 'hidden',
     },
     cardSelected: {
+        borderWidth: 2,
         borderColor: '#E8B84A',
-        backgroundColor: '#FFF6D6',
     },
     cardDisabled: {
         opacity: 0.5,
     },
-    cardHeader: {
-        backgroundColor: '#BEE3C4',
-        paddingVertical: 4,
-        paddingHorizontal: 6,
-        alignItems: 'center',
-    },
-    cardHeaderText: {
-        fontSize: 8,
-        color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
-    },
-    cardBody: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 10,
-    },
-    foodImage: {
-        width: 48,
-        height: 48,
-        resizeMode: 'contain',
-    },
-    cardFooter: {
-        backgroundColor: '#DDEED5',
-        paddingVertical: 4,
-        paddingHorizontal: 4,
-        alignItems: 'center',
-    },
-    effectText: {
-        fontSize: 7,
-        color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
-        lineHeight: 10,
+    cardImage: {
+        width: '100%',
+        height: '100%',
     },
     fullText: {
-        marginTop: 10,
+        marginTop: 18,
         textAlign: 'center',
-        fontSize: 10,
-        color: '#B84A4A',
+        fontSize: 12,
+        color: '#fff',
         fontFamily: 'PressStart2P',
+        textShadowColor: 'rgba(0,0,0,0.8)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
     },
     feedingOverlay: {
         position: 'absolute',
@@ -271,21 +216,20 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.8)',
+        backgroundColor: 'rgba(0,0,0,0.7)',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 100,
     },
     feedingImage: {
-        width: 60,
-        height: 60,
-        resizeMode: 'contain',
+        width: 240,
+        height: 180,
     },
     feedingText: {
         color: '#FFD700',
-        fontSize: 10,
+        fontSize: 12,
         fontFamily: 'PressStart2P',
-        marginTop: 10,
+        marginTop: 14,
         textAlign: 'center',
     },
 });

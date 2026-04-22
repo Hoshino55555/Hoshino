@@ -271,20 +271,17 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
         return acc;
     }, {} as Record<string, string[]>);
 
-    // Update local state when stored player name changes
+    // Seed the name input from the stored profile the first time it arrives.
+    // Do NOT auto-advance on later prop changes — that would hijack the flow
+    // when the user edits their name elsewhere (e.g. Profile page).
+    const seededNameRef = useRef(false);
     useEffect(() => {
+        if (seededNameRef.current) return;
         if (storedPlayerName && storedPlayerName.trim().length > 0) {
-            console.log('📱 WelcomeScreen: Received stored player name:', storedPlayerName);
             setPlayerName(storedPlayerName);
-            // If we have a stored name and wallet is connected, auto-continue
-            if (connected) {
-                console.log('📱 WelcomeScreen: Auto-continuing with stored name');
-                setTimeout(() => {
-                    onContinue(storedPlayerName);
-                }, 500);
-            }
+            seededNameRef.current = true;
         }
-    }, [storedPlayerName, connected, onContinue]);
+    }, [storedPlayerName]);
 
     // Auto-continue after wallet connects and name is provided
     useEffect(() => {

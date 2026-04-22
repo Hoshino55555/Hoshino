@@ -1,38 +1,60 @@
 const { onRequest } = require('firebase-functions/v2/https');
 
-// Import AI chat functions from separate file
-const aiChatFunctions = require('./ai-chat');
+// Shared admin instance (initializes Firebase Admin exactly once)
+require('./admin');
 
-// Import Solana transaction functions from separate file
+// Legacy HTTP functions
+const aiChatFunctions = require('./ai-chat');
 const solanaTransactionFunctions = require('./solana-transactions');
 
-// Export all functions
+// New callable functions
+const authBridge = require('./auth-bridge');
+const gameState = require('./game-state');
+
+// AI chat
 exports.chat = aiChatFunctions.chat;
 exports.getConversation = aiChatFunctions.getConversation;
 
-// Export Solana transaction functions
+// Solana transactions
 exports.generateNFTTransaction = solanaTransactionFunctions.generateNFTTransaction;
-exports.generateCurrencyPurchaseTransaction = solanaTransactionFunctions.generateCurrencyPurchaseTransaction;
+exports.generateCurrencyPurchaseTransaction =
+  solanaTransactionFunctions.generateCurrencyPurchaseTransaction;
 exports.fetchNFTMetadata = solanaTransactionFunctions.fetchNFTMetadata;
 exports.solanaHealth = solanaTransactionFunctions.solanaHealth;
 
+// Privy → Firebase auth bridge
+exports.exchangePrivyToken = authBridge.exchangePrivyToken;
+
+// Server-authoritative game state
+exports.getGameState = gameState.getGameState;
+exports.setTimezone = gameState.setTimezone;
+exports.feedMoonoko = gameState.feedMoonoko;
+exports.recordPlay = gameState.recordPlay;
+exports.recordChat = gameState.recordChat;
+exports.startSleep = gameState.startSleep;
+exports.endSleep = gameState.endSleep;
+
 // Health check
-exports.health = onRequest({
-  cors: ['*'],
-  invoker: 'public'
-}, async (req, res) => {
+exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     functions: [
-      'chat', 
-      'getConversation', 
+      'chat',
+      'getConversation',
       'generateNFTTransaction',
       'generateCurrencyPurchaseTransaction',
       'fetchNFTMetadata',
       'solanaHealth',
-      'health'
+      'exchangePrivyToken',
+      'getGameState',
+      'setTimezone',
+      'feedMoonoko',
+      'recordPlay',
+      'recordChat',
+      'startSleep',
+      'endSleep',
+      'health',
     ],
-    modules: ['ai-chat', 'solana-transactions']
   });
-}); 
+});

@@ -11,9 +11,7 @@ import {
 } from 'react-native';
 
 import InnerScreen from './InnerScreen';
-import WalletButton from './WalletButton';
 
-import { useProgrammableNFT } from '../hooks/useProgrammableNFT';
 import { MOONOKOS } from '../data/moonokos';
 
 
@@ -65,12 +63,6 @@ const MoonokoSelection: React.FC<Props> = ({
     onGoToCongratulations
 }) => {
 
-    const {
-        connected,
-        publicKey,
-        connectWallet,
-        disconnect,
-    } = useProgrammableNFT();
     const [currentCharacterIndex, setCurrentCharacterIndex] = useState<number>(0); // Start with first character
     const [isMinting, setIsMinting] = useState(false);
     const [isSpinning, setIsSpinning] = useState(false);
@@ -242,12 +234,6 @@ const MoonokoSelection: React.FC<Props> = ({
 
     return (
         <>
-            <WalletButton
-                connected={connected}
-                publicKey={publicKey?.toString() || null}
-                onConnect={connectWallet}
-                onDisconnect={disconnect}
-            />
             <InnerScreen
                 onLeftButtonPress={undefined}
                 onCenterButtonPress={undefined}

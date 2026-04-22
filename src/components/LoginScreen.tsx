@@ -17,7 +17,6 @@ import {
     useBackpackDeeplinkWalletConnector,
     usePhantomDeeplinkWalletConnector,
 } from '@privy-io/expo/connectors';
-import InnerScreen from './InnerScreen';
 import { mobileWalletService, useWallet } from '../contexts/WalletContext';
 import type { ExternalWalletProvider } from '../contexts/WalletContext';
 
@@ -273,7 +272,12 @@ const LoginScreen: React.FC = () => {
     };
 
     return (
-        <InnerScreen expanded animateIn showBackgroundImage={false}>
+        <LinearGradient
+            colors={['#09161f', '#112735', '#21424e']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fullScreen}
+        >
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={styles.container}
@@ -285,16 +289,8 @@ const LoginScreen: React.FC = () => {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <LinearGradient
-                        colors={['#09161f', '#112735', '#21424e']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.panel}
-                    >
+                    <View style={styles.panel}>
                         <View style={styles.panelInner}>
-                            <View style={styles.ringLarge} pointerEvents="none" />
-                            <View style={styles.ringSmall} pointerEvents="none" />
-
                             <View style={styles.heroBlock}>
                                 <View style={styles.heroTopRow}>
                                     <View style={styles.badge}>
@@ -492,61 +488,53 @@ const LoginScreen: React.FC = () => {
                                 )}
                             </View>
                         </View>
-                    </LinearGradient>
+                    </View>
                 </ScrollView>
             </KeyboardAvoidingView>
-        </InnerScreen>
+        </LinearGradient>
     );
 };
 
 const styles = StyleSheet.create({
+    fullScreen: {
+        flex: 1,
+    },
     container: {
         flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
         justifyContent: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 18,
+        paddingHorizontal: 20,
+        paddingVertical: 32,
     },
     backdropGlowLarge: {
+        position: 'absolute',
+        width: 360,
+        height: 360,
+        borderRadius: 180,
+        backgroundColor: 'rgba(91, 196, 255, 0.16)',
+        top: 60,
+        right: -80,
+    },
+    backdropGlowSmall: {
         position: 'absolute',
         width: 260,
         height: 260,
         borderRadius: 130,
-        backgroundColor: 'rgba(91, 196, 255, 0.16)',
-        top: 34,
-        right: -30,
-    },
-    backdropGlowSmall: {
-        position: 'absolute',
-        width: 180,
-        height: 180,
-        borderRadius: 90,
         backgroundColor: 'rgba(255, 210, 124, 0.14)',
-        bottom: 26,
-        left: -40,
+        bottom: 60,
+        left: -80,
     },
     panel: {
         width: '100%',
-        maxWidth: 344,
+        maxWidth: 480,
         alignSelf: 'center',
-        borderRadius: 28,
-        borderWidth: 2,
-        borderColor: '#c4e7f4',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 14 },
-        shadowOpacity: 0.35,
-        shadowRadius: 18,
-        elevation: 14,
     },
     panelInner: {
-        overflow: 'hidden',
-        borderRadius: 26,
-        backgroundColor: 'rgba(3, 11, 18, 0.22)',
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 14,
+        paddingHorizontal: 4,
+        paddingTop: 8,
+        paddingBottom: 16,
     },
     ringLarge: {
         position: 'absolute',
@@ -569,14 +557,16 @@ const styles = StyleSheet.create({
         left: -44,
     },
     heroBlock: {
-        gap: 10,
-        paddingBottom: 14,
+        gap: 16,
+        paddingBottom: 24,
+        alignItems: 'center',
     },
     heroTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         gap: 10,
+        width: '100%',
     },
     badge: {
         paddingHorizontal: 10,
@@ -616,27 +606,29 @@ const styles = StyleSheet.create({
         letterSpacing: 0.8,
     },
     logo: {
-        width: 128,
-        height: 42,
-        marginTop: 2,
+        width: 200,
+        height: 66,
+        marginTop: 8,
     },
     title: {
         fontFamily: 'PressStart2P',
-        fontSize: 16,
-        lineHeight: 24,
+        fontSize: 22,
+        lineHeight: 32,
         color: '#f7fdff',
+        textAlign: 'center',
     },
     subtitle: {
         fontFamily: 'monospace',
-        fontSize: 12,
-        lineHeight: 18,
+        fontSize: 14,
+        lineHeight: 20,
         color: '#bdd7e0',
+        textAlign: 'center',
     },
     formShell: {
-        gap: 12,
-        padding: 12,
-        borderRadius: 22,
-        backgroundColor: 'rgba(240, 249, 255, 0.94)',
+        gap: 14,
+        padding: 18,
+        borderRadius: 24,
+        backgroundColor: 'rgba(240, 249, 255, 0.96)',
         borderWidth: 2,
         borderColor: '#164257',
     },

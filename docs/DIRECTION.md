@@ -333,6 +333,8 @@ Tracked here so they don't get lost. Owner in brackets.
 - **[Creative]** Gacha rare-character drop rate (daily pull)?
 - **[Design]** Energy decay curve shape — linear, stepped, or something custom?
 - **[Design]** Hunger increase curve per missed meal window — flat penalty or compounding?
+- **[Design]** Sleep UX — current captive-overlay implementation is parked (tapping sleep toasts "being reworked"). Server stat-engine sleep state is still in place; only the client surface is disabled. Need product direction on whether sleep is an ambient passive state (any interaction wakes, no modal) vs. a full screen takeover. See `src/components/MoonokoInteraction.tsx` (sleep case) and `src/components/SleepOverlay.tsx`.
+- **[Design]** Account linking + cross-wallet merge — parked pending MagicBlock on-chain/off-chain state split. See [../ACCOUNT_LINKING.md](../ACCOUNT_LINKING.md).
 
 ---
 
