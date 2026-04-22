@@ -26,23 +26,17 @@ export const FIREBASE_CONFIG = {
 export const getFunctionUrl = (functionName: keyof typeof FIREBASE_CONFIG.functions): string =>
   FIREBASE_CONFIG.functions[functionName];
 
-// Expo uses EXPO_PUBLIC_* env vars at runtime. Accept legacy REACT_APP_* names
-// so existing .env files don't break.
-const pick = (...keys: string[]): string | undefined => {
-  for (const k of keys) {
-    const v = process.env[k];
-    if (v) return v;
-  }
-  return undefined;
-};
-
+// Expo inlines EXPO_PUBLIC_* env vars at bundle time only when accessed via
+// static member syntax (process.env.FOO). Dynamic access (process.env[k]) is
+// never inlined, so a Hermes release bundle would see `undefined` and Firebase
+// would throw `auth/invalid-api-key` at startup.
 const firebaseConfig = {
-  apiKey: pick('EXPO_PUBLIC_FIREBASE_API_KEY', 'REACT_APP_FIREBASE_API_KEY'),
-  authDomain: pick('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN', 'REACT_APP_FIREBASE_AUTH_DOMAIN'),
-  projectId: pick('EXPO_PUBLIC_FIREBASE_PROJECT_ID', 'REACT_APP_FIREBASE_PROJECT_ID') || FIREBASE_CONFIG.projectId,
-  storageBucket: pick('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET', 'REACT_APP_FIREBASE_STORAGE_BUCKET'),
-  messagingSenderId: pick('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID', 'REACT_APP_FIREBASE_MESSAGING_SENDER_ID'),
-  appId: pick('EXPO_PUBLIC_FIREBASE_APP_ID', 'REACT_APP_FIREBASE_APP_ID'),
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || FIREBASE_CONFIG.projectId,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
