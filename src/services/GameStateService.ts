@@ -8,6 +8,18 @@ export interface MealClaims {
     dinner: boolean;
 }
 
+export type ForageTier = 'common' | 'uncommon' | 'rare' | 'legendary';
+export type ForageSource = 'awake' | 'sleep';
+
+export interface ForagedItem {
+    id: string;
+    ingredient: string;
+    tier: ForageTier;
+    tickMs: number;
+    slot: number;
+    source: ForageSource;
+}
+
 export interface GameState {
     characterId: string;
     hunger: number;
@@ -22,6 +34,10 @@ export interface GameState {
     totalSleeps: number;
     level: number;
     experience: number;
+    moodDecayProgressMs?: number;
+    foragedItems?: ForagedItem[];
+    lastForagedAt?: number;
+    foragedRecapDateKey?: string;
 }
 
 interface StateResponse {
@@ -62,6 +78,11 @@ const callEndSleep = httpsCallable<
     { characterId: string; force?: boolean },
     StateResponse
 >(functions, 'endSleep');
+
+const callDrainForaged = httpsCallable<
+    { characterId: string },
+    { state: GameState; drained: ForagedItem[] }
+>(functions, 'drainForaged');
 
 const callExchangePrivyToken = httpsCallable<
     { privyAccessToken: string },
@@ -124,6 +145,13 @@ export const GameStateService = {
     async endSleep(characterId: string, force = false): Promise<GameState> {
         const res = await callEndSleep({ characterId, force });
         return res.data.state;
+    },
+
+    async drainForaged(
+        characterId: string
+    ): Promise<{ state: GameState; drained: ForagedItem[] }> {
+        const res = await callDrainForaged({ characterId });
+        return res.data;
     },
 };
 

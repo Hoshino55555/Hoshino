@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useGameState } from '../hooks/useGameState';
-import type { GameState } from '../services/GameStateService';
+import type { GameState, ForagedItem } from '../services/GameStateService';
 
 interface GameStateContextType {
     state: GameState | null;
@@ -12,6 +12,7 @@ interface GameStateContextType {
     chat: () => Promise<GameState>;
     startSleep: () => Promise<GameState>;
     endSleep: (force?: boolean) => Promise<GameState>;
+    drainForaged: () => Promise<ForagedItem[]>;
     sleepRemainingMs: number;
 }
 

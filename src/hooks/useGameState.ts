@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GameStateService, type GameState, SLEEP_REQUIRED_MS } from '../services/GameStateService';
+import {
+    GameStateService,
+    type GameState,
+    type ForagedItem,
+    SLEEP_REQUIRED_MS,
+} from '../services/GameStateService';
 import { useFirebaseAuth } from '../contexts/FirebaseAuthContext';
 
 interface UseGameStateResult {
@@ -12,6 +17,7 @@ interface UseGameStateResult {
     chat: () => Promise<GameState>;
     startSleep: () => Promise<GameState>;
     endSleep: (force?: boolean) => Promise<GameState>;
+    drainForaged: () => Promise<ForagedItem[]>;
     sleepRemainingMs: number; // 0 if not sleeping or finished
 }
 
@@ -104,6 +110,13 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         [characterId]
     );
 
+    const drainForaged = useCallback(async () => {
+        if (!characterId) throw new Error('No character selected');
+        const { state: next, drained } = await GameStateService.drainForaged(characterId);
+        setState(next);
+        return drained;
+    }, [characterId]);
+
     let sleepRemainingMs = 0;
     if (state?.sleepStartedAt) {
         const elapsed = Date.now() - state.sleepStartedAt;
@@ -122,6 +135,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         chat,
         startSleep,
         endSleep,
+        drainForaged,
         sleepRemainingMs,
     };
 }

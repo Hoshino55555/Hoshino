@@ -9,6 +9,8 @@ import Frame from './Frame';
 import Starburst from './Starburst';
 import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
+import ForagePopOut from './ForagePopOut';
+import type { ForagedItem } from '../services/GameStateService';
 
 const { height } = Dimensions.get('window');
 
@@ -75,11 +77,30 @@ const MoonokoInteraction: React.FC<Props> = ({
     shouldFadeIn = false,
     onFadeInComplete
 }) => {
-    const { state: gameState } = useGameStateContext();
+    const { state: gameState, drainForaged } = useGameStateContext();
     const currentStats = {
         mood: gameState?.mood ?? 3,
         hunger: gameState?.hunger ?? 5,
         energy: gameState?.energy ?? 3,
+    };
+    const pendingFinds = gameState?.foragedItems ?? [];
+    const hasPendingFinds = pendingFinds.length > 0;
+
+    const [popOutItems, setPopOutItems] = useState<ForagedItem[] | null>(null);
+    const drainInFlightRef = useRef(false);
+
+    const handleCharacterPress = async () => {
+        if (drainInFlightRef.current || popOutItems) return;
+        if (!hasPendingFinds) return;
+        drainInFlightRef.current = true;
+        try {
+            const drained = await drainForaged();
+            if (drained.length > 0) setPopOutItems(drained);
+        } catch (e: any) {
+            onNotification?.(e?.message || 'Failed to collect finds', 'error');
+        } finally {
+            drainInFlightRef.current = false;
+        }
     };
 
     const [currentGame, setCurrentGame] = useState<string | null>(null);
@@ -317,14 +338,32 @@ const MoonokoInteraction: React.FC<Props> = ({
             <View style={styles.mainDisplayArea}>
                 <Image source={imageSources.background} style={styles.backgroundImage} resizeMode="cover" />
                 {selectedCharacter ? (
-                    <Image
-                        source={getImageSource(selectedCharacter.image)}
-                        style={styles.characterImage}
-                    />
+                    <TouchableOpacity
+                        activeOpacity={hasPendingFinds ? 0.7 : 1}
+                        onPress={handleCharacterPress}
+                        disabled={!hasPendingFinds && !popOutItems}
+                        style={styles.characterTouch}
+                    >
+                        <Image
+                            source={getImageSource(selectedCharacter.image)}
+                            style={styles.characterImage}
+                        />
+                        {hasPendingFinds && !popOutItems && (
+                            <View style={styles.exclamationBadge} pointerEvents="none">
+                                <Text style={styles.exclamationText}>!</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
                 ) : (
                     <View style={styles.noCharacterPlaceholder}>
                         <Text>No Character Selected</Text>
                     </View>
+                )}
+                {popOutItems && (
+                    <ForagePopOut
+                        items={popOutItems}
+                        onComplete={() => setPopOutItems(null)}
+                    />
                 )}
             </View>
 
@@ -438,6 +477,29 @@ const styles = StyleSheet.create({
         height: 250,
         resizeMode: 'contain',
         marginTop: -80,
+    },
+    characterTouch: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    exclamationBadge: {
+        position: 'absolute',
+        top: -40,
+        alignSelf: 'center',
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#ffd53f',
+        borderWidth: 2,
+        borderColor: '#3a2a12',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    exclamationText: {
+        fontFamily: 'PressStart2P',
+        fontSize: 14,
+        color: '#3a2a12',
+        marginTop: -1,
     },
     noCharacterPlaceholder: {
         flex: 1,
