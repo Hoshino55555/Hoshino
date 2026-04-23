@@ -42,3 +42,7 @@ yarn-error.*
 backend/firebase/functions/solana-transactions copy.js
 target/
 test-ledger/
+
+# Agent/editor state (local to contributor)
+.claude/
+skills-lock.json

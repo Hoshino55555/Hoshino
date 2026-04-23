@@ -33,6 +33,7 @@ exports.recordPlay = gameState.recordPlay;
 exports.recordChat = gameState.recordChat;
 exports.startSleep = gameState.startSleep;
 exports.endSleep = gameState.endSleep;
+exports.drainForaged = gameState.drainForaged;
 
 // Health check
 exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) => {
@@ -54,6 +55,7 @@ exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) 
       'recordChat',
       'startSleep',
       'endSleep',
+      'drainForaged',
       'health',
     ],
   });
