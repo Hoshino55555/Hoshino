@@ -92,8 +92,8 @@ android {
         applicationId 'com.socks.hoshino'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 7
-        versionName "0.1.6-preview"
+        versionCode 8
+        versionName "0.1.7-preview"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
