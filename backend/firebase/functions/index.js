@@ -10,6 +10,7 @@ const solanaTransactionFunctions = require('./solana-transactions');
 // New callable functions
 const authBridge = require('./auth-bridge');
 const gameState = require('./game-state');
+const cooking = require('./cooking');
 
 // AI chat
 exports.chat = aiChatFunctions.chat;
@@ -35,6 +36,11 @@ exports.startSleep = gameState.startSleep;
 exports.endSleep = gameState.endSleep;
 exports.drainForaged = gameState.drainForaged;
 
+// Cooking
+exports.cook = cooking.cook;
+exports.getInventory = cooking.getInventory;
+exports.getCookingProfile = cooking.getCookingProfile;
+
 // Health check
 exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) => {
   res.json({
@@ -56,6 +62,9 @@ exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) 
       'startSleep',
       'endSleep',
       'drainForaged',
+      'cook',
+      'getInventory',
+      'getCookingProfile',
       'health',
     ],
   });

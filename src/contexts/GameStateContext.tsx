@@ -1,6 +1,11 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useGameState } from '../hooks/useGameState';
-import type { GameState, ForagedItem } from '../services/GameStateService';
+import type {
+    GameState,
+    ForagedItem,
+    IngredientCounts,
+    CookResponse,
+} from '../services/GameStateService';
 
 interface GameStateContextType {
     state: GameState | null;
@@ -14,6 +19,11 @@ interface GameStateContextType {
     endSleep: (force?: boolean) => Promise<GameState>;
     drainForaged: () => Promise<ForagedItem[]>;
     sleepRemainingMs: number;
+    inventory: IngredientCounts;
+    discoveredRecipes: string[];
+    refreshPantry: () => Promise<void>;
+    cookManual: (ingredients: string[]) => Promise<CookResponse>;
+    cookRecipe: (recipeId: string) => Promise<CookResponse>;
 }
 
 const GameStateContext = createContext<GameStateContextType | undefined>(undefined);

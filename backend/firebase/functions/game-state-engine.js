@@ -2,11 +2,18 @@
 // Given a state snapshot + `now`, returns the resolved snapshot.
 // Called from game-state.js on every read and before every mutation.
 
+// Meal windows cover the full 24h with no grace period. Dinner wraps past
+// midnight — from 18:00 local to 06:00 next day. To keep arithmetic simple
+// in tzWallClockToMs, dinner's endHour is encoded as 30 (= 24 + 6).
+// A "game day" (see gameDayKey) starts at 06:00 local and runs until the
+// next 06:00, so dinner Apr 15 belongs to game day Apr 15 even when it
+// ends/claims at 02:00 Apr 16.
 const MEAL_WINDOWS = {
-  breakfast: { startHour: 6, endHour: 10 },
-  lunch: { startHour: 11, endHour: 14 },
-  dinner: { startHour: 17, endHour: 21 },
+  breakfast: { startHour: 6, endHour: 12 },
+  lunch: { startHour: 12, endHour: 18 },
+  dinner: { startHour: 18, endHour: 30 },
 };
+const GAME_DAY_START_HOUR = 6;
 
 const SLEEP_REQUIRED_MS = 8 * 60 * 60 * 1000;
 const ENERGY_DECAY_HOURS = 4; // lose 1 energy per 4 awake hours
@@ -43,13 +50,15 @@ const FORAGE_SLOTS_PER_TICK = 3; // max ingredients per forage event
 const FORAGE_BASE_SLOT_PROB = 0.05; // energy=1
 const FORAGE_ENERGY_COEF = 0.025; // per energy point above 1
 
-// Rarity tier → ingredient id. When tiers grow beyond 1 ingredient, move to an
-// array-per-tier and pick within the tier using the second random byte.
+// Rarity tier → ingredient pool. Each successful slot picks a tier (from the
+// mood-driven CDF), then picks one ingredient uniformly within that tier's
+// array using an additional random byte. Keep in sync with the recipe catalog
+// and the docs/GAME_MECHANICS.md ingredient table.
 const FORAGE_INGREDIENT_BY_TIER = {
-  common: 'mira_berry',
-  uncommon: 'nova_egg',
-  rare: 'pink_sugar',
-  legendary: null, // reserved
+  common: ['egg', 'lettuce', 'potato', 'rice', 'carrot'],
+  uncommon: ['banana', 'strawberry', 'tomato', 'tofu', 'oat', 'bread'],
+  rare: ['bacon', 'milk', 'tuna', 'gouda'],
+  ultra_rare: ['star_dust'],
 };
 
 // Cap how much backlog is honored. If a user is away longer than this, we
@@ -81,25 +90,45 @@ function localHour(ms, tz) {
 }
 
 // Get the epoch ms at (dateKey, hour, 0, 0) in the given timezone.
+// `hour` may be ≥ 24 to express wall-clock times that spill past midnight
+// (e.g. dinner's endHour=30 means 06:00 the day *after* dateKey). We roll the
+// date forward so the calibration loop always works with an in-range hour.
 // Uses a calibration pass because JS Date can't directly construct a local-tz timestamp.
 function tzWallClockToMs(dateKey, hour, tz) {
-  const [y, m, d] = dateKey.split('-').map(Number);
+  const daysForward = Math.floor(hour / 24);
+  const hourInDay = hour - daysForward * 24;
+  let effectiveDateKey = dateKey;
+  if (daysForward > 0) {
+    const [y0, m0, d0] = dateKey.split('-').map(Number);
+    const next = new Date(Date.UTC(y0, m0 - 1, d0 + daysForward));
+    effectiveDateKey =
+      `${next.getUTCFullYear()}-` +
+      `${String(next.getUTCMonth() + 1).padStart(2, '0')}-` +
+      `${String(next.getUTCDate()).padStart(2, '0')}`;
+  }
+  const [y, m, d] = effectiveDateKey.split('-').map(Number);
   // Start with UTC approximation, then correct for tz offset.
-  let guess = Date.UTC(y, m - 1, d, hour, 0, 0, 0);
+  let guess = Date.UTC(y, m - 1, d, hourInDay, 0, 0, 0);
   // What hour does this guess appear as in tz?
   for (let i = 0; i < 2; i++) {
     const appearedHour = localHour(guess, tz);
     const appearedDateKey = localDateKey(guess, tz);
-    const expected = { dateKey, hour };
     // If we're in the right hour on the right day, done.
-    if (appearedHour === expected.hour && appearedDateKey === expected.dateKey) return guess;
+    if (appearedHour === hourInDay && appearedDateKey === effectiveDateKey) return guess;
     // Otherwise offset by difference
-    const hourDiff = expected.hour - appearedHour;
+    const hourDiff = hourInDay - appearedHour;
     const dayDiff =
-      expected.dateKey < appearedDateKey ? -1 : expected.dateKey > appearedDateKey ? 1 : 0;
+      effectiveDateKey < appearedDateKey ? -1 : effectiveDateKey > appearedDateKey ? 1 : 0;
     guess += (dayDiff * 24 + hourDiff) * 3600 * 1000;
   }
   return guess;
+}
+
+// A "game day" starts at GAME_DAY_START_HOUR local time. Dinner eaten at
+// 02:00 belongs to the previous game day (so claims.dateKey matches the
+// window's start-day, not the calendar day it technically ends on).
+function gameDayKey(ms, tz) {
+  return localDateKey(ms - GAME_DAY_START_HOUR * 3600 * 1000, tz);
 }
 
 function getWindowEndsInRange(fromMs, toMs, tz) {
@@ -129,12 +158,13 @@ function getWindowEndsInRange(fromMs, toMs, tz) {
   });
 }
 
+// Contiguous windows: every local hour maps to exactly one meal. Dinner
+// covers the 18:00–06:00 wrap, so hours 0–5 and 18–23 both resolve to dinner.
 function currentWindowName(ms, tz) {
   const hour = localHour(ms, tz);
-  for (const [name, { startHour, endHour }] of Object.entries(MEAL_WINDOWS)) {
-    if (hour >= startHour && hour < endHour) return name;
-  }
-  return null;
+  if (hour >= 6 && hour < 12) return 'breakfast';
+  if (hour >= 12 && hour < 18) return 'lunch';
+  return 'dinner';
 }
 
 function defaultMealClaims(dateKey) {
@@ -160,7 +190,7 @@ function forageSlotProb(energy, asleep) {
   return asleep ? base * FORAGE_SLEEP_RATE_MULT : base;
 }
 
-// Tier weights from mood (1..5). Legendary clamps to 0 when the shift would
+// Tier weights from mood (1..5). Ultra-rare clamps to 0 when the shift would
 // make it negative; the mass is redistributed into common. Returns an ordered
 // array of [tier, cumulativeWeight] pairs summing to 1.0, ready for bucket
 // pick.
@@ -169,10 +199,10 @@ function forageTierCDF(mood) {
   let common = 0.6 - moodDelta * 0.04;
   const uncommon = 0.25;
   let rare = 0.12 + moodDelta * 0.02;
-  let legendary = 0.03 + moodDelta * 0.02;
-  if (legendary < 0) {
-    common += legendary; // legendary is negative, so this subtracts
-    legendary = 0;
+  let ultraRare = 0.03 + moodDelta * 0.02;
+  if (ultraRare < 0) {
+    common += ultraRare; // ultraRare is negative, so this subtracts
+    ultraRare = 0;
   }
   if (rare < 0) {
     common += rare;
@@ -182,7 +212,7 @@ function forageTierCDF(mood) {
     ['common', common],
     ['uncommon', common + uncommon],
     ['rare', common + uncommon + rare],
-    ['legendary', common + uncommon + rare + legendary],
+    ['ultra_rare', common + uncommon + rare + ultraRare],
   ];
 }
 
@@ -204,8 +234,10 @@ function pickTier(u, mood) {
 // — precise retroactive stat simulation is out of scope for v1.
 //
 // `randomBytes(userId, tickMs)` is injected so HMAC vs VRF can swap cleanly.
-// Must return ≥ 2 * FORAGE_SLOTS_PER_TICK bytes: bytes[0..slots-1] gate each
-// slot, bytes[slots..2*slots-1] pick tier for successful slots.
+// Must return ≥ 3 * FORAGE_SLOTS_PER_TICK bytes:
+//   bytes[0..slots-1]            gate each slot (find/no-find)
+//   bytes[slots..2*slots-1]      pick tier for successful slots
+//   bytes[2*slots..3*slots-1]    pick ingredient within the chosen tier
 function resolveForaging(state, nowMs, randomBytes) {
   const asleep = !!state.sleepStartedAt;
   const interval = forageInterval(state.hunger);
@@ -230,8 +262,10 @@ function resolveForaging(state, nowMs, randomBytes) {
       if (findRoll < slotProb) {
         const tierRoll = bytes[FORAGE_SLOTS_PER_TICK + slot] / 256;
         const tier = pickTier(tierRoll, state.mood);
-        const ingredient = FORAGE_INGREDIENT_BY_TIER[tier];
-        if (ingredient) {
+        const pool = FORAGE_INGREDIENT_BY_TIER[tier];
+        if (pool && pool.length > 0) {
+          const poolRoll = bytes[2 * FORAGE_SLOTS_PER_TICK + slot] / 256;
+          const ingredient = pool[Math.min(pool.length - 1, Math.floor(poolRoll * pool.length))];
           finds.push({
             id: `${eventMs}-${slot}-${ingredient}`,
             ingredient,
@@ -259,7 +293,7 @@ function defaultState(characterId, nowMs, tz) {
     lastResolvedAt: nowMs,
     sleepStartedAt: null,
     timezone: tz || 'UTC',
-    mealBonusClaimed: defaultMealClaims(localDateKey(nowMs, tz || 'UTC')),
+    mealBonusClaimed: defaultMealClaims(gameDayKey(nowMs, tz || 'UTC')),
     totalFeedings: 0,
     totalPlays: 0,
     totalSleeps: 0,
@@ -273,10 +307,10 @@ function defaultState(characterId, nowMs, tz) {
   };
 }
 
-// Normalize: make sure derived fields exist, claims match today's dateKey.
+// Normalize: make sure derived fields exist, claims match today's game day.
 function normalize(state, nowMs) {
   const tz = state.timezone || 'UTC';
-  const todayKey = localDateKey(nowMs, tz);
+  const todayKey = gameDayKey(nowMs, tz);
   const claims = state.mealBonusClaimed;
   const needsReset = !claims || claims.dateKey !== todayKey;
   return {
@@ -320,7 +354,7 @@ function applyStatDecay(state, nowMs) {
   const fromMs = state.lastResolvedAt || nowMs;
   if (nowMs <= fromMs) return normalize(state, nowMs);
 
-  const todayKey = localDateKey(nowMs, tz);
+  const todayKey = gameDayKey(nowMs, tz);
   const claims = state.mealBonusClaimed || defaultMealClaims(todayKey);
 
   // Merge hunger-drop events (meal window ends) and energy-drop events (every
@@ -384,6 +418,9 @@ function applyStatDecay(state, nowMs) {
 // Feed action: bumps hunger + optional mood boost. Claims the meal window if
 // we're inside one (which prevents hunger decay at window end) — but no mood
 // bonus: mood has its own clock and isn't tied to meal timing.
+//
+// opts.xp overrides the default +10 per feed (used by cook() to scale xp with
+// recipe complexity; slop/one-off feeds stick with the default).
 function applyFeed(state, nowMs, hungerBoost = 0, moodBoost = 0, opts = {}) {
   if (state.sleepStartedAt) {
     throw new Error('Cannot feed: moonoko is sleeping');
@@ -395,13 +432,14 @@ function applyFeed(state, nowMs, hungerBoost = 0, moodBoost = 0, opts = {}) {
   if (windowName && !claims[windowName]) {
     claims[windowName] = true;
   }
+  const xpGain = typeof opts.xp === 'number' ? opts.xp : 10;
   return {
     ...resolved,
     hunger: clamp(1, 5, resolved.hunger + hungerBoost),
     mood: clamp(1, 5, resolved.mood + moodBoost),
     mealBonusClaimed: claims,
     totalFeedings: (resolved.totalFeedings || 0) + 1,
-    experience: (resolved.experience || 0) + 10,
+    experience: (resolved.experience || 0) + xpGain,
     lastResolvedAt: nowMs,
   };
 }

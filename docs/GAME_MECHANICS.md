@@ -18,7 +18,7 @@ Three visible stats, integer 1–5, always clamped.
 
 Each stat has its own clock — they're deliberately decoupled so "hungry", "tired", and "bored" mean different things to the user.
 
-**Hunger — stepwise, per missed meal window.** Windows (local time): breakfast 06–10, lunch 11–14, dinner 17–21. Each unclaimed window end drops hunger by 3 (floor 1). Between windows there's no hunger decay — grace period. Cascade: 5 → miss → 2 → miss → 1 (bottomed after two consecutive misses). Feeding *during* a window claims it (no decay at window end). Each feeding is worth up to +3 hunger (clamp 1–5), so climbing from 1 back to 5 takes two feedings.
+**Hunger — stepwise, per missed meal window.** Windows (local time) are contiguous and tile the 24h day: breakfast 06–12, lunch 12–18, dinner 18–06 (dinner wraps past midnight). Every local hour resolves to exactly one meal. A "game day" starts at 06:00 and runs to the next 06:00, so dinner eaten at 02:00 belongs to the previous game day's claims. Each unclaimed window end drops hunger by 3 (floor 1). Cascade: 5 → miss → 2 → miss → 1 (bottomed after two consecutive misses). Feeding *during* a window claims it (no decay at window end). Each feeding is worth up to +3 hunger (clamp 1–5), so climbing from 1 back to 5 takes two feedings.
 
 **Energy — time-based.** Drops 1 per 4 awake hours. Full 8h sleep restores to 5. Forced wake grants partial (+1 per 2h slept).
 
@@ -42,12 +42,12 @@ Example timeline (starting H=5, M=5):
 
 | Event | H | M |
 |---|---:|---:|
-| Breakfast window opens | 5 | 5 |
-| Breakfast ends unclaimed | 2 | 5 |
-| Lunch window opens (grace) | 2 | 5 |
+| Breakfast window opens (06:00) | 5 | 5 |
+| Breakfast ends unclaimed (12:00) | 2 | 5 |
+| Lunch window opens (12:00) | 2 | 5 |
 | Feed during lunch (+3 H) | 5 | 5 |
-| Lunch ends claimed — no decay | 5 | 5 |
-| Dinner ends unclaimed | 2 | 5 |
+| Lunch ends claimed (18:00) — no decay | 5 | 5 |
+| Dinner ends unclaimed (06:00 next day) | 2 | 5 |
 
 Mood is visibly eroded only over days, not single events — `M` column shown here doesn't move within one day because mood decay is continuous and small at this scale.
 
@@ -118,31 +118,32 @@ Stat crosstalk is intentional: "fed but tired" and "hungry but rested" land in t
 
 ### Rarity distribution
 
-When a tick produces a find, roll a second random for tier. Base distribution plus mood shift:
+When a tick produces a find, roll a second random for tier, then a third to pick an ingredient within that tier's pool. Base distribution plus mood shift:
 
-| Tier | Base | Shift per mood point above 3 | Ingredient (v1) |
-|---|---:|---|---|
-| Common | 60% | −4% | Mira Berry |
-| Uncommon | 25% | 0 | Nova Egg |
-| Rare | 12% | +2% | Pink Sugar |
-| Legendary | 3% | +2% | *(reserved)* |
+| Tier | Base | Shift per mood point above 3 |
+|---|---:|---|
+| Common | 60% | −4% |
+| Uncommon | 25% | 0 |
+| Rare | 12% | +2% |
+| Ultra rare | 3% | +2% |
 
 Examples:
-- Mood = 1 → Common 68% / Uncommon 25% / Rare 8% / Legendary 0% (legendary clamps to 0, redistributed to common)
+- Mood = 1 → Common 68% / Uncommon 25% / Rare 8% / Ultra rare 0% (ultra rare clamps to 0, redistributed to common)
 - Mood = 3 → baseline
-- Mood = 5 → Common 52% / Uncommon 25% / Rare 16% / Legendary 7%
+- Mood = 5 → Common 52% / Uncommon 25% / Rare 16% / Ultra rare 7%
 
-### Ingredient pool (v1 bootstrap)
+### Ingredient pool
 
-Three ingredients to start. Each ingredient maps to one rarity tier. Legendary slot is reserved so the UI/drop table is ready when new ingredients land.
+16 ingredients across 4 tiers. Within a tier, picks are uniform — every common is equally likely when the roll lands on "common", and so on.
 
-| ID | Display | Tier |
-|---|---|---|
-| `mira_berry` | Mira Berry | Common |
-| `nova_egg` | Nova Egg | Uncommon |
-| `pink_sugar` | Pink Sugar | Rare |
+| Tier | Pool |
+|---|---|
+| Common (5) | `egg`, `lettuce`, `potato`, `rice`, `carrot` |
+| Uncommon (6) | `banana`, `strawberry`, `tomato`, `tofu`, `oat`, `bread` |
+| Rare (4) | `bacon`, `milk`, `tuna`, `gouda` |
+| Ultra rare (1) | `star_dust` |
 
-When more ingredients ship, they fill additional slots per tier — update the table and add ingredient art to `assets/images/ingredients/`.
+The tier + within-tier split means adding a new ingredient doesn't require retuning the rarity curve — drop it into the relevant pool and it inherits the tier's drop odds (divided across pool size).
 
 ### Randomness source
 
@@ -167,8 +168,38 @@ On first `getGameState` of a local day, if any pending finds are tagged `source:
 
 - Client sends `hungerBoost` (0–3) and `moodBoost` (0–5) per food item.
 - Server applies boosts, clamps 1–5. Feeding inside a meal window *claims* it (prevents hunger decay at window end) but grants no mood bonus — mood is on its own clock, deliberately decoupled from meal timing.
-- v1: 8 placeholder recipes ([src/components/FeedingPage.tsx](../src/components/FeedingPage.tsx)) each `+1 hunger, +1 mood`.
-- v2 (post-hackathon): recipes derived from ingredient combinations — cooking system TBD.
+
+### Cooking
+
+The v1 cooking system is trial-and-error: toss any subset of foraged ingredients into the pot, and the recipe catalog decides what you made.
+
+- Canonical match is a **sorted multiset** of ingredient ids — order doesn't matter, duplicates do.
+- If the multiset matches a recipe exactly → that dish, full xp reward.
+- Any other combination → **slop** (still food, low xp). This is the discovery loop.
+
+Catalog: [src/services/RecipeCatalog.ts](../src/services/RecipeCatalog.ts). 14 recipes to start:
+
+| Recipe | Ingredients | Tier signal |
+|---|---|---|
+| Eggtato | egg, potato | 2× common |
+| Wobble | egg, strawberry | common + uncommon |
+| Veggeta | carrot, rice, tofu | 2× common + uncommon |
+| Miso Nori | carrot, egg, lettuce, potato, tofu | 4× common + uncommon |
+| Healthy Era | carrot, egg, lettuce, potato, tofu, tomato | 4× common + 2× uncommon |
+| Maki-chan | lettuce, rice, tuna | 2× common + rare |
+| Oat & Cheese | gouda, oat | uncommon + rare |
+| Oatmaxxing | milk, oat, strawberry | 2× uncommon + rare |
+| Babana Bred | banana, egg, milk, oat | common + 2× uncommon + rare |
+| Hoshi Boba | banana, milk, rice, strawberry | common + 2× uncommon + rare |
+| Burdger | bacon, bread, lettuce, tomato | common + 2× uncommon + rare |
+| Don't Ask.. | bacon, star_dust, tuna | 2× rare + ultra rare |
+| Hoshi Tato | banana, egg, milk, star_dust, strawberry | common + 2× uncommon + rare + ultra rare |
+| TURBOSLAYER9000 | bacon, bread, gouda, lettuce, star_dust | common + uncommon + 2× rare + ultra rare |
+
+The tier-signal column is advisory — it's just the sum of constituent tiers, useful for surfacing "you probably can't cook this yet" hints without hardcoding per-recipe unlock gates.
+
+- v1 (April 30 hackathon target): placeholder feeding UI still lives in [src/components/FeedingPage.tsx](../src/components/FeedingPage.tsx); wiring the pot + ingredient-picker to `matchRecipe()` is an open task.
+- v2: per-recipe hunger/mood/xp rewards, unlock tracking, recipe book UI.
 
 ## Sleep
 

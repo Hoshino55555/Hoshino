@@ -2,16 +2,31 @@ import React, { useEffect, useRef } from 'react';
 import { View, Image, Animated, Easing, StyleSheet, Text } from 'react-native';
 import type { ForagedItem } from '../services/GameStateService';
 
-const INGREDIENT_IMAGES: Record<string, any> = {
-    mira_berry: require('../../assets/images/Mira Berry.png'),
-    nova_egg: require('../../assets/images/Nova Egg.png'),
-    pink_sugar: require('../../assets/images/Pink Sugar.png'),
-};
+// Image sprites are still being drawn for the current ingredient pool.
+// Until an asset exists, the animated pop-out falls back to the text label.
+const INGREDIENT_IMAGES: Record<string, any> = {};
 
 const INGREDIENT_LABELS: Record<string, string> = {
-    mira_berry: 'Mira Berry',
-    nova_egg: 'Nova Egg',
-    pink_sugar: 'Pink Sugar',
+    // common
+    egg: 'Egg',
+    lettuce: 'Lettuce',
+    potato: 'Potato',
+    rice: 'Rice',
+    carrot: 'Carrot',
+    // uncommon
+    banana: 'Banana',
+    strawberry: 'Strawberry',
+    tomato: 'Tomato',
+    tofu: 'Tofu',
+    oat: 'Oat',
+    bread: 'Bread',
+    // rare
+    bacon: 'Bacon',
+    milk: 'Milk',
+    tuna: 'Tuna',
+    gouda: 'Gouda',
+    // ultra rare
+    star_dust: 'Star Dust',
 };
 
 interface Props {

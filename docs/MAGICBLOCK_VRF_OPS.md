@@ -67,18 +67,53 @@ After a successful deploy:
 
 ## Fees
 
-Current payer model:
+Two payer models, picked per call site:
 
-- The request signer pays.
-- In the temporary mobile-wallet path, the connected user wallet signs and pays.
-- In the intended Privy path, the embedded wallet signs and pays.
+**Client-signed (gacha, Starburst seed):**
+- The connected user wallet signs and pays.
+- Acceptable because these are explicit user actions ("pull a character", "start minigame") — one prompt per intent.
 
-There is no sponsor/relayer layer in this branch. Every new randomness request is an on-chain transaction, so it incurs normal Solana transaction fees plus whatever the MagicBlock VRF flow charges per request.
+**Server-signed (foraging):**
+- A dedicated server keypair pays for all foraging VRF requests, once per user per 24h window.
+- Foraging resolves lazily on every `getGameState` call; prompting the user's wallet per tick (up to 96/day) is unacceptable UX, so the backend owns the payer.
+- Fallback: if the VRF request fails or times out, foraging degrades to HMAC-SHA256 so gameplay never blocks on Solana. Logged as a warning but not surfaced to the user.
+
+### Server-signer setup (foraging path)
+
+The foraging path lives in [backend/firebase/functions/vrf-requester.js](../backend/firebase/functions/vrf-requester.js) and is gated by the `FORAGING_RNG_MODE` env var (`hmac` by default, `vrf` opts in).
+
+To enable the VRF path:
+
+1. Generate a dedicated keypair (do not reuse your personal wallet):
+   ```bash
+   solana-keygen new --outfile ~/.config/solana/hoshino-vrf-signer.json --no-bip39-passphrase
+   solana address -k ~/.config/solana/hoshino-vrf-signer.json
+   ```
+2. Airdrop devnet SOL to the keypair (a few SOL covers many thousands of requests):
+   ```bash
+   solana airdrop 2 <SIGNER_PUBKEY> --url devnet
+   ```
+3. Store the keypair as a Firebase secret. The value is the **entire JSON array** from the keyfile:
+   ```bash
+   cat ~/.config/solana/hoshino-vrf-signer.json | firebase functions:secrets:set FORAGING_VRF_SIGNER_SECRET_KEY
+   ```
+4. Set the RNG mode:
+   ```bash
+   firebase functions:config:set foraging.rng_mode=vrf   # or set via secrets / env
+   ```
+5. Deploy functions and verify by calling `getGameState` — Firestore will grow a `users/{uid}/vrf/window-<startMs>` doc after the first VRF request fulfills.
+
+### Cost envelope (devnet)
+
+- 1 on-chain tx per user per 24h (~0.00001 SOL base fee + MagicBlock per-request fee).
+- At 1000 DAU with a 24h window: ~1000 txs/day. Low 5-figure lamport spend. Trivial on devnet.
+- Scale lever: widen `VRF_WINDOW_MS` in [foraging-rng.js](../backend/firebase/functions/foraging-rng.js) to reduce requests per user at the cost of larger correlation windows.
 
 Operational implication:
 
-- Dev harness prompts are acceptable.
-- Production gameplay should move to the Privy signer path so repeated gameplay rolls do not require wallet approval on every request.
+- Dev harness (client-signed path) prompts are acceptable.
+- Gameplay gacha still prompts on each pull — swap to Privy signer when the session-key path lands.
+- Foraging never prompts — server-signer handles the whole loop.
 
 ## Failure Modes
 

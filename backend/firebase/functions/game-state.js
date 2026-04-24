@@ -1,16 +1,20 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const admin = require('./admin');
 const engine = require('./game-state-engine');
-const { makeForagingRng } = require('./foraging-rng');
+const { makeForagingRngForUser } = require('./foraging-rng');
 
 const REGION = 'us-central1';
 
-// Lazy-init so the RNG isn't constructed at module load (and can't throw before
-// the function body runs, which confuses Firebase error surfaces).
-let _foragingRng;
-function getForagingOpts() {
-  if (!_foragingRng) _foragingRng = makeForagingRng();
-  return { randomBytes: _foragingRng.randomBytes };
+// Per-request foraging RNG. In HMAC mode this is a no-op; in VRF mode it
+// fetches (or requests) the user's current window seed before resolve() runs.
+// Returns engine-compatible opts with a synchronous randomBytes closure.
+async function getForagingOptsForUser(uid, nowMs) {
+  const rng = await makeForagingRngForUser({
+    uid,
+    nowMs,
+    firestore: admin.firestore(),
+  });
+  return { randomBytes: rng.randomBytes };
 }
 
 function requireAuth(request) {
@@ -64,7 +68,11 @@ function validTimezone(tz) {
   }
 }
 
-const COMMON_OPTS = { cors: true, region: REGION };
+const COMMON_OPTS = {
+  cors: true,
+  region: REGION,
+  secrets: ['FORAGING_HMAC_SECRET', 'FORAGING_VRF_SIGNER_SECRET_KEY'],
+};
 
 exports.getGameState = onCall(COMMON_OPTS, async (request) => {
   const uid = requireAuth(request);
@@ -73,7 +81,8 @@ exports.getGameState = onCall(COMMON_OPTS, async (request) => {
   const nowMs = Date.now();
 
   let state = await loadOrDefault(uid, characterId, nowMs, validTimezone(tz) ? tz : undefined);
-  const resolved = engine.resolve(state, nowMs, getForagingOpts());
+  const opts = await getForagingOptsForUser(uid, nowMs);
+  const resolved = engine.resolve(state, nowMs, opts);
   if (resolved !== state) {
     await saveState(uid, characterId, resolved);
   }
@@ -89,7 +98,8 @@ exports.setTimezone = onCall(COMMON_OPTS, async (request) => {
   }
   const nowMs = Date.now();
   const state = await loadOrDefault(uid, characterId, nowMs, tz);
-  const next = { ...engine.resolve(state, nowMs), timezone: tz };
+  const opts = await getForagingOptsForUser(uid, nowMs);
+  const next = { ...engine.resolve(state, nowMs, opts), timezone: tz };
   await saveState(uid, characterId, next);
   return { state: next };
 });
@@ -109,9 +119,10 @@ exports.feedMoonoko = onCall(COMMON_OPTS, async (request) => {
   const nowMs = Date.now();
   const state = await loadOrDefault(uid, characterId, nowMs, validTimezone(tz) ? tz : undefined);
 
+  const opts = await getForagingOptsForUser(uid, nowMs);
   let next;
   try {
-    next = engine.applyFeed(state, nowMs, hungerBoost, moodBoost, getForagingOpts());
+    next = engine.applyFeed(state, nowMs, hungerBoost, moodBoost, opts);
   } catch (e) {
     throw new HttpsError('failed-precondition', e.message);
   }
@@ -124,9 +135,10 @@ exports.recordPlay = onCall(COMMON_OPTS, async (request) => {
   const characterId = validateCharacterId(request.data && request.data.characterId);
   const nowMs = Date.now();
   const state = await loadOrDefault(uid, characterId, nowMs);
+  const opts = await getForagingOptsForUser(uid, nowMs);
   let next;
   try {
-    next = engine.applyPlay(state, nowMs, getForagingOpts());
+    next = engine.applyPlay(state, nowMs, opts);
   } catch (e) {
     throw new HttpsError('failed-precondition', e.message);
   }
@@ -139,9 +151,10 @@ exports.recordChat = onCall(COMMON_OPTS, async (request) => {
   const characterId = validateCharacterId(request.data && request.data.characterId);
   const nowMs = Date.now();
   const state = await loadOrDefault(uid, characterId, nowMs);
+  const opts = await getForagingOptsForUser(uid, nowMs);
   let next;
   try {
-    next = engine.applyChat(state, nowMs, getForagingOpts());
+    next = engine.applyChat(state, nowMs, opts);
   } catch (e) {
     throw new HttpsError('failed-precondition', e.message);
   }
@@ -154,7 +167,8 @@ exports.startSleep = onCall(COMMON_OPTS, async (request) => {
   const characterId = validateCharacterId(request.data && request.data.characterId);
   const nowMs = Date.now();
   const state = await loadOrDefault(uid, characterId, nowMs);
-  const next = engine.applyStartSleep(state, nowMs, getForagingOpts());
+  const opts = await getForagingOptsForUser(uid, nowMs);
+  const next = engine.applyStartSleep(state, nowMs, opts);
   await saveState(uid, characterId, next);
   return { state: next };
 });
@@ -188,7 +202,8 @@ exports.drainForaged = onCall(COMMON_OPTS, async (request) => {
   const characterId = validateCharacterId(request.data && request.data.characterId);
   const nowMs = Date.now();
   const state = await loadOrDefault(uid, characterId, nowMs);
-  const resolved = engine.resolve(state, nowMs, getForagingOpts());
+  const opts = await getForagingOptsForUser(uid, nowMs);
+  const resolved = engine.resolve(state, nowMs, opts);
   const finds = resolved.foragedItems || [];
   if (finds.length > 0) {
     // Append to inventory — ingredients as {id, count} aggregates.

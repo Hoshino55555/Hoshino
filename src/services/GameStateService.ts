@@ -8,7 +8,7 @@ export interface MealClaims {
     dinner: boolean;
 }
 
-export type ForageTier = 'common' | 'uncommon' | 'rare' | 'legendary';
+export type ForageTier = 'common' | 'uncommon' | 'rare' | 'ultra_rare';
 export type ForageSource = 'awake' | 'sleep';
 
 export interface ForagedItem {
@@ -89,6 +89,54 @@ const callExchangePrivyToken = httpsCallable<
     { firebaseToken: string; uid: string }
 >(functions, 'exchangePrivyToken');
 
+export interface IngredientCounts {
+    [ingredientId: string]: number;
+}
+
+export interface CookingProfile {
+    discoveredRecipes: string[];
+}
+
+export type CookMode = 'manual' | 'recipe';
+
+export interface CookResult {
+    kind: 'recipe' | 'slop';
+    recipeId: string | null;
+    recipeName: string | null;
+    firstDiscovery: boolean;
+    hungerBoost: number;
+    moodBoost: number;
+    xp: number;
+    ingredientsUsed: string[];
+}
+
+export interface CookResponse {
+    state: GameState;
+    inventory: { counts: IngredientCounts };
+    cooking: CookingProfile;
+    result: CookResult;
+}
+
+interface CookRequest {
+    characterId: string;
+    mode: CookMode;
+    ingredients?: string[];
+    recipeId?: string;
+    timezone?: string;
+}
+
+const callCook = httpsCallable<CookRequest, CookResponse>(functions, 'cook');
+
+const callGetInventory = httpsCallable<Record<string, never>, { counts: IngredientCounts }>(
+    functions,
+    'getInventory'
+);
+
+const callGetCookingProfile = httpsCallable<Record<string, never>, CookingProfile>(
+    functions,
+    'getCookingProfile'
+);
+
 function localTimezone(): string {
     try {
         return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -151,6 +199,36 @@ export const GameStateService = {
         characterId: string
     ): Promise<{ state: GameState; drained: ForagedItem[] }> {
         const res = await callDrainForaged({ characterId });
+        return res.data;
+    },
+
+    async getInventory(): Promise<IngredientCounts> {
+        const res = await callGetInventory({});
+        return res.data.counts || {};
+    },
+
+    async getCookingProfile(): Promise<CookingProfile> {
+        const res = await callGetCookingProfile({});
+        return { discoveredRecipes: res.data.discoveredRecipes || [] };
+    },
+
+    async cookManual(characterId: string, ingredients: string[]): Promise<CookResponse> {
+        const res = await callCook({
+            characterId,
+            mode: 'manual',
+            ingredients,
+            timezone: localTimezone(),
+        });
+        return res.data;
+    },
+
+    async cookRecipe(characterId: string, recipeId: string): Promise<CookResponse> {
+        const res = await callCook({
+            characterId,
+            mode: 'recipe',
+            recipeId,
+            timezone: localTimezone(),
+        });
         return res.data;
     },
 };

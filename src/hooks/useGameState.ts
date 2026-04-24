@@ -3,6 +3,8 @@ import {
     GameStateService,
     type GameState,
     type ForagedItem,
+    type IngredientCounts,
+    type CookResponse,
     SLEEP_REQUIRED_MS,
 } from '../services/GameStateService';
 import { useFirebaseAuth } from '../contexts/FirebaseAuthContext';
@@ -19,6 +21,12 @@ interface UseGameStateResult {
     endSleep: (force?: boolean) => Promise<GameState>;
     drainForaged: () => Promise<ForagedItem[]>;
     sleepRemainingMs: number; // 0 if not sleeping or finished
+    // Cooking surfaces
+    inventory: IngredientCounts;
+    discoveredRecipes: string[];
+    refreshPantry: () => Promise<void>;
+    cookManual: (ingredients: string[]) => Promise<CookResponse>;
+    cookRecipe: (recipeId: string) => Promise<CookResponse>;
 }
 
 export function useGameState(characterId: string | null | undefined): UseGameStateResult {
@@ -27,6 +35,8 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [tick, setTick] = useState(0);
+    const [inventory, setInventory] = useState<IngredientCounts>({});
+    const [discoveredRecipes, setDiscoveredRecipes] = useState<string[]>([]);
     const inFlightRef = useRef<Promise<void> | null>(null);
 
     const load = useCallback(async () => {
@@ -114,8 +124,58 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         if (!characterId) throw new Error('No character selected');
         const { state: next, drained } = await GameStateService.drainForaged(characterId);
         setState(next);
+        // Forage drain writes ingredients into the pantry doc — refresh local mirror.
+        try {
+            const counts = await GameStateService.getInventory();
+            setInventory(counts);
+        } catch {
+            // Non-fatal: the drain already succeeded, the mirror just lags a tick.
+        }
         return drained;
     }, [characterId]);
+
+    const refreshPantry = useCallback(async () => {
+        if (!firebaseUid) return;
+        try {
+            const [counts, profile] = await Promise.all([
+                GameStateService.getInventory(),
+                GameStateService.getCookingProfile(),
+            ]);
+            setInventory(counts);
+            setDiscoveredRecipes(profile.discoveredRecipes);
+        } catch (e: any) {
+            setError(e?.message || 'Failed to load pantry');
+        }
+    }, [firebaseUid]);
+
+    useEffect(() => {
+        if (!ready || !firebaseUid) return;
+        refreshPantry();
+    }, [ready, firebaseUid, refreshPantry]);
+
+    const cookManual = useCallback(
+        async (ingredients: string[]) => {
+            if (!characterId) throw new Error('No character selected');
+            const res = await GameStateService.cookManual(characterId, ingredients);
+            setState(res.state);
+            setInventory(res.inventory.counts);
+            setDiscoveredRecipes(res.cooking.discoveredRecipes);
+            return res;
+        },
+        [characterId]
+    );
+
+    const cookRecipe = useCallback(
+        async (recipeId: string) => {
+            if (!characterId) throw new Error('No character selected');
+            const res = await GameStateService.cookRecipe(characterId, recipeId);
+            setState(res.state);
+            setInventory(res.inventory.counts);
+            setDiscoveredRecipes(res.cooking.discoveredRecipes);
+            return res;
+        },
+        [characterId]
+    );
 
     let sleepRemainingMs = 0;
     if (state?.sleepStartedAt) {
@@ -137,5 +197,10 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         endSleep,
         drainForaged,
         sleepRemainingMs,
+        inventory,
+        discoveredRecipes,
+        refreshPantry,
+        cookManual,
+        cookRecipe,
     };
 }
