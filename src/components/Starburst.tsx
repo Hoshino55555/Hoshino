@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import InnerScreen from './InnerScreen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ZoomOutOverlay from './ZoomOutOverlay';
 
 interface StarburstProps {
     onBack: () => void;
@@ -22,6 +23,7 @@ interface RowHint {
 const GRID_SIZE = 5;
 
 const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
+    const insets = useSafeAreaInsets();
     const [grid, setGrid] = useState<GridCell[][]>([]);
     const [rowHints, setRowHints] = useState<RowHint[]>([]);
     const [colHints, setColHints] = useState<RowHint[]>([]);
@@ -182,19 +184,22 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
     };
 
     return (
-        <InnerScreen
-            expanded
-            animateIn
+        <ZoomOutOverlay
             exiting={isClosing}
             onExitComplete={onBack}
-            showBackgroundImage={false}
-            leftButtonText=""
-            centerButtonText=""
-            rightButtonText=""
-            onLeftButtonPress={handleBack}
-            onRightButtonPress={handleNewGame}
+            backgroundColor="#D4E8D4"
         >
-            <View style={styles.content}>
+            <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+                <TouchableOpacity
+                    style={styles.topButton}
+                    onPress={handleBack}
+                    hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                >
+                    <Text style={styles.topButtonText}>{'<'} Back</Text>
+                </TouchableOpacity>
+            </View>
+
+            <View style={[styles.content, { paddingBottom: insets.bottom + 16 }]}>
                 <Text style={styles.title}>Starburst</Text>
 
                 <View style={styles.scoreContainer}>
@@ -249,15 +254,46 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
                 <Text style={styles.instructionText}>
                     Flip all 2s and 3s. Avoid Stars!
                 </Text>
+
+                <TouchableOpacity
+                    style={styles.newGameButton}
+                    onPress={handleNewGame}
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                >
+                    <Text style={styles.newGameButtonText}>New Game</Text>
+                </TouchableOpacity>
             </View>
-        </InnerScreen>
+        </ZoomOutOverlay>
     );
 };
 
 const { width } = Dimensions.get('window');
-const CELL_SIZE = Math.min((width - 100) / (GRID_SIZE + 1), 42);
+// Board grows to fill the fullscreen overlay instead of the old InnerScreen
+// cavity — cap at 64px so tablets don't get a giant grid, otherwise let phones
+// use the whole width minus margins.
+const CELL_SIZE = Math.min((width - 48) / (GRID_SIZE + 1), 64);
 
 const styles = StyleSheet.create({
+    topBar: {
+        paddingHorizontal: 16,
+        paddingBottom: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+    },
+    topButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        backgroundColor: 'rgba(46, 90, 62, 0.85)',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#E8F5E8',
+    },
+    topButtonText: {
+        color: '#E8F5E8',
+        fontFamily: 'PressStart2P',
+        fontSize: 10,
+    },
     content: {
         flex: 1,
         alignItems: 'center',
@@ -373,6 +409,22 @@ const styles = StyleSheet.create({
         fontFamily: 'PressStart2P',
         textAlign: 'center',
         marginTop: 4,
+    },
+    newGameButton: {
+        marginTop: 16,
+        paddingVertical: 14,
+        paddingHorizontal: 32,
+        backgroundColor: '#2E5A3E',
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#E8F5E8',
+        alignSelf: 'center',
+    },
+    newGameButtonText: {
+        color: '#E8F5E8',
+        fontFamily: 'PressStart2P',
+        fontSize: 14,
+        textAlign: 'center',
     },
 });
 

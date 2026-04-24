@@ -17,6 +17,13 @@ service cloud.firestore {
         allow read: if request.auth != null && request.auth.uid == userId;
         allow write: if false;
       }
+
+      // Player profile (playerName, selectedCharacterId). Same shape: client
+      // reads, Functions write via admin SDK.
+      match /profile/{docId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if false;
+      }
     }
 
     // Legacy per-user game data (kept for backwards compat).

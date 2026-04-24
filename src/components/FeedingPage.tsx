@@ -7,17 +7,61 @@ import {
     ImageBackground,
     ScrollView,
     Modal,
+    Image,
+    useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ZoomOutOverlay from './ZoomOutOverlay';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import {
     RECIPES,
+    INGREDIENT_TIER,
     ingredientLabel,
     type Recipe,
     type IngredientId,
+    type IngredientTier,
 } from '../services/RecipeCatalog';
 import type { CookResponse, IngredientCounts } from '../services/GameStateService';
+
+// Per-recipe dish art hasn't been authored yet. Until it lands, each recipe
+// picks one of the three existing ingredient sprites via a hash of its id so
+// the same recipe always shows the same placeholder.
+const PLACEHOLDER_DISH_IMAGES = [
+    require('../../assets/images/Mira Berry.png'),
+    require('../../assets/images/Nova Egg.png'),
+    require('../../assets/images/Pink Sugar.png'),
+];
+function placeholderDishFor(id: string) {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+    return PLACEHOLDER_DISH_IMAGES[Math.abs(h) % PLACEHOLDER_DISH_IMAGES.length];
+}
+
+const TIER_COLOR: Record<IngredientTier, string> = {
+    common: '#cfd8c4',
+    uncommon: '#7ecf7a',
+    rare: '#6aaaff',
+    ultra_rare: '#d6a2ff',
+};
+
+// Client-side mirrors of server formulas — exact same constants, used only
+// for UI preview. The server re-derives on every cook, so any drift just
+// shows a stale hint, not a scoring bug.
+const RECIPE_LEVEL_STEP = 3;
+const TIER_POINTS: Record<IngredientTier, number> = {
+    common: 1,
+    uncommon: 2,
+    rare: 3,
+    ultra_rare: 5,
+};
+function recipeBasePoints(recipe: Recipe): number {
+    let sum = 0;
+    for (const ing of recipe.ingredients) sum += TIER_POINTS[INGREDIENT_TIER[ing]] || 0;
+    return sum * 10;
+}
+function levelFromProgress(progress: number): number {
+    return 1 + Math.floor((progress || 0) / RECIPE_LEVEL_STEP);
+}
 
 interface Props {
     onBack: () => void;
@@ -39,15 +83,32 @@ function canAfford(recipe: Recipe, inventory: IngredientCounts): boolean {
     return true;
 }
 
+// Twin of server's currentWindowName() — used only for UX hinting. The server
+// re-derives this from its own clock on every cook, so an off-by-an-hour
+// device clock can't actually let the user cook twice.
+type MealWindow = 'breakfast' | 'lunch' | 'dinner';
+function currentMealWindow(now = new Date()): MealWindow {
+    const hour = now.getHours();
+    if (hour >= 6 && hour < 12) return 'breakfast';
+    if (hour >= 12 && hour < 18) return 'lunch';
+    return 'dinner';
+}
+
 const FeedingPage = ({ onBack, onNotification }: Props) => {
     const {
         state,
         inventory,
         discoveredRecipes,
+        recipeProgress,
         cookManual,
         cookRecipe,
     } = useGameStateContext();
     const insets = useSafeAreaInsets();
+    const { height: screenHeight } = useWindowDimensions();
+    // Reserve the top ~33% of the screen so content lands just below the
+    // painted "MENU" banner. Measured from the cooking-bg.png: scene + MENU
+    // label occupy roughly the top third of a tall phone screen.
+    const bannerReserve = screenHeight * 0.25;
 
     const [isClosing, setIsClosing] = useState(false);
     const [manualOpen, setManualOpen] = useState(false);
@@ -55,24 +116,42 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     const [pendingManual, setPendingManual] = useState(false);
     const [lastResult, setLastResult] = useState<CookResponse['result'] | null>(null);
 
-    const currentHunger = state?.hunger ?? 5;
-    const full = currentHunger >= 5;
-
     const discoveredSet = useMemo(() => new Set(discoveredRecipes), [discoveredRecipes]);
     const discoveredRecipeDetails = useMemo(
         () => RECIPES.filter((r) => discoveredSet.has(r.id)),
         [discoveredSet]
     );
 
+    const currentWindow = currentMealWindow();
+    const alreadyClaimed = state?.mealBonusClaimed?.[currentWindow] === true;
+    const windowLabel =
+        currentWindow.charAt(0).toUpperCase() + currentWindow.slice(1);
+
+    // Twin of server's moodMultiplier/hungerMultiplier (see cooking.js). Used
+    // only for UI preview — the server re-derives from its own resolved state
+    // on every cook, so any drift here just shows a stale hint, not a scoring
+    // bug. Falls back to baseline (1.0 × 0.6) when state hasn't loaded yet.
+    const mood = state?.mood ?? 0;
+    const hunger = state?.hunger ?? 1;
+    const moodMult = 1 + 0.1 * Math.max(0, Math.min(5, mood));
+    const hungerMult = 0.5 + 0.1 * Math.max(0, Math.min(5, hunger));
+
     const handleClose = () => {
         if (isClosing) return;
         setIsClosing(true);
     };
 
+    const notifyAlreadyClaimed = () => {
+        onNotification?.(
+            `${windowLabel} already cooked — wait for the next meal window`,
+            'warning'
+        );
+    };
+
     const handleCookRecipe = async (recipe: Recipe) => {
         if (pendingRecipeId || pendingManual) return;
-        if (full) {
-            onNotification?.('Too full to cook', 'info');
+        if (alreadyClaimed) {
+            notifyAlreadyClaimed();
             return;
         }
         if (!canAfford(recipe, inventory)) {
@@ -126,24 +205,26 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                     >
                         <Text style={styles.backButtonText}>{'<'} Back</Text>
                     </TouchableOpacity>
-                    <Text style={styles.hungerText}>Hunger {currentHunger}/5</Text>
                 </View>
 
                 <ScrollView
                     contentContainerStyle={[
                         styles.scrollBody,
-                        { paddingBottom: insets.bottom + 16 },
+                        { paddingTop: bannerReserve, paddingBottom: insets.bottom + 16 },
                     ]}
                 >
                     <TouchableOpacity
-                        style={[styles.manualCard, full && styles.cardDisabled]}
-                        activeOpacity={0.8}
-                        onPress={() => !full && setManualOpen(true)}
-                        disabled={full}
+                        style={[styles.manualCard, alreadyClaimed && styles.cardDisabled]}
+                        activeOpacity={alreadyClaimed ? 1 : 0.8}
+                        onPress={() =>
+                            alreadyClaimed ? notifyAlreadyClaimed() : setManualOpen(true)
+                        }
                     >
                         <Text style={styles.manualTitle}>MANUAL COOK</Text>
                         <Text style={styles.manualSubtitle}>
-                            Toss ingredients into the pot and see what happens
+                            {alreadyClaimed
+                                ? `${windowLabel} already cooked — come back next window`
+                                : 'Toss ingredients into the pot and see what happens'}
                         </Text>
                     </TouchableOpacity>
 
@@ -156,46 +237,134 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                             No recipes yet. Cook manually to discover your first dish.
                         </Text>
                     ) : (
-                        discoveredRecipeDetails.map((recipe) => {
-                            const affordable = canAfford(recipe, inventory);
-                            const isPending = pendingRecipeId === recipe.id;
-                            const disabled = !affordable || full || isPending;
-                            return (
-                                <TouchableOpacity
-                                    key={recipe.id}
-                                    style={[
-                                        styles.recipeCard,
-                                        disabled && styles.cardDisabled,
-                                        isPending && styles.cardPending,
-                                    ]}
-                                    activeOpacity={disabled ? 1 : 0.7}
-                                    onPress={() => !disabled && handleCookRecipe(recipe)}
-                                    disabled={disabled}
-                                >
-                                    <Text style={styles.recipeName}>{recipe.name}</Text>
-                                    <Text style={styles.recipeIngredients}>
-                                        {recipe.ingredients.map(ingredientLabel).join(' · ')}
-                                    </Text>
-                                    {!affordable && (
-                                        <Text style={styles.recipeNote}>
-                                            missing ingredients
-                                        </Text>
-                                    )}
-                                </TouchableOpacity>
-                            );
-                        })
+                        <View style={styles.recipeGrid}>
+                            {discoveredRecipeDetails.map((recipe) => {
+                                const affordable = canAfford(recipe, inventory);
+                                const isPending = pendingRecipeId === recipe.id;
+                                const visuallyDisabled =
+                                    !affordable || isPending || alreadyClaimed;
+                                // Keep the card tappable when the only reason it's
+                                // disabled is the claimed window, so we can pop the
+                                // explanatory toast instead of silently eating the tap.
+                                const hardDisabled =
+                                    isPending || (!affordable && !alreadyClaimed);
+                                const level = levelFromProgress(
+                                    recipeProgress[recipe.id] || 0
+                                );
+                                const basePoints = recipeBasePoints(recipe);
+                                // XP this recipe would pay out right now given
+                                // current mood/hunger. Mirrors server formula:
+                                //   basePoints × levelBonus × moodMult × hungerMult
+                                // So the badge number moves with stats — a well-
+                                // tended moonoko visibly pays more than a hungry
+                                // one for the same dish.
+                                const projectedXp = Math.max(
+                                    0,
+                                    Math.round(
+                                        basePoints *
+                                            (1 + 0.1 * (level - 1)) *
+                                            moodMult *
+                                            hungerMult
+                                    )
+                                );
+                                // Collapse the ingredient list into a multiset so
+                                // duplicates render as `[icon] ×N` instead of
+                                // repeating icons (matches recipe-example.png).
+                                const counts: Record<string, number> = {};
+                                for (const ing of recipe.ingredients) {
+                                    counts[ing] = (counts[ing] || 0) + 1;
+                                }
+                                const ingredientEntries = Object.entries(counts);
+                                return (
+                                    <TouchableOpacity
+                                        key={recipe.id}
+                                        style={[
+                                            styles.recipeCard,
+                                            visuallyDisabled && styles.cardDisabled,
+                                            isPending && styles.cardPending,
+                                        ]}
+                                        activeOpacity={visuallyDisabled ? 1 : 0.7}
+                                        onPress={() => {
+                                            if (hardDisabled) return;
+                                            if (alreadyClaimed) {
+                                                notifyAlreadyClaimed();
+                                                return;
+                                            }
+                                            handleCookRecipe(recipe);
+                                        }}
+                                        disabled={hardDisabled}
+                                    >
+                                        <View style={styles.cardHeader}>
+                                            <Text
+                                                style={styles.cardHeaderName}
+                                                numberOfLines={1}
+                                            >
+                                                {recipe.name}
+                                            </Text>
+                                            <Text style={styles.cardHeaderLevel}>
+                                                Lv.{level}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.cardBody}>
+                                            <View style={styles.dishImageWrap}>
+                                                <Image
+                                                    source={placeholderDishFor(recipe.id)}
+                                                    style={styles.dishImage}
+                                                    resizeMode="contain"
+                                                />
+                                            </View>
+                                            <View style={styles.ingredientCol}>
+                                                <View style={styles.ingredientList}>
+                                                    {ingredientEntries.map(([ing, n]) => (
+                                                        <View
+                                                            key={ing}
+                                                            style={styles.ingredientRow}
+                                                        >
+                                                            <Image
+                                                                source={placeholderDishFor(ing)}
+                                                                style={styles.ingredientIcon}
+                                                                resizeMode="contain"
+                                                            />
+                                                            <Text style={styles.ingredientCount}>
+                                                                ×{n}
+                                                            </Text>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                                <View style={styles.pointsBadge}>
+                                                    <View style={styles.pointsMarker} />
+                                                    <Text style={styles.pointsBadgeText}>
+                                                        {projectedXp}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                        {!affordable && (
+                                            <Text style={styles.recipeNote}>
+                                                missing ingredients
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
                     )}
 
                     {lastResult && (
                         <View style={styles.lastResultCard}>
                             <Text style={styles.lastResultTitle}>
                                 {lastResult.kind === 'recipe'
-                                    ? lastResult.recipeName
+                                    ? `${lastResult.recipeName} · Lv.${lastResult.level}`
                                     : 'Slop'}
                             </Text>
                             <Text style={styles.lastResultLine}>
                                 +{lastResult.hungerBoost} hunger · +{lastResult.moodBoost}{' '}
-                                mood · +{lastResult.xp} xp
+                                mood · +{lastResult.xp} pts
+                            </Text>
+                            <Text style={styles.lastResultBreakdown}>
+                                base {lastResult.basePoints} × mood{' '}
+                                {lastResult.moodMult.toFixed(2)} × hunger{' '}
+                                {lastResult.hungerMult.toFixed(2)}
                             </Text>
                             {lastResult.firstDiscovery && (
                                 <Text style={styles.lastResultDiscovery}>
@@ -378,14 +547,8 @@ const styles = StyleSheet.create({
         fontFamily: 'PressStart2P',
         fontSize: 10,
     },
-    hungerText: {
-        color: '#FFD700',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
-    },
     scrollBody: {
         paddingHorizontal: 16,
-        paddingTop: 8,
     },
     manualCard: {
         backgroundColor: 'rgba(46, 90, 62, 0.85)',
@@ -421,30 +584,129 @@ const styles = StyleSheet.create({
         opacity: 0.8,
         marginVertical: 16,
     },
-    recipeCard: {
-        backgroundColor: 'rgba(28, 35, 55, 0.85)',
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: 'rgba(232, 245, 232, 0.3)',
-        padding: 10,
-        marginBottom: 8,
+    recipeGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
     },
-    recipeName: {
-        color: '#FFD700',
+    // Cards are intentionally sharp-cornered (borderRadius 0) with a chunky
+    // dark border — gives the pixel-art feel of the recipe-example reference.
+    // Inner lip uses a lighter border to get the two-tone "pressed" look.
+    recipeCard: {
+        backgroundColor: '#f5eed6',
+        borderRadius: 0,
+        borderWidth: 2,
+        borderColor: '#3a2a1a',
+        padding: 0,
+        marginBottom: 10,
+        width: '48%',
+        overflow: 'hidden',
+    },
+    cardHeader: {
+        backgroundColor: '#9ed5c5',
+        paddingHorizontal: 6,
+        paddingVertical: 4,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottomWidth: 2,
+        borderBottomColor: '#3a2a1a',
+    },
+    cardHeaderName: {
+        color: '#ffffff',
+        fontFamily: 'PressStart2P',
+        fontSize: 8,
+        flexShrink: 1,
+        paddingRight: 4,
+        textShadowColor: '#3a2a1a',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 0,
+    },
+    cardHeaderLevel: {
+        color: '#ffffff',
+        fontFamily: 'PressStart2P',
+        fontSize: 8,
+        textShadowColor: '#3a2a1a',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 0,
+    },
+    cardBody: {
+        flexDirection: 'row',
+        padding: 8,
+        minHeight: 90,
+    },
+    dishImageWrap: {
+        flex: 1,
+        aspectRatio: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    dishImage: {
+        width: '95%',
+        height: '95%',
+    },
+    ingredientCol: {
+        flex: 1,
+        paddingLeft: 6,
+        paddingRight: 8,
+        justifyContent: 'space-between',
+    },
+    ingredientList: {
+        alignItems: 'flex-end',
+    },
+    ingredientRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 2,
+    },
+    ingredientIcon: {
+        width: 24,
+        height: 24,
+        marginRight: 4,
+    },
+    ingredientCount: {
+        color: '#3a2a1a',
         fontFamily: 'PressStart2P',
         fontSize: 10,
-        marginBottom: 4,
     },
-    recipeIngredients: {
-        color: '#E8F5E8',
-        fontSize: 10,
-    },
-    recipeNote: {
-        color: '#e87a7a',
-        fontSize: 9,
+    pointsBadge: {
+        alignSelf: 'flex-end',
+        backgroundColor: '#9ed5c5',
+        borderWidth: 2,
+        borderColor: '#3a2a1a',
+        borderRadius: 0,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        flexDirection: 'row',
+        alignItems: 'center',
         marginTop: 4,
     },
-    cardDisabled: { opacity: 0.45 },
+    pointsMarker: {
+        width: 8,
+        height: 10,
+        backgroundColor: '#ef6d3a',
+        borderWidth: 1,
+        borderColor: '#3a2a1a',
+        borderRadius: 0,
+        marginRight: 4,
+    },
+    pointsBadgeText: {
+        color: '#ffffff',
+        fontFamily: 'PressStart2P',
+        fontSize: 10,
+        textShadowColor: '#3a2a1a',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 0,
+    },
+    recipeNote: {
+        color: '#c14a4a',
+        fontFamily: 'PressStart2P',
+        fontSize: 7,
+        paddingHorizontal: 6,
+        paddingBottom: 4,
+        textAlign: 'center',
+    },
+    cardDisabled: { opacity: 0.5 },
     cardPending: { borderColor: '#E8B84A' },
     lastResultCard: {
         backgroundColor: 'rgba(24, 46, 32, 0.85)',
@@ -461,6 +723,12 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     lastResultLine: { color: '#E8F5E8', fontSize: 10 },
+    lastResultBreakdown: {
+        color: '#E8F5E8',
+        fontSize: 9,
+        opacity: 0.75,
+        marginTop: 2,
+    },
     lastResultDiscovery: {
         color: '#8dd68d',
         fontFamily: 'PressStart2P',

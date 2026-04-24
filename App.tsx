@@ -38,8 +38,9 @@ import { Connection, PublicKey } from '@solana/web3.js';
 // New services and configs
 import { getGameCharacters, MOONOKOS_BY_ID, toGameCharacter } from './src/data/moonokos';
 import { ENABLE_VRF_DEV_SCREEN } from './src/config/vrf';
-import { FirebaseAuthProvider } from './src/contexts/FirebaseAuthContext';
+import { FirebaseAuthProvider, useFirebaseAuth } from './src/contexts/FirebaseAuthContext';
 import { GameStateProvider } from './src/contexts/GameStateContext';
+import { GameStateService } from './src/services/GameStateService';
 
 interface Character {
     id: string;
@@ -180,6 +181,7 @@ function App() {
 
 
     const { connected, publicKey, connect, disconnect, email, walletSource } = useWallet();
+    const { firebaseUid } = useFirebaseAuth();
     const [currentView, setCurrentView] = useState('welcome');
     const [previousView, setPreviousView] = useState('welcome');
     const [welcomePhase, setWelcomePhase] = useState<string>('intro');
@@ -261,6 +263,27 @@ function App() {
             };
 
             void saveStoredPlayerProfile(walletAddress, profile);
+
+            // Mirror the explicitly-changed fields to the server. We only send
+            // fields the caller actually passed (not the derived/implicit
+            // ones) so we don't spam setPlayerProfile on every render, and we
+            // don't send ownedCharacterIds because the server derives it from
+            // /users/{uid}/moonokos/*. Server-side auth isn't a hard gate —
+            // it'll reject with unauthenticated if Firebase Auth isn't ready,
+            // which we swallow and rely on AsyncStorage as a queue that will
+            // naturally re-sync on next hydrate.
+            const serverUpdates: { playerName?: string; selectedCharacterId?: string | null } = {};
+            if (nextProfile.playerName !== undefined) {
+                serverUpdates.playerName = nextProfile.playerName.trim();
+            }
+            if (nextProfile.selectedCharacterId !== undefined) {
+                serverUpdates.selectedCharacterId = nextProfile.selectedCharacterId;
+            }
+            if (Object.keys(serverUpdates).length > 0) {
+                GameStateService.setPlayerProfile(serverUpdates).catch((err) => {
+                    console.warn('⚠️ setPlayerProfile failed (cache still saved):', err);
+                });
+            }
         },
         [ownedCharacters, playerName, selectedCharacter?.id]
     );
@@ -379,6 +402,66 @@ function App() {
     useEffect(() => {
         let isCancelled = false;
 
+        const applyProfile = (
+            walletAddress: string,
+            profile: { playerName: string; ownedCharacterIds: string[]; selectedCharacterId: string | null },
+            source: 'server' | 'cache'
+        ) => {
+            if (isCancelled) return;
+            const restoredOwnedCharacters = normalizeOwnedCharacterIds(profile.ownedCharacterIds);
+            // If the user owns Moonokos but hasn't stamped a selection yet
+            // (e.g. their selection predates the server-side profile doc), fall
+            // back to the first owned character so they land on interaction
+            // instead of being re-asked to pick — and persist that choice so
+            // the server takes over on the next login.
+            const effectiveSelectedId =
+                profile.selectedCharacterId ??
+                (restoredOwnedCharacters.length > 0 ? restoredOwnedCharacters[0] : null);
+            const restoredCharacter = restoreCharacterFromId(
+                effectiveSelectedId,
+                restoredOwnedCharacters
+            );
+            if (
+                source === 'server' &&
+                !profile.selectedCharacterId &&
+                restoredCharacter &&
+                publicKey
+            ) {
+                GameStateService.setPlayerProfile({
+                    selectedCharacterId: restoredCharacter.id,
+                }).catch((err) => {
+                    console.warn('⚠️ default-select persist failed:', err);
+                });
+            }
+            const hasStoredCompanion =
+                restoredOwnedCharacters.length > 0 || Boolean(restoredCharacter);
+
+            console.log(`✅ Restored player profile (${source}):`, {
+                walletAddress,
+                playerName: profile.playerName,
+                ownedCharacters: restoredOwnedCharacters,
+                selectedCharacterId: restoredCharacter?.id ?? null,
+            });
+
+            setPlayerName(profile.playerName);
+            setOwnedCharacters(restoredOwnedCharacters);
+            setSelectedCharacter(restoredCharacter);
+
+            if (hasStoredCompanion) {
+                setCurrentView(restoredCharacter ? 'interaction' : 'selection');
+                if (profile.playerName.trim()) {
+                    addNotification(`🌟 Welcome back, ${profile.playerName}!`, 'success');
+                }
+            } else if (profile.playerName.trim()) {
+                setCurrentView('selection');
+                addNotification(`🌟 Welcome back, ${profile.playerName}!`, 'success');
+            } else {
+                setCurrentView('welcome');
+            }
+
+            setProfileHydratedWallet(walletAddress);
+        };
+
         const hydrateStoredProfile = async () => {
             if (!publicKey) {
                 setProfileHydratedWallet(null);
@@ -389,13 +472,39 @@ function App() {
             }
 
             const walletAddress = publicKey.toString();
-            const storedProfile = await loadStoredPlayerProfile(walletAddress);
 
-            if (isCancelled) {
-                return;
+            // Server is the source of truth. Wait until Firebase Auth is ready
+            // (Privy→Firebase exchange runs in FirebaseAuthContext) before
+            // calling the callable; otherwise it rejects unauthenticated.
+            if (firebaseUid) {
+                try {
+                    const serverProfile = await GameStateService.getPlayerProfile();
+                    if (isCancelled) return;
+                    applyProfile(walletAddress, serverProfile, 'server');
+                    // Mirror into AsyncStorage so next cold start has a warm
+                    // cache for instant first-paint (while still being
+                    // overridden by the server on arrival).
+                    void saveStoredPlayerProfile(walletAddress, {
+                        version: 1,
+                        playerName: serverProfile.playerName,
+                        ownedCharacterIds: serverProfile.ownedCharacterIds,
+                        selectedCharacterId: serverProfile.selectedCharacterId,
+                        updatedAt: Date.now(),
+                    });
+                    return;
+                } catch (err) {
+                    console.warn('⚠️ Server profile fetch failed, falling back to cache:', err);
+                    // Fall through to AsyncStorage cache.
+                }
             }
 
-            if (!storedProfile) {
+            // Fallback: AsyncStorage cache (offline, pre-auth, or server error).
+            // If no cache either, land on welcome.
+            const cached = await loadStoredPlayerProfile(walletAddress);
+            if (isCancelled) return;
+            if (cached) {
+                applyProfile(walletAddress, cached, 'cache');
+            } else {
                 console.log(
                     '🔍 No stored player profile for wallet:',
                     walletAddress.slice(0, 8) + '...'
@@ -405,49 +514,7 @@ function App() {
                 setSelectedCharacter(null);
                 setCurrentView('welcome');
                 setProfileHydratedWallet(walletAddress);
-                return;
             }
-
-            const restoredOwnedCharacters = normalizeOwnedCharacterIds(
-                storedProfile.ownedCharacterIds
-            );
-            const restoredCharacter = restoreCharacterFromId(
-                storedProfile.selectedCharacterId,
-                restoredOwnedCharacters
-            );
-            const hasStoredCompanion =
-                restoredOwnedCharacters.length > 0 || Boolean(restoredCharacter);
-
-            console.log('✅ Restored player profile:', {
-                walletAddress,
-                playerName: storedProfile.playerName,
-                ownedCharacters: restoredOwnedCharacters,
-                selectedCharacterId: restoredCharacter?.id ?? null,
-            });
-
-            setPlayerName(storedProfile.playerName);
-            setOwnedCharacters(restoredOwnedCharacters);
-            setSelectedCharacter(restoredCharacter);
-
-            if (hasStoredCompanion) {
-                setCurrentView(restoredCharacter ? 'interaction' : 'selection');
-                if (storedProfile.playerName.trim()) {
-                    addNotification(
-                        `🌟 Welcome back, ${storedProfile.playerName}!`,
-                        'success'
-                    );
-                }
-            } else if (storedProfile.playerName.trim()) {
-                setCurrentView('selection');
-                addNotification(
-                    `🌟 Welcome back, ${storedProfile.playerName}!`,
-                    'success'
-                );
-            } else {
-                setCurrentView('welcome');
-            }
-
-            setProfileHydratedWallet(walletAddress);
         };
 
         hydrateStoredProfile();
@@ -455,7 +522,7 @@ function App() {
         return () => {
             isCancelled = true;
         };
-    }, [addNotification, publicKey]);
+    }, [addNotification, publicKey, firebaseUid]);
 
     useEffect(() => {
         if (!publicKey) {

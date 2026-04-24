@@ -174,8 +174,10 @@ On first `getGameState` of a local day, if any pending finds are tagged `source:
 The v1 cooking system is trial-and-error: toss any subset of foraged ingredients into the pot, and the recipe catalog decides what you made.
 
 - Canonical match is a **sorted multiset** of ingredient ids — order doesn't matter, duplicates do.
-- If the multiset matches a recipe exactly → that dish, full xp reward.
-- Any other combination → **slop** (still food, low xp). This is the discovery loop.
+- If the multiset matches a recipe exactly → that dish, full reward.
+- Any other combination → **slop** (still food, trivial base points, still feeds). This is the discovery loop.
+
+**One cook per meal window.** A successful cook *claims* the current meal window just like a raw feed does. The server throws on repeat cook attempts inside the same window, and the client greys out the manual + recipe cards to match. Rationale: hunger boosts are the strongest lever in the game; uncapped cooking would let grinders pin hunger at 5 and trivialize the forage cadence clock that punishes neglect. Players who feed on schedule still sit near hunger=5 naturally; repeat cooks only ever bought spam.
 
 Catalog: [src/services/RecipeCatalog.ts](../src/services/RecipeCatalog.ts). 14 recipes to start:
 
@@ -198,8 +200,52 @@ Catalog: [src/services/RecipeCatalog.ts](../src/services/RecipeCatalog.ts). 14 r
 
 The tier-signal column is advisory — it's just the sum of constituent tiers, useful for surfacing "you probably can't cook this yet" hints without hardcoding per-recipe unlock gates.
 
-- v1 (April 30 hackathon target): placeholder feeding UI still lives in [src/components/FeedingPage.tsx](../src/components/FeedingPage.tsx); wiring the pot + ingredient-picker to `matchRecipe()` is an open task.
-- v2: per-recipe hunger/mood/xp rewards, unlock tracking, recipe book UI.
+### Dish art — placeholder until authored
+
+Per-recipe dish sprites haven't been authored yet. Until they land, the recipe book picks one of three existing ingredient sprites (Mira Berry / Nova Egg / Pink Sugar) per recipe by hashing the recipe id, so the same recipe always shows the same placeholder. When real art ships, replace `PLACEHOLDER_DISH_IMAGES` in [src/components/FeedingPage.tsx](../src/components/FeedingPage.tsx) with a per-recipe map. The forage pop-out uses the same placeholder scheme hashed by foraged-item id.
+
+### Dual XP — player score vs. recipe progress
+
+Cooking drives two independent counters. Both pull from the same mood × hunger multiplier stack, so stat management is load-bearing for both, but the swings are deliberately different magnitudes.
+
+**Shared multipliers** (evaluated from the pre-feed resolved state):
+
+```
+moodMult   = 1 + 0.1 * mood       // mood ∈ [0,5] → 1.0..1.5, clamped stats put it at 1.1..1.5
+hungerMult = 0.5 + 0.1 * hunger   // hunger ∈ [0,5] → 0.5..1.0, clamped stats at 0.6..1.0
+```
+
+**Player XP** (cumulative season score — leaderboard lever):
+
+```
+recipeLevelBonus = 1 + 0.1 * (level - 1)        // +10% per recipe level above 1
+playerXp         = basePoints
+                 * recipeLevelBonus
+                 * moodMult
+                 * hungerMult
+```
+
+- `basePoints` is the sum of constituent ingredient tier points × 10 (2 commons → 20, ultra-rare combos → 100+). Slop is a flat 3.
+- The product of mood × hunger modifiers lives in ~0.66× (mood 1, hunger 1) to 1.5× (mood 5, hunger 5). Well-timed feeds can more than 2× a badly-timed one at the same recipe.
+- `recipeLevelBonus` applies to recipes only; slop has no level track and its bonus is 1.0×.
+- Slop still gets the mood/hunger swing on its 3-point base, so feeding well matters even when you fail the recipe match.
+
+**Recipe progress** (per-recipe level, separate from player XP):
+
+```
+progressDelta = 1 + 0.2 * (moodMult * hungerMult - 1)   // subtle ±10% band
+level         = 1 + floor(recipeProgress / 3)           // no cap
+```
+
+- Stored in `/users/{uid}/cooking/profile.recipeProgress` as `{ [recipeId]: number }` floats.
+- Three cooks at baseline (`moodMult*hungerMult = 1.0`) hits level 2. Strong modifiers shave ~10% off the progress needed; weak modifiers add ~10%. Over a season this compounds, but never dominates basePoint tier ordering — an ultra-rare combo at level 1 still out-scores a 2-common recipe at level 5.
+- Slop does **not** advance any recipe (no matched recipe to credit).
+- No level cap for the hackathon build. If leaderboard telemetry shows a grind ceiling problem we'll add one.
+
+**Why two counters.** Player XP is the *outcome* score — the thing the leaderboard ranks. Recipe level is the *input* lever — it makes the same recipe quietly more valuable over time, so players invest in favorites instead of always chasing ultra-rares. The multipliers are shared so stat management affects both, but the recipe-progress delta is compressed by 0.2 so the leveling race doesn't trivialize the base-points tier structure.
+
+- v1 (April 30 hackathon target): server-authoritative cook with one-per-window claim, dual-XP accounting, per-recipe progress tracking, and 2-col recipe book UI with placeholder dish art are all shipped. Open task: real per-recipe dish sprites.
+- v2 (post-hackathon): authored dish art, recipe unlock animations, possibly a recipe-level-cap if telemetry shows one is needed.
 
 ## Sleep
 

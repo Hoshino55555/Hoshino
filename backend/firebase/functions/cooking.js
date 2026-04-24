@@ -92,12 +92,45 @@ async function getForagingOpts(uid, nowMs) {
   return { randomBytes: rng.randomBytes };
 }
 
+// Dual XP model. Player XP is cumulative season score — modifiers make good
+// stat management visibly rewarded. Recipe progress is a subtler lever: the
+// same mood/hunger modifiers push recipe leveling faster or slower, but the
+// swing is narrow (±10%) so grinders don't trivially outpace casual players.
+//
+// moodMult : 1.0 (mood 0) → 1.5 (mood 5)    — 0.1 per point
+// hungerMult : 0.5 (hunger 0) → 1.0 (hunger 5) — 0.1 per point
+// stats are clamped 1..5 in gameplay, so practical ranges are 1.1..1.5 and 0.6..1.0
+function moodMultiplier(mood) {
+  return 1 + 0.1 * Math.max(0, Math.min(5, mood || 0));
+}
+function hungerMultiplier(hunger) {
+  return 0.5 + 0.1 * Math.max(0, Math.min(5, hunger || 0));
+}
+
+// Recipe level derives from cumulative cook progress. 3 points per level, no
+// cap. Each level adds +10% to the recipe's contribution to player XP — so
+// repeat-cooking a recipe slowly makes it a bigger fraction of the season
+// score without overriding the base-points tier ordering.
+const RECIPE_LEVEL_STEP = 3;
+function recipeLevelFromProgress(progress) {
+  return 1 + Math.floor((progress || 0) / RECIPE_LEVEL_STEP);
+}
+
+// Recipe progress gain per cook. Baseline is 1 per cook; the combined mood×
+// hunger multiplier nudges it ±10% so better-managed cooks level recipes a
+// touch faster. Compressed by 0.2 so the swing stays subtle vs the bigger
+// swing applied to player XP.
+function recipeProgressDelta(moodMult, hungerMult) {
+  return 1 + 0.2 * (moodMult * hungerMult - 1);
+}
+
 // Core cook transaction: inside a single Firestore txn we
 //   1. confirm the inventory can cover the ingredient multiset,
 //   2. deduct the ingredients,
 //   3. record the discovery if this is a first-time match,
-//   4. apply the feed to the character state,
-//   5. return the updated surfaces (state, inventory, cooking profile, result).
+//   4. apply the feed to the character state (with computed player XP),
+//   5. bump the per-recipe progress counter,
+//   6. return the updated surfaces (state, inventory, cooking profile, result).
 async function runCookTransaction({ uid, characterId, ingredients, recipe, nowMs, tz }) {
   const firestore = admin.firestore();
   const stateDoc = stateRef(uid, characterId);
@@ -129,23 +162,40 @@ async function runCookTransaction({ uid, characterId, ingredients, recipe, nowMs
       if (counts[ing] === 0) delete counts[ing];
     }
 
-    // --- discovery (recipe mode always, no discovery write; manual mode on match) ---
+    // --- cooking profile (discovery + per-recipe progress) ---
     const cookSnap = await tx.get(cookDoc);
     const cookData = cookSnap.exists ? cookSnap.data() : {};
     const discovered = Array.isArray(cookData.discoveredRecipes)
       ? [...cookData.discoveredRecipes]
       : [];
+    const recipeProgress = { ...(cookData.recipeProgress || {}) };
     let firstDiscovery = false;
     if (recipe && !discovered.includes(recipe.id)) {
       discovered.push(recipe.id);
       firstDiscovery = true;
     }
 
-    // --- load + feed the character state ---
+    // --- load state + compute modifiers + player XP ---
     const stateSnap = await tx.get(stateDoc);
     const currentState = stateSnap.exists
       ? stateSnap.data()
       : engine.defaultState(characterId, nowMs, tz);
+    // Pre-resolve to read the pre-feed mood/hunger that drive the multipliers.
+    // applyFeed re-resolves internally, which is idempotent at the same nowMs.
+    const preResolved = engine.resolve(currentState, nowMs, opts);
+    const moodMult = moodMultiplier(preResolved.mood);
+    const hungerMult = hungerMultiplier(preResolved.hunger);
+    const preLevel = recipe
+      ? recipeLevelFromProgress(recipeProgress[recipe.id] || 0)
+      : 1;
+    // Slop has no recipe level bonus — the 0.0x-0.9x combined modifier still
+    // tugs on its player xp so the stats matter, but there's no level track.
+    const recipeLevelBonus = recipe ? 1 + 0.1 * (preLevel - 1) : 1;
+    const playerXp = Math.max(
+      0,
+      Math.round(rewards.basePoints * recipeLevelBonus * moodMult * hungerMult)
+    );
+
     let next;
     try {
       next = engine.applyFeed(
@@ -153,10 +203,20 @@ async function runCookTransaction({ uid, characterId, ingredients, recipe, nowMs
         nowMs,
         rewards.hungerBoost,
         rewards.moodBoost,
-        { ...opts, xp: rewards.xp }
+        { ...opts, xp: playerXp }
       );
     } catch (e) {
       throw new HttpsError('failed-precondition', e.message);
+    }
+
+    // --- bump recipe progress (recipes only; slop does not level any dish) ---
+    let postLevel = preLevel;
+    let postProgress = recipeProgress[recipe ? recipe.id : ''] || 0;
+    if (recipe) {
+      const delta = recipeProgressDelta(moodMult, hungerMult);
+      postProgress = postProgress + delta;
+      recipeProgress[recipe.id] = postProgress;
+      postLevel = recipeLevelFromProgress(postProgress);
     }
 
     // --- writes ---
@@ -164,14 +224,18 @@ async function runCookTransaction({ uid, characterId, ingredients, recipe, nowMs
     tx.set(invDoc, { counts, updatedAt: nowMs }, { merge: true });
     tx.set(
       cookDoc,
-      { discoveredRecipes: discovered, updatedAt: nowMs },
+      {
+        discoveredRecipes: discovered,
+        recipeProgress,
+        updatedAt: nowMs,
+      },
       { merge: true }
     );
 
     return {
       state: next,
       inventory: { counts },
-      cooking: { discoveredRecipes: discovered },
+      cooking: { discoveredRecipes: discovered, recipeProgress },
       result: {
         kind: recipe ? 'recipe' : 'slop',
         recipeId: recipe ? recipe.id : null,
@@ -179,7 +243,12 @@ async function runCookTransaction({ uid, characterId, ingredients, recipe, nowMs
         firstDiscovery,
         hungerBoost: rewards.hungerBoost,
         moodBoost: rewards.moodBoost,
-        xp: rewards.xp,
+        basePoints: rewards.basePoints,
+        xp: playerXp,
+        level: postLevel,
+        recipeProgress: recipe ? postProgress : null,
+        moodMult,
+        hungerMult,
         ingredientsUsed: ingredients,
       },
     };
@@ -251,5 +320,8 @@ exports.getCookingProfile = onCall(COMMON_OPTS, async (request) => {
   const uid = requireAuth(request);
   const snap = await cookingRef(uid).get();
   const data = snap.exists ? snap.data() : {};
-  return { discoveredRecipes: data.discoveredRecipes || [] };
+  return {
+    discoveredRecipes: data.discoveredRecipes || [],
+    recipeProgress: data.recipeProgress || {},
+  };
 });

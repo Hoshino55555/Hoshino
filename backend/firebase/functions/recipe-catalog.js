@@ -88,23 +88,25 @@ function recipeTierPoints(recipe) {
   }, 0);
 }
 
-// Reward shape for a successful recipe cook. Intentionally simple for v1 —
+// Reward shape for a successful recipe cook. basePoints is the "clean" recipe
+// score — the cook() handler multiplies it by per-recipe level bonus and the
+// mood/hunger modifiers to arrive at player XP. Intentionally simple for v1 —
 // creative can tune per-recipe values later.
 function recipeRewards(recipe) {
   const points = recipeTierPoints(recipe);
   return {
     hungerBoost: Math.min(3, Math.max(1, Math.ceil(recipe.ingredients.length / 2))),
     moodBoost: 1,
-    xp: points * 10, // 2 commons → 20 xp, ultra-rare combos → 100+
+    basePoints: points * 10, // 2 commons → 20, ultra-rare combos → 100+
   };
 }
 
 // Reward shape when the ingredient multiset doesn't match any recipe — still
-// edible, still grants a hunger tick, trivial xp.
+// edible, still grants a hunger tick, trivial points.
 const SLOP_REWARD = Object.freeze({
   hungerBoost: 1,
   moodBoost: 0,
-  xp: 3,
+  basePoints: 3,
 });
 
 function isKnownIngredient(id) {

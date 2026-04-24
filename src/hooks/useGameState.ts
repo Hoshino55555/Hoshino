@@ -5,6 +5,7 @@ import {
     type ForagedItem,
     type IngredientCounts,
     type CookResponse,
+    type RecipeProgressMap,
     SLEEP_REQUIRED_MS,
 } from '../services/GameStateService';
 import { useFirebaseAuth } from '../contexts/FirebaseAuthContext';
@@ -24,6 +25,7 @@ interface UseGameStateResult {
     // Cooking surfaces
     inventory: IngredientCounts;
     discoveredRecipes: string[];
+    recipeProgress: RecipeProgressMap;
     refreshPantry: () => Promise<void>;
     cookManual: (ingredients: string[]) => Promise<CookResponse>;
     cookRecipe: (recipeId: string) => Promise<CookResponse>;
@@ -37,15 +39,24 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     const [tick, setTick] = useState(0);
     const [inventory, setInventory] = useState<IngredientCounts>({});
     const [discoveredRecipes, setDiscoveredRecipes] = useState<string[]>([]);
+    const [recipeProgress, setRecipeProgress] = useState<RecipeProgressMap>({});
     const inFlightRef = useRef<Promise<void> | null>(null);
+    // Timestamp of the most recent authoritative local mutation (feed, drain,
+    // cook, sleep, etc.). A background poll whose request started before this
+    // is stale and its response is discarded — prevents a mid-flight
+    // getGameState from clobbering freshly drained/fed state and causing a
+    // visible flicker (e.g., exclamation badge briefly reappearing).
+    const lastMutationAtRef = useRef(0);
 
     const load = useCallback(async () => {
         if (!characterId || !firebaseUid) return;
         if (inFlightRef.current) return inFlightRef.current;
+        const startedAt = Date.now();
         const p = (async () => {
             setLoading(true);
             try {
                 const next = await GameStateService.getState(characterId);
+                if (startedAt < lastMutationAtRef.current) return;
                 setState(next);
                 setError(null);
             } catch (e: any) {
@@ -83,6 +94,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         async (hungerBoost: number, moodBoost: number) => {
             if (!characterId) throw new Error('No character selected');
             const next = await GameStateService.feed(characterId, hungerBoost, moodBoost);
+            lastMutationAtRef.current = Date.now();
             setState(next);
             return next;
         },
@@ -92,6 +104,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     const play = useCallback(async () => {
         if (!characterId) throw new Error('No character selected');
         const next = await GameStateService.play(characterId);
+        lastMutationAtRef.current = Date.now();
         setState(next);
         return next;
     }, [characterId]);
@@ -99,6 +112,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     const chat = useCallback(async () => {
         if (!characterId) throw new Error('No character selected');
         const next = await GameStateService.chat(characterId);
+        lastMutationAtRef.current = Date.now();
         setState(next);
         return next;
     }, [characterId]);
@@ -106,6 +120,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     const startSleep = useCallback(async () => {
         if (!characterId) throw new Error('No character selected');
         const next = await GameStateService.startSleep(characterId);
+        lastMutationAtRef.current = Date.now();
         setState(next);
         return next;
     }, [characterId]);
@@ -114,6 +129,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         async (force = false) => {
             if (!characterId) throw new Error('No character selected');
             const next = await GameStateService.endSleep(characterId, force);
+            lastMutationAtRef.current = Date.now();
             setState(next);
             return next;
         },
@@ -123,13 +139,19 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     const drainForaged = useCallback(async () => {
         if (!characterId) throw new Error('No character selected');
         const { state: next, drained } = await GameStateService.drainForaged(characterId);
+        lastMutationAtRef.current = Date.now();
         setState(next);
-        // Forage drain writes ingredients into the pantry doc — refresh local mirror.
-        try {
-            const counts = await GameStateService.getInventory();
-            setInventory(counts);
-        } catch {
-            // Non-fatal: the drain already succeeded, the mirror just lags a tick.
+        // Patch inventory locally from the drained items instead of issuing a
+        // second getInventory round trip. The server already committed these
+        // counts in the same transaction that returned `drained`.
+        if (drained.length > 0) {
+            setInventory((prev) => {
+                const copy = { ...prev };
+                for (const f of drained) {
+                    copy[f.ingredient] = (copy[f.ingredient] || 0) + 1;
+                }
+                return copy;
+            });
         }
         return drained;
     }, [characterId]);
@@ -143,6 +165,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
             ]);
             setInventory(counts);
             setDiscoveredRecipes(profile.discoveredRecipes);
+            setRecipeProgress(profile.recipeProgress);
         } catch (e: any) {
             setError(e?.message || 'Failed to load pantry');
         }
@@ -157,9 +180,11 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         async (ingredients: string[]) => {
             if (!characterId) throw new Error('No character selected');
             const res = await GameStateService.cookManual(characterId, ingredients);
+            lastMutationAtRef.current = Date.now();
             setState(res.state);
             setInventory(res.inventory.counts);
             setDiscoveredRecipes(res.cooking.discoveredRecipes);
+            setRecipeProgress(res.cooking.recipeProgress);
             return res;
         },
         [characterId]
@@ -169,9 +194,11 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         async (recipeId: string) => {
             if (!characterId) throw new Error('No character selected');
             const res = await GameStateService.cookRecipe(characterId, recipeId);
+            lastMutationAtRef.current = Date.now();
             setState(res.state);
             setInventory(res.inventory.counts);
             setDiscoveredRecipes(res.cooking.discoveredRecipes);
+            setRecipeProgress(res.cooking.recipeProgress);
             return res;
         },
         [characterId]
@@ -199,6 +226,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         sleepRemainingMs,
         inventory,
         discoveredRecipes,
+        recipeProgress,
         refreshPantry,
         cookManual,
         cookRecipe,

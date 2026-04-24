@@ -11,6 +11,7 @@ const solanaTransactionFunctions = require('./solana-transactions');
 const authBridge = require('./auth-bridge');
 const gameState = require('./game-state');
 const cooking = require('./cooking');
+const playerProfile = require('./player-profile');
 
 // AI chat
 exports.chat = aiChatFunctions.chat;
@@ -41,6 +42,12 @@ exports.cook = cooking.cook;
 exports.getInventory = cooking.getInventory;
 exports.getCookingProfile = cooking.getCookingProfile;
 
+// Player profile (playerName + selectedCharacterId; ownedCharacterIds derived
+// from /users/{uid}/moonokos/*). Replaces AsyncStorage-only profile so app
+// reinstalls don't wipe identity.
+exports.getPlayerProfile = playerProfile.getPlayerProfile;
+exports.setPlayerProfile = playerProfile.setPlayerProfile;
+
 // Health check
 exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) => {
   res.json({
@@ -65,6 +72,8 @@ exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) 
       'cook',
       'getInventory',
       'getCookingProfile',
+      'getPlayerProfile',
+      'setPlayerProfile',
       'health',
     ],
   });

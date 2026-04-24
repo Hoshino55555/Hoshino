@@ -93,8 +93,13 @@ export interface IngredientCounts {
     [ingredientId: string]: number;
 }
 
+export interface RecipeProgressMap {
+    [recipeId: string]: number;
+}
+
 export interface CookingProfile {
     discoveredRecipes: string[];
+    recipeProgress: RecipeProgressMap;
 }
 
 export type CookMode = 'manual' | 'recipe';
@@ -106,7 +111,12 @@ export interface CookResult {
     firstDiscovery: boolean;
     hungerBoost: number;
     moodBoost: number;
+    basePoints: number;
     xp: number;
+    level: number;
+    recipeProgress: number | null;
+    moodMult: number;
+    hungerMult: number;
     ingredientsUsed: string[];
 }
 
@@ -136,6 +146,22 @@ const callGetCookingProfile = httpsCallable<Record<string, never>, CookingProfil
     functions,
     'getCookingProfile'
 );
+
+export interface PlayerProfile {
+    playerName: string;
+    ownedCharacterIds: string[];
+    selectedCharacterId: string | null;
+}
+
+const callGetPlayerProfile = httpsCallable<Record<string, never>, PlayerProfile>(
+    functions,
+    'getPlayerProfile'
+);
+
+const callSetPlayerProfile = httpsCallable<
+    { playerName?: string; selectedCharacterId?: string | null },
+    PlayerProfile
+>(functions, 'setPlayerProfile');
 
 function localTimezone(): string {
     try {
@@ -209,7 +235,10 @@ export const GameStateService = {
 
     async getCookingProfile(): Promise<CookingProfile> {
         const res = await callGetCookingProfile({});
-        return { discoveredRecipes: res.data.discoveredRecipes || [] };
+        return {
+            discoveredRecipes: res.data.discoveredRecipes || [],
+            recipeProgress: res.data.recipeProgress || {},
+        };
     },
 
     async cookManual(characterId: string, ingredients: string[]): Promise<CookResponse> {
@@ -229,6 +258,18 @@ export const GameStateService = {
             recipeId,
             timezone: localTimezone(),
         });
+        return res.data;
+    },
+
+    async getPlayerProfile(): Promise<PlayerProfile> {
+        const res = await callGetPlayerProfile({});
+        return res.data;
+    },
+
+    async setPlayerProfile(
+        updates: { playerName?: string; selectedCharacterId?: string | null }
+    ): Promise<PlayerProfile> {
+        const res = await callSetPlayerProfile(updates);
         return res.data;
     },
 };

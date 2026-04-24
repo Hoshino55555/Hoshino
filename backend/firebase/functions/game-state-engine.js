@@ -429,7 +429,14 @@ function applyFeed(state, nowMs, hungerBoost = 0, moodBoost = 0, opts = {}) {
   const tz = resolved.timezone || 'UTC';
   const windowName = currentWindowName(nowMs, tz);
   const claims = { ...resolved.mealBonusClaimed };
-  if (windowName && !claims[windowName]) {
+  // One feed per meal window. A well-managed player who feeds on schedule
+  // will naturally sit near hunger=5; allowing repeats would let them spam
+  // mood/xp through cooking. Reject rather than silently no-op so the client
+  // surfaces a clear "already cooked this window" state to the user.
+  if (windowName && claims[windowName]) {
+    throw new Error('Already cooked this meal window — wait for the next meal');
+  }
+  if (windowName) {
     claims[windowName] = true;
   }
   const xpGain = typeof opts.xp === 'number' ? opts.xp : 10;

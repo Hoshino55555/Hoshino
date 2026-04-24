@@ -7,6 +7,7 @@ import InnerScreen from './InnerScreen';
 import Settings from './Settings';
 import Frame from './Frame';
 import Starburst from './Starburst';
+import SleepScreen from './SleepScreen';
 import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import ForagePopOut from './ForagePopOut';
@@ -77,7 +78,7 @@ const MoonokoInteraction: React.FC<Props> = ({
     shouldFadeIn = false,
     onFadeInComplete
 }) => {
-    const { state: gameState, drainForaged } = useGameStateContext();
+    const { state: gameState, drainForaged, startSleep, endSleep } = useGameStateContext();
     const currentStats = {
         mood: gameState?.mood ?? 3,
         hunger: gameState?.hunger ?? 5,
@@ -89,21 +90,25 @@ const MoonokoInteraction: React.FC<Props> = ({
     const [popOutItems, setPopOutItems] = useState<ForagedItem[] | null>(null);
     const drainInFlightRef = useRef(false);
 
-    const handleCharacterPress = async () => {
+    const handleCharacterPress = () => {
         if (drainInFlightRef.current || popOutItems) return;
         if (!hasPendingFinds) return;
+        // Play the animation immediately from the cached finds — the drain
+        // call still flushes the server queue, but the pop-out no longer
+        // waits on a round trip (+ inventory refetch) before starting.
+        setPopOutItems(pendingFinds);
         drainInFlightRef.current = true;
-        try {
-            const drained = await drainForaged();
-            if (drained.length > 0) setPopOutItems(drained);
-        } catch (e: any) {
-            onNotification?.(e?.message || 'Failed to collect finds', 'error');
-        } finally {
-            drainInFlightRef.current = false;
-        }
+        drainForaged()
+            .catch((e: any) => {
+                onNotification?.(e?.message || 'Failed to collect finds', 'error');
+            })
+            .finally(() => {
+                drainInFlightRef.current = false;
+            });
     };
 
     const [currentGame, setCurrentGame] = useState<string | null>(null);
+    const [isSleeping, setIsSleeping] = useState(false);
     const [isTransitioning, setIsTransitioning] = useState(true);
     const [transitionOpacity, setTransitionOpacity] = useState(1);
 
@@ -143,6 +148,30 @@ const MoonokoInteraction: React.FC<Props> = ({
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuBarLayout, setMenuBarLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
     const frameOpacity = useRef(new Animated.Value(0)).current;
+    const bobAnim = useRef(new Animated.Value(0)).current;
+
+    // Gentle up/down loop to match the Moonoko's baked-in float. Native driver
+    // so it doesn't fight any JS work while forage ticks land.
+    useEffect(() => {
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(bobAnim, {
+                    toValue: 1,
+                    duration: 900,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(bobAnim, {
+                    toValue: 0,
+                    duration: 900,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+        loop.start();
+        return () => loop.stop();
+    }, [bobAnim]);
 
     useEffect(() => {
         if (menuBarLayout.width > 0) {
@@ -206,8 +235,24 @@ const MoonokoInteraction: React.FC<Props> = ({
                 break;
 
             case 'sleep':
-                // TEMP: sleep is disabled while the UX is being reworked.
-                onNotification?.('😴 Sleep is being reworked — stay tuned.', 'info');
+                if (isSleeping) {
+                    // Already sleeping; tapping sleep again wakes up. Exit is
+                    // also surfaced via the in-screen Wake button.
+                    setIsSleeping(false);
+                    endSleep(true).catch((e: any) =>
+                        onNotification?.(e?.message || 'Failed to end sleep', 'error')
+                    );
+                } else {
+                    // Flip the overlay on immediately — the startSleep callable
+                    // is a server round-trip and awaiting it here makes the tap
+                    // feel laggy. Server is authoritative, so on failure we
+                    // revert and toast.
+                    setIsSleeping(true);
+                    startSleep().catch((e: any) => {
+                        setIsSleeping(false);
+                        onNotification?.(e?.message || 'Failed to start sleep', 'error');
+                    });
+                }
                 break;
 
             case 'shop':
@@ -314,11 +359,11 @@ const MoonokoInteraction: React.FC<Props> = ({
                         </View>
                     </View>
                     <View style={styles.statItem}>
-                        <Text style={styles.statLabel}>Sleep</Text>
+                        <Text style={styles.statLabel}>Energy</Text>
                         <View style={styles.starContainer}>
                             {[...Array(5)].map((_, index) => (
                                 <Image
-                                    key={`sleep-${index}`}
+                                    key={`energy-${index}`}
                                     source={index < currentStats.energy ? require('../../assets/images/star_life_3.png') : require('../../assets/images/star_life.png')}
                                     style={styles.starImage}
                                 />
@@ -349,9 +394,24 @@ const MoonokoInteraction: React.FC<Props> = ({
                             style={styles.characterImage}
                         />
                         {hasPendingFinds && !popOutItems && (
-                            <View style={styles.exclamationBadge} pointerEvents="none">
+                            <Animated.View
+                                style={[
+                                    styles.exclamationBadge,
+                                    {
+                                        transform: [
+                                            {
+                                                translateY: bobAnim.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [0, -8],
+                                                }),
+                                            },
+                                        ],
+                                    },
+                                ]}
+                                pointerEvents="none"
+                            >
                                 <Text style={styles.exclamationText}>!</Text>
-                            </View>
+                            </Animated.View>
                         )}
                     </TouchableOpacity>
                 ) : (
@@ -421,8 +481,23 @@ const MoonokoInteraction: React.FC<Props> = ({
             {/* TEMP: SleepOverlay disabled while sleep UX is being reworked. */}
 
             {currentGame === 'starburst' && (
-                <View style={[StyleSheet.absoluteFill, { zIndex: 2, elevation: 12 }]}>
+                <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
                     <Starburst onBack={() => setCurrentGame(null)} />
+                </View>
+            )}
+
+            {isSleeping && (
+                <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
+                    <SleepScreen
+                        onWake={async () => {
+                            try {
+                                await endSleep(true);
+                            } catch (e: any) {
+                                onNotification?.(e?.message || 'Failed to end sleep', 'error');
+                            }
+                            setIsSleeping(false);
+                        }}
+                    />
                 </View>
             )}
 
@@ -482,24 +557,29 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    // Floats well above the Moonoko's head. characterImage is 250x250 with
+    // contain + marginTop:-80, so the visible head sits in the upper third of
+    // that box. left:0/right:0 + alignItems:center makes the text reliably
+    // centered horizontally (alignSelf on an absolute element without an
+    // explicit width drifts off-center). Negative top pulls the glyph above
+    // the ears — tune by eye if sprites change size.
     exclamationBadge: {
         position: 'absolute',
-        top: -40,
-        alignSelf: 'center',
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: '#ffd53f',
-        borderWidth: 2,
-        borderColor: '#3a2a12',
+        top: -100,
+        left: 0,
+        right: 0,
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: 'transparent',
     },
     exclamationText: {
         fontFamily: 'PressStart2P',
-        fontSize: 14,
-        color: '#3a2a12',
-        marginTop: -1,
+        fontSize: 36,
+        color: '#ff2a2a',
+        textAlign: 'center',
+        textShadowColor: '#000',
+        textShadowOffset: { width: 2, height: 2 },
+        textShadowRadius: 0,
     },
     noCharacterPlaceholder: {
         flex: 1,

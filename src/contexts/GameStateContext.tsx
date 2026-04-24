@@ -5,6 +5,7 @@ import type {
     ForagedItem,
     IngredientCounts,
     CookResponse,
+    RecipeProgressMap,
 } from '../services/GameStateService';
 
 interface GameStateContextType {
@@ -21,6 +22,7 @@ interface GameStateContextType {
     sleepRemainingMs: number;
     inventory: IngredientCounts;
     discoveredRecipes: string[];
+    recipeProgress: RecipeProgressMap;
     refreshPantry: () => Promise<void>;
     cookManual: (ingredients: string[]) => Promise<CookResponse>;
     cookRecipe: (recipeId: string) => Promise<CookResponse>;
