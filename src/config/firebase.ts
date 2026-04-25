@@ -16,8 +16,6 @@ export const FIREBASE_CONFIG = {
     generateNFTTransaction: 'https://us-central1-hoshino-996d0.cloudfunctions.net/generateNFTTransaction',
     generateCurrencyPurchaseTransaction: 'https://us-central1-hoshino-996d0.cloudfunctions.net/generateCurrencyPurchaseTransaction',
     fetchNFTMetadata: 'https://us-central1-hoshino-996d0.cloudfunctions.net/fetchNFTMetadata',
-    chat: 'https://us-central1-hoshino-996d0.cloudfunctions.net/chat',
-    getConversation: 'https://us-central1-hoshino-996d0.cloudfunctions.net/getConversation',
     health: 'https://us-central1-hoshino-996d0.cloudfunctions.net/health',
     solanaHealth: 'https://us-central1-hoshino-996d0.cloudfunctions.net/solanaHealth',
   },
@@ -38,6 +36,28 @@ const firebaseConfig = {
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
+
+// Fail loudly at boot if EXPO_PUBLIC_FIREBASE_* are missing. Without this,
+// Firebase throws `auth/invalid-api-key` deep inside its first network call,
+// which is hard to trace back to a missing .env entry — especially in a
+// release bundle where there is no Metro reload to surface the cause.
+const requiredFirebaseKeys: (keyof typeof firebaseConfig)[] = [
+  'apiKey',
+  'authDomain',
+  'storageBucket',
+  'messagingSenderId',
+  'appId',
+];
+const missingFirebaseKeys = requiredFirebaseKeys.filter((k) => !firebaseConfig[k]);
+if (missingFirebaseKeys.length > 0) {
+  const envNames = missingFirebaseKeys
+    .map((k) => `EXPO_PUBLIC_FIREBASE_${k.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}`)
+    .join(', ');
+  throw new Error(
+    `Firebase config is missing required env vars: ${envNames}. ` +
+      `Copy env.example to .env and fill them in (see docs/SETUP_ANDROID.md §8).`
+  );
+}
 
 const app = initializeApp(firebaseConfig);
 

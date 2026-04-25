@@ -5,12 +5,23 @@ import ZoomOutOverlay from './ZoomOutOverlay';
 
 interface Props {
     onWake: () => void;
+    // Parent can request a wake (e.g. menu sleep button tapped a second time)
+    // and SleepScreen will run the same exit animation as the in-screen Wake
+    // button. Without this, parent setState used to unmount us instantly,
+    // skipping the zoom-out and reading as a stuck transition.
+    wakeRequested?: boolean;
 }
 
-const SleepScreen: React.FC<Props> = ({ onWake }) => {
+const SleepScreen: React.FC<Props> = ({ onWake, wakeRequested = false }) => {
     const insets = useSafeAreaInsets();
     const [isClosing, setIsClosing] = useState(false);
     const zzzAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (wakeRequested && !isClosing) {
+            setIsClosing(true);
+        }
+    }, [wakeRequested, isClosing]);
 
     useEffect(() => {
         const loop = Animated.loop(

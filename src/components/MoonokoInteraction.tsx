@@ -7,6 +7,7 @@ import InnerScreen from './InnerScreen';
 import Settings from './Settings';
 import Frame from './Frame';
 import Starburst from './Starburst';
+import GamesList from './GamesList';
 import SleepScreen from './SleepScreen';
 import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
@@ -108,7 +109,14 @@ const MoonokoInteraction: React.FC<Props> = ({
     };
 
     const [currentGame, setCurrentGame] = useState<string | null>(null);
+    // Arcade hub gates access to individual games. Tapping the games menu
+    // button opens the hub; the hub then launches a specific game.
+    const [arcadeOpen, setArcadeOpen] = useState(false);
     const [isSleeping, setIsSleeping] = useState(false);
+    // When true, SleepScreen plays its exit animation and then fires onWake.
+    // Used so a second tap on the sleep menu button reads the same as
+    // tapping the in-screen Wake button (no instant unmount jump).
+    const [wakeRequested, setWakeRequested] = useState(false);
     const [isTransitioning, setIsTransitioning] = useState(true);
     const [transitionOpacity, setTransitionOpacity] = useState(1);
 
@@ -236,12 +244,11 @@ const MoonokoInteraction: React.FC<Props> = ({
 
             case 'sleep':
                 if (isSleeping) {
-                    // Already sleeping; tapping sleep again wakes up. Exit is
-                    // also surfaced via the in-screen Wake button.
-                    setIsSleeping(false);
-                    endSleep(true).catch((e: any) =>
-                        onNotification?.(e?.message || 'Failed to end sleep', 'error')
-                    );
+                    // Already sleeping; tapping sleep again triggers the same
+                    // wake flow as the in-screen button — SleepScreen plays
+                    // its exit animation then onWake unmounts us. Issuing
+                    // endSleep here would race with onWake's call.
+                    if (!wakeRequested) setWakeRequested(true);
                 } else {
                     // Flip the overlay on immediately — the startSleep callable
                     // is a server round-trip and awaiting it here makes the tap
@@ -268,7 +275,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                 break;
 
             case 'games':
-                setCurrentGame('starburst');
+                setArcadeOpen(true);
                 break;
 
             case 'gallery':
@@ -480,8 +487,17 @@ const MoonokoInteraction: React.FC<Props> = ({
             </InnerScreen>
             {/* TEMP: SleepOverlay disabled while sleep UX is being reworked. */}
 
-            {currentGame === 'starburst' && (
+            {arcadeOpen && (
                 <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
+                    <GamesList
+                        onClose={() => setArcadeOpen(false)}
+                        onSelectGame={(gameId) => setCurrentGame(gameId)}
+                    />
+                </View>
+            )}
+
+            {currentGame === 'starburst' && (
+                <View style={[StyleSheet.absoluteFill, { zIndex: 60, elevation: 60 }]}>
                     <Starburst onBack={() => setCurrentGame(null)} />
                 </View>
             )}
@@ -489,6 +505,7 @@ const MoonokoInteraction: React.FC<Props> = ({
             {isSleeping && (
                 <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
                     <SleepScreen
+                        wakeRequested={wakeRequested}
                         onWake={async () => {
                             try {
                                 await endSleep(true);
@@ -496,6 +513,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                                 onNotification?.(e?.message || 'Failed to end sleep', 'error');
                             }
                             setIsSleeping(false);
+                            setWakeRequested(false);
                         }}
                     />
                 </View>

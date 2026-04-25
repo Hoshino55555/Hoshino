@@ -1,11 +1,21 @@
-const { onRequest } = require('firebase-functions/v2/https');
-const admin = require('firebase-admin');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const admin = require('./admin');
 const { GoogleGenAI } = require('@google/genai');
 const OpenAI = require('openai');
 
-// Initialize Firebase Admin
-admin.initializeApp();
 const db = admin.firestore();
+
+// Auth gate. Chat history + extracted facts are sensitive enough that we
+// require a signed-in caller and key all per-user storage by request.auth.uid
+// rather than a client-supplied identifier — the prior public HTTP endpoints
+// let anyone read another user's conversation by guessing their playerName.
+function requireChatAuth(request) {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) {
+    throw new HttpsError('unauthenticated', 'Must sign in to chat');
+  }
+  return uid;
+}
 
 // Max prior turns (user+model combined) sent back to the model each request
 const HISTORY_LIMIT = 10;
@@ -315,32 +325,23 @@ const MOONOKO_PERSONALITIES = {
 };
 
 // AI Chat Function
-exports.chat = onRequest({
-  cors: ['*'],
-  invoker: 'public'
-}, async (req, res) => {
-  let moonokoId; // hoisted for catch block access
-  let moonoko;
-  let userId;
-  let message;
+exports.chat = onCall({
+  cors: true,
+  region: 'us-central1',
+}, async (request) => {
+  const userId = requireChatAuth(request);
+  const { message, moonokoId } = request.data || {};
+
+  if (!message || !moonokoId) {
+    throw new HttpsError('invalid-argument', 'Missing required fields: message, moonokoId');
+  }
+
+  const moonoko = MOONOKO_PERSONALITIES[moonokoId];
+  if (!moonoko) {
+    throw new HttpsError('invalid-argument', 'Invalid moonoko ID');
+  }
 
   try {
-    if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    ({ message, moonokoId, userId } = req.body);
-
-    if (!message || !moonokoId || !userId) {
-      return res.status(400).json({
-        error: 'Missing required fields: message, moonokoId, userId'
-      });
-    }
-
-    moonoko = MOONOKO_PERSONALITIES[moonokoId];
-    if (!moonoko) {
-      return res.status(400).json({ error: 'Invalid moonoko ID' });
-    }
 
     // Load prior turns + durable facts for this user+moonoko pair in parallel
     const [history, facts] = await Promise.all([
@@ -454,7 +455,7 @@ Keep responses under 50 words.${factsBlock}`;
       console.error('Failed to persist conversation state:', saveError);
     }
 
-    res.json({
+    return {
       success: true,
       message: aiResponse,
       moonokoName: moonoko.name,
@@ -463,7 +464,7 @@ Keep responses under 50 words.${factsBlock}`;
       provider: usedProvider,
       newFacts: savedFacts.length,
       supersededFacts: supersededIds.length,
-    });
+    };
 
   } catch (error) {
     console.error('Chat function error:', error);
@@ -480,15 +481,15 @@ Keep responses under 50 words.${factsBlock}`;
 
       const fallbackResponse = safetyFilterResponses[moonokoId] || "My cosmic filters are being extra careful! Let me adjust my energy! 😊";
 
-      return res.json({
+      return {
         success: true,
         message: fallbackResponse,
-        moonokoName: moonokoId || 'Unknown',
+        moonokoName: moonoko?.name || moonokoId || 'Unknown',
         conversationId: 'safety-fallback-conversation',
         timestamp: new Date().toISOString(),
         note: 'Using fallback response due to safety filter violation',
         provider: 'fallback'
-      });
+      };
     }
 
     // Check if it's a quota/rate limit error
@@ -504,39 +505,36 @@ Keep responses under 50 words.${factsBlock}`;
 
       const fallbackResponse = fallbackResponses[moonokoId] || "I'm taking a quick break! 😊";
 
-      return res.json({
+      return {
         success: true,
         message: fallbackResponse,
-        moonokoName: moonokoId || 'Unknown',
+        moonokoName: moonoko?.name || moonokoId || 'Unknown',
         conversationId: 'fallback-conversation',
         timestamp: new Date().toISOString(),
         note: 'Using fallback response due to API quota limit',
         provider: 'fallback'
-      });
+      };
     }
 
-    // For any other error, return a 500
-    res.status(500).json({
-      error: 'Failed to process chat request',
-      details: error.message
-    });
+    // For any other error, raise a callable error so the client surfaces it.
+    throw new HttpsError('internal', error.message || 'Failed to process chat request');
   }
 });
 
-// Get conversation history for a given user+moonoko pair
-exports.getConversation = onRequest({
-  cors: ['*'],
-  invoker: 'public'
-}, async (req, res) => {
+// Get conversation history for a given user+moonoko pair. Caller's uid is used
+// as the user key — passing a different one is no longer possible.
+exports.getConversation = onCall({
+  cors: true,
+  region: 'us-central1',
+}, async (request) => {
+  const userId = requireChatAuth(request);
+  const { moonokoId, limit: limitParam } = request.data || {};
+
+  if (!moonokoId) {
+    throw new HttpsError('invalid-argument', 'Missing required field: moonokoId');
+  }
+
   try {
-    const { moonokoId, userId, limit: limitParam } = req.query;
-
-    if (!moonokoId || !userId) {
-      return res.status(400).json({
-        error: 'Missing required fields: moonokoId, userId'
-      });
-    }
-
     const limit = Math.min(parseInt(limitParam, 10) || 50, 200);
 
     const [msgsSnap, factsSnap] = await Promise.all([
@@ -574,7 +572,7 @@ exports.getConversation = onRequest({
         createdAt: f.createdAt?.toDate?.().toISOString() || null,
       }));
 
-    res.json({
+    return {
       success: true,
       conversation: {
         id: `${userId}_${moonokoId}`,
@@ -583,10 +581,10 @@ exports.getConversation = onRequest({
         messages,
         facts,
       }
-    });
+    };
 
   } catch (error) {
     console.error('Get conversation error:', error);
-    res.status(500).json({ error: 'Failed to fetch conversation' });
+    throw new HttpsError('internal', error.message || 'Failed to fetch conversation');
   }
 });

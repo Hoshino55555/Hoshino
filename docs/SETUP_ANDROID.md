@@ -172,7 +172,7 @@ Fill in the values. For device-side testing you need:
 
 - `EXPO_PUBLIC_PRIVY_APP_ID`
 - `EXPO_PUBLIC_PRIVY_CLIENT_ID`
-- `REACT_APP_FIREBASE_*` (all six)
+- `EXPO_PUBLIC_FIREBASE_*` (all six)
 
 The `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `XAI_API_KEY` values are only used by the backend and are not needed on the device.
 

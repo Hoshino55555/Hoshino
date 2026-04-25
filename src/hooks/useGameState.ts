@@ -47,19 +47,26 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     // getGameState from clobbering freshly drained/fed state and causing a
     // visible flicker (e.g., exclamation badge briefly reappearing).
     const lastMutationAtRef = useRef(0);
+    // Tracks the characterId currently displayed. Any in-flight response or
+    // mutation result for a different id is discarded — switching characters
+    // mid-request used to flash the prior character's stats onto the new one.
+    const currentCharacterIdRef = useRef<string | null | undefined>(characterId);
 
     const load = useCallback(async () => {
         if (!characterId || !firebaseUid) return;
         if (inFlightRef.current) return inFlightRef.current;
         const startedAt = Date.now();
+        const requestedFor = characterId;
         const p = (async () => {
             setLoading(true);
             try {
                 const next = await GameStateService.getState(characterId);
+                if (requestedFor !== currentCharacterIdRef.current) return;
                 if (startedAt < lastMutationAtRef.current) return;
                 setState(next);
                 setError(null);
             } catch (e: any) {
+                if (requestedFor !== currentCharacterIdRef.current) return;
                 setError(e?.message || 'Failed to load state');
             } finally {
                 setLoading(false);
@@ -69,6 +76,17 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         inFlightRef.current = p;
         return p;
     }, [characterId, firebaseUid]);
+
+    // Clear stale per-character state the instant characterId changes so the
+    // UI doesn't render the prior character's stats while the new fetch is
+    // in flight. Bumps the mutation watermark so any pre-switch response
+    // resolving late is also discarded.
+    useEffect(() => {
+        currentCharacterIdRef.current = characterId;
+        lastMutationAtRef.current = Date.now();
+        setState(null);
+        setError(null);
+    }, [characterId]);
 
     useEffect(() => {
         if (!ready || !firebaseUid || !characterId) return;
@@ -90,10 +108,16 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         return () => clearInterval(id);
     }, [state?.sleepStartedAt]);
 
+    // Per-character mutations capture the id at call time and skip the state
+    // writes if the user has since switched characters — the server commit
+    // still happens, but the response can't repaint the wrong character's
+    // stats onto the screen.
     const feed = useCallback(
         async (hungerBoost: number, moodBoost: number) => {
             if (!characterId) throw new Error('No character selected');
+            const requestedFor = characterId;
             const next = await GameStateService.feed(characterId, hungerBoost, moodBoost);
+            if (requestedFor !== currentCharacterIdRef.current) return next;
             lastMutationAtRef.current = Date.now();
             setState(next);
             return next;
@@ -103,7 +127,9 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
 
     const play = useCallback(async () => {
         if (!characterId) throw new Error('No character selected');
+        const requestedFor = characterId;
         const next = await GameStateService.play(characterId);
+        if (requestedFor !== currentCharacterIdRef.current) return next;
         lastMutationAtRef.current = Date.now();
         setState(next);
         return next;
@@ -111,7 +137,9 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
 
     const chat = useCallback(async () => {
         if (!characterId) throw new Error('No character selected');
+        const requestedFor = characterId;
         const next = await GameStateService.chat(characterId);
+        if (requestedFor !== currentCharacterIdRef.current) return next;
         lastMutationAtRef.current = Date.now();
         setState(next);
         return next;
@@ -119,7 +147,9 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
 
     const startSleep = useCallback(async () => {
         if (!characterId) throw new Error('No character selected');
+        const requestedFor = characterId;
         const next = await GameStateService.startSleep(characterId);
+        if (requestedFor !== currentCharacterIdRef.current) return next;
         lastMutationAtRef.current = Date.now();
         setState(next);
         return next;
@@ -128,7 +158,9 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     const endSleep = useCallback(
         async (force = false) => {
             if (!characterId) throw new Error('No character selected');
+            const requestedFor = characterId;
             const next = await GameStateService.endSleep(characterId, force);
+            if (requestedFor !== currentCharacterIdRef.current) return next;
             lastMutationAtRef.current = Date.now();
             setState(next);
             return next;
@@ -138,7 +170,9 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
 
     const drainForaged = useCallback(async () => {
         if (!characterId) throw new Error('No character selected');
+        const requestedFor = characterId;
         const { state: next, drained } = await GameStateService.drainForaged(characterId);
+        if (requestedFor !== currentCharacterIdRef.current) return drained;
         lastMutationAtRef.current = Date.now();
         setState(next);
         // Patch inventory locally from the drained items instead of issuing a
@@ -179,7 +213,9 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     const cookManual = useCallback(
         async (ingredients: string[]) => {
             if (!characterId) throw new Error('No character selected');
+            const requestedFor = characterId;
             const res = await GameStateService.cookManual(characterId, ingredients);
+            if (requestedFor !== currentCharacterIdRef.current) return res;
             lastMutationAtRef.current = Date.now();
             setState(res.state);
             setInventory(res.inventory.counts);
@@ -193,7 +229,9 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     const cookRecipe = useCallback(
         async (recipeId: string) => {
             if (!characterId) throw new Error('No character selected');
+            const requestedFor = characterId;
             const res = await GameStateService.cookRecipe(characterId, recipeId);
+            if (requestedFor !== currentCharacterIdRef.current) return res;
             lastMutationAtRef.current = Date.now();
             setState(res.state);
             setInventory(res.inventory.counts);

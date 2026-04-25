@@ -17,81 +17,40 @@ function placeholderForId(id: string) {
     return PLACEHOLDER_IMAGES[Math.abs(h) % PLACEHOLDER_IMAGES.length];
 }
 
+// Hash to a deterministic float in [-1, 1] so each item gets stable jitter
+// across rerenders without using random (which would reshuffle on every render).
+function jitterForId(id: string, salt: number) {
+    let h = salt;
+    for (let i = 0; i < id.length; i++) h = (h * 131 + id.charCodeAt(i)) | 0;
+    return ((h & 0xffff) / 0xffff) * 2 - 1;
+}
+
 interface Props {
     items: ForagedItem[];
     onComplete: () => void;
 }
 
-// Ballistic tuning. T is the half-period of the main arc (up-time = down-time
-// under constant gravity). Subsequent bounces shrink by BOUNCE_DECAY, and
-// their half-periods shrink with √height to match projectile physics.
-const ARC_HALF_MS = 260;
-const BOUNCE_DECAY = 0.35; // energy retained per ground contact
-const STAGGER_MS = 80;
+// Snappier pile-at-feet feel:
+// - One arc (up + down), no rebounds — items thud and stay put.
+// - Items land in a small footprint and stack vertically so successive finds
+//   read as a "pile" instead of a horizontal line on the ground line.
+const ARC_HALF_MS = 220;
+const STAGGER_MS = 55;
 const GROUND_HOLD_MS = 10000;
 const FADE_DURATION_MS = 400;
+// Pile footprint at the moonoko's feet.
+const PILE_SPREAD_X = 28; // ±px horizontal jitter around centerline
+const PILE_LIFT_PER_ITEM = 5; // px each subsequent item sits higher (stack height)
+const PILE_LIFT_CAP = 60; // never lift higher than this — keeps the pile near the ground
 
-// Total travel time for one item — main arc + two bounces.
-function flightMs() {
-    const b1 = Math.sqrt(BOUNCE_DECAY);
-    const b2 = Math.sqrt(BOUNCE_DECAY * BOUNCE_DECAY);
-    return ARC_HALF_MS * 2 * (1 + b1 + b2);
-}
+const flightMs = () => ARC_HALF_MS * 2;
 
-// Build the ballistic Y sequence for one item: main arc, then two shrinking
-// bounces. Ease.out on each rise (gravity decelerates), Ease.in on each fall
-// (gravity accelerates). Peak heights follow BOUNCE_DECAY, periods follow √h.
-function buildBounceSequence(yVal: Animated.Value, peak: number, delayMs: number) {
-    const b1Peak = peak * BOUNCE_DECAY;
-    const b2Peak = b1Peak * BOUNCE_DECAY;
-    const b1Ms = ARC_HALF_MS * Math.sqrt(BOUNCE_DECAY);
-    const b2Ms = ARC_HALF_MS * Math.sqrt(BOUNCE_DECAY * BOUNCE_DECAY);
-    return Animated.sequence([
-        Animated.delay(delayMs),
-        Animated.timing(yVal, {
-            toValue: -peak,
-            duration: ARC_HALF_MS,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-        }),
-        Animated.timing(yVal, {
-            toValue: 0,
-            duration: ARC_HALF_MS,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-        }),
-        Animated.timing(yVal, {
-            toValue: -b1Peak,
-            duration: b1Ms,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-        }),
-        Animated.timing(yVal, {
-            toValue: 0,
-            duration: b1Ms,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-        }),
-        Animated.timing(yVal, {
-            toValue: -b2Peak,
-            duration: b2Ms,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-        }),
-        Animated.timing(yVal, {
-            toValue: 0,
-            duration: b2Ms,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-        }),
-    ]);
-}
+export const FORAGE_FLIGHT_MS = ARC_HALF_MS * 2;
 
-// Items launch from the Moonoko's feet with real ballistic motion, bounce
-// twice on the ground line, and sit waiting to be collected. Each item is
-// tappable for a quick pop-dismiss. Leftovers fade on a global timer.
-// Inventory was already credited by the parent's drain call — this overlay
-// is the reward flourish, not the source of truth.
+// Items launch from the Moonoko's feet, arc once, and land in a pile at the
+// feet. Each item is tappable for a quick pop-dismiss. Leftovers fade on a
+// global timer. Inventory was already credited by the parent's drain call —
+// this overlay is the reward flourish, not the source of truth.
 const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
     const xRefs = useRef(items.map(() => new Animated.Value(0))).current;
     const yRefs = useRef(items.map(() => new Animated.Value(0))).current;
@@ -111,11 +70,13 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
             return;
         }
         const flight = flightMs();
-        items.forEach((_, i) => {
+        items.forEach((item, i) => {
             const delayMs = i * STAGGER_MS;
-            const peak = 90 + (i % 3) * 18;
-            // Horizontal travel decelerates slightly (air drag feel) over the
-            // full flight so the item keeps drifting through each bounce.
+            // Slightly varying arc heights so identical sprites don't fly in
+            // perfect lockstep — pure visual texture, no gameplay meaning.
+            const peak = 110 + jitterForId(item.id, 7) * 18;
+            // Horizontal drift over the full flight so items don't fall
+            // straight down. Native driver throughout.
             Animated.timing(xRefs[i], {
                 toValue: 1,
                 duration: flight,
@@ -123,12 +84,27 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
                 easing: Easing.out(Easing.quad),
                 useNativeDriver: true,
             }).start();
-            // Vertical bounce cascade.
-            buildBounceSequence(yRefs[i], peak, delayMs).start();
+            // Single arc: up (decel) then down (accel) — no rebound.
+            const stackOffset = -Math.min(i * PILE_LIFT_PER_ITEM, PILE_LIFT_CAP);
+            Animated.sequence([
+                Animated.delay(delayMs),
+                Animated.timing(yRefs[i], {
+                    toValue: -peak,
+                    duration: ARC_HALF_MS,
+                    easing: Easing.out(Easing.quad),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(yRefs[i], {
+                    toValue: stackOffset,
+                    duration: ARC_HALF_MS,
+                    easing: Easing.in(Easing.quad),
+                    useNativeDriver: true,
+                }),
+            ]).start();
         });
 
         // Global ground-hold timer: starts when the LAST item has finished
-        // bouncing, so every find gets its full shelf life regardless of
+        // landing, so every find gets its full shelf life regardless of
         // batch size. Fades whatever is still on the ground and resolves.
         const lastLandingMs = flight + (items.length - 1) * STAGGER_MS;
         const timeout = setTimeout(() => {
@@ -174,13 +150,9 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
     return (
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
             {items.map((item, i) => {
-                // Every item arcs to one side — alternating left/right by
-                // index, with distance growing each pair. Single items still
-                // visibly arc (instead of flying straight up and falling), and
-                // batches fan symmetrically from the moonoko's feet.
-                const side = i % 2 === 0 ? 1 : -1;
-                const distance = 70 + Math.floor(i / 2) * 40;
-                const landingX = side * distance;
+                // Small horizontal jitter around the centerline so the pile
+                // has natural width without scattering across the screen.
+                const landingX = jitterForId(item.id, 11) * PILE_SPREAD_X;
 
                 const translateX = xRefs[i].interpolate({
                     inputRange: [0, 1],

@@ -20,7 +20,7 @@
         "backgroundColor": "#211F37"
       },
       "package": "com.socks.hoshino",
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "resize"
     },
     "extra": {
       "eas": {

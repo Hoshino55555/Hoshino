@@ -1,4 +1,5 @@
-import { Platform } from 'react-native';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../config/firebase';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -30,80 +31,27 @@ interface ConversationData {
   facts: MemoryFact[];
 }
 
+// Auth identity comes from FirebaseAuthContext on the device — the server
+// derives userId from request.auth.uid, so callers no longer pass a user id.
+const chatCallable = httpsCallable<
+  { message: string; moonokoId: string },
+  ChatResponse
+>(functions, 'chat');
+
+const getConversationCallable = httpsCallable<
+  { moonokoId: string; limit?: number },
+  { success: boolean; conversation: ConversationData }
+>(functions, 'getConversation');
+
 class ChatService {
-  private baseUrl: string;
-  private userId: string | null = null;
-
-  constructor() {
-    // Firebase Functions URL with correct project ID
-    // Using production URL for both dev and prod since emulator isn't running
-    this.baseUrl = 'https://us-central1-hoshino-996d0.cloudfunctions.net';
-  }
-
-  setUserId(userId: string) {
-    this.userId = userId;
-  }
-
-  private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const url = `${this.baseUrl}${endpoint}`;
-    
-    const defaultOptions: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    try {
-      const response = await fetch(url, defaultOptions);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('ChatService request failed:', error);
-      throw error;
-    }
-  }
-
-  async sendMessage(
-    message: string,
-    moonokoId: string
-  ): Promise<ChatResponse> {
-    if (!this.userId) {
-      throw new Error('User ID not set. Call setUserId() first.');
-    }
-
-    return this.makeRequest('/chat', {
-      method: 'POST',
-      body: JSON.stringify({
-        message,
-        moonokoId,
-        userId: this.userId,
-      }),
-    });
+  async sendMessage(message: string, moonokoId: string): Promise<ChatResponse> {
+    const result = await chatCallable({ message, moonokoId });
+    return result.data;
   }
 
   async getConversation(moonokoId: string): Promise<ConversationData> {
-    if (!this.userId) {
-      throw new Error('User ID not set. Call setUserId() first.');
-    }
-
-    const params = new URLSearchParams({
-      moonokoId,
-      userId: this.userId,
-    });
-
-    const response = await this.makeRequest(`/getConversation?${params}`);
-    return response.conversation;
-  }
-
-  async healthCheck(): Promise<{ status: string; timestamp: string; functions: string[] }> {
-    return this.makeRequest('/health');
+    const result = await getConversationCallable({ moonokoId });
+    return result.data.conversation;
   }
 
   // Helper method to get moonoko personality info

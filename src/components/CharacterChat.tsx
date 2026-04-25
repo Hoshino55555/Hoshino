@@ -1,6 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
-import InnerScreen from './InnerScreen';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    ScrollView,
+    TextInput,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
+import ZoomOutOverlay from './ZoomOutOverlay';
 import chatService from '../services/ChatService';
 
 interface Character {
@@ -33,42 +47,70 @@ interface Props {
     onNotification?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
+const getImageSource = (imageName: string) => {
+    switch (imageName) {
+        case 'LYRA.gif':
+            return require('../../assets/images/anim/LYRA.gif');
+        case 'ORION.gif':
+            return require('../../assets/images/anim/ORION.gif');
+        case 'ARO.gif':
+            return require('../../assets/images/anim/ARO.gif');
+        case 'SIRIUS.gif':
+            return require('../../assets/images/anim/SIRIUS.gif');
+        case 'ZANIAH.gif':
+            return require('../../assets/images/anim/ZANIAH.gif');
+        default:
+            return require('../../assets/images/anim/LYRA.gif');
+    }
+};
+
 const CharacterChat = ({ character, onExit, playerName, onNotification }: Props) => {
+    const insets = useSafeAreaInsets();
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [isThinking, setIsThinking] = useState(false);
-    const [showChat, setShowChat] = useState(true);
-    const [keyboardVisible, setKeyboardVisible] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
+    // Track the soft keyboard height directly. We can't rely on adjustResize
+    // alone because Android 14+ edge-to-edge mode reports the IME via window
+    // insets without shrinking the activity, so KeyboardAvoidingView is a
+    // no-op. Lifting the input bar by this height lands it just above the
+    // keyboard on every recent Android version.
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const messagesEndRef = useRef<ScrollView>(null);
 
     const handleClose = () => {
         if (isClosing) return;
+        Keyboard.dismiss();
         setIsClosing(true);
     };
-    const messagesEndRef = useRef<ScrollView>(null);
 
-    // Keyboard event listeners
     useEffect(() => {
-        const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
-            setKeyboardVisible(true);
+        const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+        const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+        const showSub = Keyboard.addListener(showEvt, (e) => {
+            setKeyboardHeight(e.endCoordinates?.height ?? 0);
         });
-        const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
-            setKeyboardVisible(false);
-        });
-
+        const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardHeight(0));
         return () => {
-            keyboardDidShowListener?.remove();
-            keyboardDidHideListener?.remove();
+            showSub.remove();
+            hideSub.remove();
         };
     }, []);
+
+    const copyMessage = async (text: string) => {
+        try {
+            await Clipboard.setStringAsync(text);
+            onNotification?.('Copied to clipboard', 'success');
+        } catch {
+            onNotification?.('Could not copy message', 'error');
+        }
+    };
 
     // Load prior conversation with this character on mount
     useEffect(() => {
         let cancelled = false;
         const loadHistory = async () => {
             try {
-                const userId = playerName || 'anonymous';
-                chatService.setUserId(userId);
                 const moonokoId = character.name.toLowerCase();
                 const convo = await chatService.getConversation(moonokoId);
                 if (cancelled) return;
@@ -84,45 +126,20 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
             }
         };
         loadHistory();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [character.name, playerName]);
-
-    // Helper function to get image source based on character image name
-    const getImageSource = (imageName: string) => {
-        switch (imageName) {
-            case 'LYRA.gif':
-                return require('../../assets/images/anim/LYRA.gif');
-            case 'ORION.gif':
-                return require('../../assets/images/anim/ORION.gif');
-            case 'ARO.gif':
-                return require('../../assets/images/anim/ARO.gif');
-            case 'SIRIUS.gif':
-                return require('../../assets/images/anim/SIRIUS.gif');
-            case 'ZANIAH.gif':
-                return require('../../assets/images/anim/ZANIAH.gif');
-            default:
-                return require('../../assets/images/anim/LYRA.gif'); // fallback
-        }
-    };
 
     // Auto-scroll to bottom when new messages are added
     useEffect(() => {
         messagesEndRef.current?.scrollToEnd({ animated: true });
     }, [messages]);
 
-    // Generate character response using Firebase AI
     const generateCharacterResponse = async (userInput: string): Promise<string> => {
         try {
-            // Always set a user ID (use playerName or fallback to 'anonymous')
-            const userId = playerName || 'anonymous';
-            chatService.setUserId(userId);
-
-            // Get moonoko ID from character name
             const moonokoId = character.name.toLowerCase();
-            
-            // Send message to Firebase AI service
             const response = await chatService.sendMessage(userInput, moonokoId);
-            
             if (response.success) {
                 return response.message;
             } else {
@@ -130,7 +147,6 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
             }
         } catch (error) {
             console.error('AI response error:', error);
-            // Fallback to a simple response if AI fails
             return `I'm having trouble connecting right now, ${playerName || 'friend'}. But I'm still here for you! ✨`;
         }
     };
@@ -142,255 +158,236 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
             id: Date.now().toString(),
             text: inputText.trim(),
             sender: 'user',
-            timestamp: new Date()
+            timestamp: new Date(),
         };
 
-        setMessages(prev => [...prev, userMessage]);
+        setMessages((prev) => [...prev, userMessage]);
         setInputText('');
         setIsThinking(true);
 
         try {
-            const characterResponse = await generateCharacterResponse(inputText);
+            const characterResponse = await generateCharacterResponse(userMessage.text);
 
             const characterMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 text: characterResponse,
                 sender: 'character',
-                timestamp: new Date()
+                timestamp: new Date(),
             };
 
-            setMessages(prev => [...prev, characterMessage]);
+            setMessages((prev) => [...prev, characterMessage]);
         } catch (error) {
             console.error('Error generating response:', error);
-            onNotification?.('❌ Failed to generate response', 'error');
+            onNotification?.('Failed to generate response', 'error');
         } finally {
             setIsThinking(false);
         }
     };
 
-    const toggleChat = () => {
-        setShowChat(!showChat);
-    };
-
     return (
-        <InnerScreen
-            expanded
-            animateIn
-            exiting={isClosing}
-            onExitComplete={onExit}
-            showBackgroundImage={false}
-            onLeftButtonPress={handleClose}
-            onCenterButtonPress={toggleChat}
-            onRightButtonPress={() => onNotification?.('💬 Chat Tips: Ask questions, share thoughts, or just chat naturally!', 'info')}
-            leftButtonText=""
-            centerButtonText=""
-            rightButtonText=""
-            keyboardVisible={keyboardVisible}
-        >
-            {/* Main Display Area - Always show character, optionally overlay chat */}
-            <View style={styles.container}>
-                {/* Character Display - Always visible */}
-                <View style={styles.characterDisplay}>
-                    <Image
-                        source={getImageSource(character.image)}
-                        style={styles.characterImage}
-                    />
-                    {!showChat && (
-                        <View style={styles.characterInfo}>
-                            <Text style={styles.characterName}>{character.name}</Text>
-                            <Text style={styles.characterStatus}>✨ Ready to chat! ✨</Text>
-                        </View>
-                    )}
+        <ZoomOutOverlay exiting={isClosing} onExitComplete={onExit} backgroundColor="#0d0f2e">
+            <KeyboardAvoidingView
+                style={styles.flex}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={0}
+            >
+                {/* Cosmic background sparkles — purely decorative, behind everything. */}
+                <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                    <View style={[styles.star, { top: '8%', left: '12%' }]} />
+                    <View style={[styles.star, { top: '14%', right: '18%' }]} />
+                    <View style={[styles.star, { top: '40%', left: '6%' }]} />
+                    <View style={[styles.star, { top: '55%', right: '10%' }]} />
+                    <View style={[styles.star, { bottom: '30%', left: '20%' }]} />
+                    <View style={[styles.star, { bottom: '15%', right: '25%' }]} />
                 </View>
 
-                {/* Chat Interface - Only show when toggled on */}
-                {showChat && (
-                    <View style={styles.chatContainer}>
-                        {/* Cosmic Background Effect */}
-                        <View style={styles.cosmicBackground}>
-                            {/* Simulated stars */}
-                            <View style={[styles.star, { top: '10%', left: '15%' }]} />
-                            <View style={[styles.star, { top: '25%', right: '20%' }]} />
-                            <View style={[styles.star, { top: '60%', left: '10%' }]} />
-                            <View style={[styles.star, { bottom: '30%', right: '15%' }]} />
-                            <View style={[styles.star, { bottom: '15%', left: '25%' }]} />
-                        </View>
+                <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                    <TouchableOpacity
+                        style={styles.headerButton}
+                        onPress={handleClose}
+                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                    >
+                        <Text style={styles.headerButtonText}>{'< Back'}</Text>
+                    </TouchableOpacity>
 
-                        {/* Chat Header */}
-                        <View style={styles.chatHeader}>
-                            <View style={styles.headerBorder}>
-                                <Text style={styles.chatHeaderText}>✨ Chatting with {character.name} ✨</Text>
-                            </View>
-                        </View>
+                    <View style={styles.headerTitleWrap} />
 
-                        {/* Messages Area */}
-                        <ScrollView
-                            style={styles.messagesContainer}
-                            ref={messagesEndRef}
-                            contentContainerStyle={{ paddingBottom: 10 }}
+                    {/* Spacer to balance the Back button on the left. */}
+                    <View style={styles.headerSpacer} />
+                </View>
+
+                <ScrollView
+                    style={styles.messagesContainer}
+                    ref={messagesEndRef}
+                    contentContainerStyle={styles.messagesContent}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {messages.length === 0 && !isThinking && (
+                        <Text style={styles.emptyHint}>
+                            Say hi to {character.name}. Long-press any message to copy it.
+                        </Text>
+                    )}
+
+                    {messages.map((message) => (
+                        <View
+                            key={message.id}
+                            style={[
+                                styles.message,
+                                message.sender === 'user' ? styles.userMessage : styles.characterMessage,
+                            ]}
                         >
-                            {messages.map((message) => (
-                                <View
-                                    key={message.id}
+                            <Pressable
+                                onLongPress={() => copyMessage(message.text)}
+                                delayLongPress={350}
+                                style={({ pressed }) => [
+                                    styles.messageBorder,
+                                    message.sender === 'user'
+                                        ? styles.userMessageBorder
+                                        : styles.characterMessageBorder,
+                                    pressed && styles.messagePressed,
+                                ]}
+                            >
+                                <Text
                                     style={[
-                                        styles.message,
-                                        message.sender === 'user' ? styles.userMessage : styles.characterMessage
+                                        styles.messageText,
+                                        message.sender === 'user'
+                                            ? styles.userMessageText
+                                            : styles.characterMessageText,
                                     ]}
+                                    selectable
                                 >
-                                    <View style={[
-                                        styles.messageBorder,
-                                        message.sender === 'user' ? styles.userMessageBorder : styles.characterMessageBorder
-                                    ]}>
-                                        <Text style={[
-                                            styles.messageText,
-                                            message.sender === 'user' ? styles.userMessageText : styles.characterMessageText
-                                        ]}>
-                                            {message.text}
-                                        </Text>
-                                    </View>
-                                </View>
-                            ))}
+                                    {message.text}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    ))}
 
-                            {isThinking && (
-                                <View style={styles.thinkingMessage}>
-                                    <View style={styles.thinkingBorder}>
-                                        <Text style={styles.thinkingText}>
-                                            🌟 {character.name} is thinking...
-                                        </Text>
-                                        <Text style={styles.thinkingDots}>✨ ✨ ✨</Text>
-                                    </View>
-                                </View>
-                            )}
-                        </ScrollView>
-
-                        {/* Input Area */}
-                        <View style={styles.inputContainer}>
-                            <View style={styles.inputBorder}>
-                                <TextInput
-                                    style={styles.textInput}
-                                    value={inputText}
-                                    onChangeText={setInputText}
-                                    placeholder={`Message ${character.name}...`}
-                                    placeholderTextColor="#B8860B"
-                                    multiline
-                                    maxLength={200}
-                                />
-                                <TouchableOpacity
-                                    style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-                                    onPress={sendMessage}
-                                    disabled={!inputText.trim() || isThinking}
-                                >
-                                    <View style={styles.sendButtonBorder}>
-                                        <Text style={styles.sendButtonText}>Send ✨</Text>
-                                    </View>
-                                </TouchableOpacity>
+                    {isThinking && (
+                        <View style={styles.thinkingMessage}>
+                            <View style={styles.thinkingBorder}>
+                                <Text style={styles.thinkingText}>
+                                    {character.name} is thinking...
+                                </Text>
+                                <Text style={styles.thinkingDots}>✦ ✦ ✦</Text>
                             </View>
                         </View>
+                    )}
+                </ScrollView>
+
+                <View
+                    style={[
+                        styles.inputContainer,
+                        {
+                            paddingBottom:
+                                keyboardHeight > 0
+                                    ? keyboardHeight + insets.bottom + 8
+                                    : insets.bottom + 6,
+                        },
+                    ]}
+                >
+                    <View style={styles.inputBorder}>
+                        <TextInput
+                            style={styles.textInput}
+                            value={inputText}
+                            onChangeText={setInputText}
+                            placeholder={`Message ${character.name}...`}
+                            placeholderTextColor="#9aa3d0"
+                            multiline
+                            maxLength={500}
+                        />
+                        <TouchableOpacity
+                            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+                            onPress={sendMessage}
+                            disabled={!inputText.trim() || isThinking}
+                        >
+                            <View style={styles.sendButtonBorder}>
+                                <Text style={styles.sendButtonText}>Send</Text>
+                            </View>
+                        </TouchableOpacity>
                     </View>
-                )}
-            </View>
-        </InnerScreen>
+                </View>
+            </KeyboardAvoidingView>
+        </ZoomOutOverlay>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        width: '100%',
-        height: '100%',
-        position: 'relative',
-    },
-    characterDisplay: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        width: '100%',
-    },
-    characterImage: {
-        width: 200,
-        height: 200,
-        resizeMode: 'contain',
-    },
-    characterInfo: {
-        alignItems: 'center',
-        marginTop: 10,
-        backgroundColor: 'rgba(25, 25, 112, 0.8)', // Deep space blue
-        borderWidth: 2,
-        borderColor: '#FFD700', // Cosmic gold
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 8,
-    },
-    characterName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#FFD700', // Golden yellow
-        marginBottom: 2,
-        fontFamily: 'monospace',
-        letterSpacing: 1,
-    },
-    characterStatus: {
-        fontSize: 12,
-        color: '#E6E6FA', // Lavender
-        fontFamily: 'monospace',
-        letterSpacing: 0.5,
-    },
-    chatContainer: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(25, 25, 112, 0.95)', // Deep space blue background
-        borderWidth: 3,
-        borderColor: '#4169E1', // Royal blue border
-        borderRadius: 8,
-        padding: 4,
-        zIndex: 10,
-    },
-    cosmicBackground: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'transparent',
-    },
+    flex: { flex: 1 },
     star: {
         position: 'absolute',
         width: 3,
         height: 3,
         backgroundColor: '#FFD700',
         borderRadius: 1.5,
-        opacity: 0.8,
+        opacity: 0.6,
     },
-    chatHeader: {
-        marginBottom: 6,
-        zIndex: 2,
-    },
-    headerBorder: {
-        backgroundColor: 'rgba(72, 61, 139, 0.9)', // Dark slate blue
-        borderWidth: 2,
-        borderColor: '#FFD700', // Golden border
-        paddingVertical: 8,
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: 12,
-        borderRadius: 6,
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(105, 110, 180, 0.4)',
     },
-    chatHeaderText: {
-        color: '#FFD700', // Golden text
-        fontSize: 14,
-        fontWeight: 'bold',
-        textAlign: 'center',
-        fontFamily: 'monospace',
+    headerButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        backgroundColor: 'rgba(72, 61, 139, 0.85)',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#FFD700',
+        minWidth: 56,
+        alignItems: 'center',
+    },
+    headerButtonText: {
+        color: '#FFD700',
+        fontFamily: 'PressStart2P',
+        fontSize: 10,
+    },
+    headerSpacer: {
+        minWidth: 56,
+    },
+    headerTitleWrap: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 8,
+        overflow: 'hidden',
+    },
+    headerAvatar: {
+        width: 28,
+        height: 28,
+        marginRight: 8,
+        resizeMode: 'contain',
+    },
+    headerTitle: {
+        color: '#FFD700',
+        fontFamily: 'PressStart2P',
+        fontSize: 12,
         letterSpacing: 0.5,
+        flexShrink: 1,
     },
     messagesContainer: {
         flex: 1,
-        paddingHorizontal: 4,
-        zIndex: 2,
+        paddingHorizontal: 8,
+    },
+    messagesContent: {
+        paddingTop: 12,
+        paddingBottom: 16,
+    },
+    emptyHint: {
+        textAlign: 'center',
+        color: '#b8c6ff',
+        fontFamily: 'monospace',
+        fontSize: 12,
+        marginTop: 32,
+        paddingHorizontal: 24,
+        lineHeight: 18,
     },
     message: {
-        marginVertical: 3,
+        marginVertical: 4,
         maxWidth: '85%',
     },
     userMessage: {
@@ -401,46 +398,49 @@ const styles = StyleSheet.create({
     },
     messageBorder: {
         borderWidth: 2,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 4,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 6,
+    },
+    messagePressed: {
+        opacity: 0.7,
     },
     userMessageBorder: {
-        backgroundColor: 'rgba(138, 43, 226, 0.8)', // Cosmic purple
-        borderColor: '#DA70D6', // Orchid border
+        backgroundColor: 'rgba(138, 43, 226, 0.85)',
+        borderColor: '#DA70D6',
     },
     characterMessageBorder: {
-        backgroundColor: 'rgba(70, 130, 180, 0.8)', // Steel blue
-        borderColor: '#87CEEB', // Sky blue border
+        backgroundColor: 'rgba(70, 130, 180, 0.85)',
+        borderColor: '#87CEEB',
     },
     messageText: {
-        fontSize: 13,
-        lineHeight: 16,
+        fontSize: 14,
+        lineHeight: 19,
         fontFamily: 'monospace',
     },
     userMessageText: {
-        color: '#E6E6FA', // Lavender
+        color: '#F5F0FF',
     },
     characterMessageText: {
-        color: '#F0F8FF', // Alice blue
+        color: '#F0F8FF',
     },
     thinkingMessage: {
         alignSelf: 'flex-start',
-        marginVertical: 3,
+        marginVertical: 4,
     },
     thinkingBorder: {
         borderWidth: 2,
-        borderColor: '#FF69B4', // Hot pink for thinking
-        backgroundColor: 'rgba(199, 21, 133, 0.6)', // Medium violet red
-        paddingHorizontal: 10,
-        paddingVertical: 6,
+        borderColor: '#FF69B4',
+        backgroundColor: 'rgba(199, 21, 133, 0.6)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 4,
+        borderRadius: 6,
     },
     thinkingText: {
         fontSize: 12,
-        color: '#FFB6C1', // Light pink
+        color: '#FFB6C1',
         fontFamily: 'monospace',
         letterSpacing: 0.5,
         flex: 1,
@@ -452,48 +452,50 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     inputContainer: {
-        marginTop: 6,
-        zIndex: 2,
+        paddingHorizontal: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(105, 110, 180, 0.4)',
     },
     inputBorder: {
         borderWidth: 2,
-        borderColor: '#4169E1', // Royal blue
-        backgroundColor: 'rgba(72, 61, 139, 0.8)', // Dark slate blue
-        borderRadius: 6,
+        borderColor: '#4169E1',
+        backgroundColor: 'rgba(72, 61, 139, 0.85)',
+        borderRadius: 8,
         padding: 6,
         flexDirection: 'row',
         alignItems: 'flex-end',
     },
     textInput: {
         flex: 1,
-        backgroundColor: 'rgba(25, 25, 112, 0.9)', // Deep space blue
+        backgroundColor: 'rgba(20, 22, 60, 0.95)',
         borderWidth: 1,
-        borderColor: '#6495ED', // Cornflower blue
-        borderRadius: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 6,
-        marginRight: 6,
-        color: '#E6E6FA', // Lavender text
-        fontSize: 12,
+        borderColor: '#6495ED',
+        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        marginRight: 8,
+        color: '#E6E6FA',
+        fontSize: 14,
         fontFamily: 'monospace',
-        maxHeight: 60,
-        minHeight: 32,
+        maxHeight: 120,
+        minHeight: 40,
     },
     sendButton: {
-        minWidth: 60,
+        minWidth: 64,
     },
     sendButtonBorder: {
-        backgroundColor: 'rgba(138, 43, 226, 0.8)', // Cosmic purple
+        backgroundColor: 'rgba(138, 43, 226, 0.85)',
         borderWidth: 2,
-        borderColor: '#DA70D6', // Orchid
-        borderRadius: 4,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
+        borderColor: '#DA70D6',
+        borderRadius: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
         alignItems: 'center',
         justifyContent: 'center',
     },
     sendButtonText: {
-        color: '#E6E6FA', // Lavender
+        color: '#F5F0FF',
         fontWeight: 'bold',
         fontSize: 12,
         fontFamily: 'monospace',
