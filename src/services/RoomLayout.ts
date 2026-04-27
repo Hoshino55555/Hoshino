@@ -129,7 +129,7 @@ export function itemPixelRect(
 // release — the editor will mutate this array (or a per-user copy) once it
 // lands. Order in the array matches paint order for ties on `z`.
 export const STARTER_ROOM_LAYOUT: RoomLayout = [
-    { id: 'cobweb-1', asset: 'decals.cobweb', band: 'wall', gx: 2, gy: 1, span: { w: 2, h: 2 } },
+    { id: 'cobweb-1', asset: 'decals.cobweb', band: 'wall', gx: 2, gy: 2, span: { w: 2, h: 2 } },
     { id: 'porthole-1', asset: 'decals.porthole', band: 'wall', gx: 7, gy: 2, span: { w: 1, h: 2 } },
     { id: 'bloodsplatter-1', asset: 'decals.bloodsplatter', band: 'wall', gx: 9, gy: 2, span: { w: 2, h: 2 } },
     { id: 'aro-1', asset: 'minis.aro', band: 'floor', gx: 5, gy: 1, span: { w: 2, h: 3 } },

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, Modal, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
 import Shop from './Shop';
 import Gallery from './Gallery';
-import SleepMode from './SleepMode';
 import InnerScreen from './InnerScreen';
 import Settings from './Settings';
 import Frame from './Frame';
@@ -100,6 +99,15 @@ const MoonokoInteraction: React.FC<Props> = ({
         drainForaged()
             .catch((e: any) => {
                 onNotification?.(e?.message || 'Failed to collect finds', 'error');
+                // Clear the optimistic items on failure. Otherwise, if
+                // ForagePopOut unmounts before its onComplete fires (e.g. the
+                // user navigates into Inventory mid-animation), its cleanup
+                // [ForagePopOut.tsx:113] clears the completion timer and
+                // popOutItems stays set forever — the character tap then
+                // perma-rejects (`if (popOutItems) return`) until the whole
+                // component remounts. Cutting the animation short here is
+                // visually OK because the toast already explains the failure.
+                setPopOutItems(null);
             })
             .finally(() => {
                 drainInFlightRef.current = false;
@@ -174,11 +182,37 @@ const MoonokoInteraction: React.FC<Props> = ({
     // Arcade hub gates access to individual games. Tapping the games menu
     // button opens the hub; the hub then launches a specific game.
     const [arcadeOpen, setArcadeOpen] = useState(false);
-    const [isSleeping, setIsSleeping] = useState(false);
+    // `isSleeping` is derived from the server (`gameState.sleepStartedAt`),
+    // not held as independent local state. Earlier impl used `useState(false)`
+    // and got out of sync if the user force-quit mid-sleep: server still had
+    // sleepStartedAt set, local state defaulted to false, home menu rendered
+    // while the server paused all decay → "stats stuck after 48h" bug.
+    //
+    // `pendingStartSleep` covers the brief optimistic window: tapping Sleep
+    // flips the screen instantly while the startSleep callable is in flight.
+    // Cleared in the success/failure paths below.
+    const [pendingStartSleep, setPendingStartSleep] = useState(false);
+    const serverSleeping = gameState?.sleepStartedAt != null;
+    const isSleeping = serverSleeping || pendingStartSleep;
     // When true, SleepScreen plays its exit animation and then fires onWake.
     // Used so a second tap on the sleep menu button reads the same as
     // tapping the in-screen Wake button (no instant unmount jump).
     const [wakeRequested, setWakeRequested] = useState(false);
+    // Bumped on endSleep failure to remount SleepScreen with a fresh
+    // ZoomOutOverlay — the in-flight one already animated to its exited
+    // (invisible, scaled-small) state and would otherwise block touches with
+    // no visible UI. Bumping the key gives the user a clean retry surface.
+    const [sleepInstanceKey, setSleepInstanceKey] = useState(0);
+
+    // Clear sleep UI flags when the active character changes. Without this,
+    // a startSleep promise inflight on character A could leave pendingStartSleep
+    // true while the user is now viewing character B, briefly showing
+    // SleepScreen for the wrong moonoko. wakeRequested is reset for the same
+    // reason — its meaning is per-character.
+    useEffect(() => {
+        setPendingStartSleep(false);
+        setWakeRequested(false);
+    }, [selectedCharacter?.id]);
     const [isTransitioning, setIsTransitioning] = useState(true);
     const [transitionOpacity, setTransitionOpacity] = useState(1);
 
@@ -312,15 +346,19 @@ const MoonokoInteraction: React.FC<Props> = ({
                     // endSleep here would race with onWake's call.
                     if (!wakeRequested) setWakeRequested(true);
                 } else {
-                    // Flip the overlay on immediately — the startSleep callable
-                    // is a server round-trip and awaiting it here makes the tap
-                    // feel laggy. Server is authoritative, so on failure we
-                    // revert and toast.
-                    setIsSleeping(true);
-                    startSleep().catch((e: any) => {
-                        setIsSleeping(false);
-                        onNotification?.(e?.message || 'Failed to start sleep', 'error');
-                    });
+                    // Flip the overlay on immediately via pendingStartSleep —
+                    // the startSleep callable is a server round-trip and
+                    // awaiting it here makes the tap feel laggy. On success
+                    // the server response sets sleepStartedAt and serverSleeping
+                    // takes over, so we clear the pending flag. On failure we
+                    // clear the flag and toast — caller stays on home menu.
+                    setPendingStartSleep(true);
+                    startSleep()
+                        .then(() => setPendingStartSleep(false))
+                        .catch((e: any) => {
+                            setPendingStartSleep(false);
+                            onNotification?.(e?.message || 'Failed to start sleep', 'error');
+                        });
                 }
                 break;
 
@@ -567,15 +605,28 @@ const MoonokoInteraction: React.FC<Props> = ({
             {isSleeping && (
                 <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
                     <SleepScreen
+                        key={sleepInstanceKey}
                         wakeRequested={wakeRequested}
                         onWake={async () => {
                             try {
                                 await endSleep(true);
+                                // Success: server cleared sleepStartedAt, the
+                                // derived isSleeping flips false on next render
+                                // and SleepScreen unmounts.
+                                setWakeRequested(false);
                             } catch (e: any) {
-                                onNotification?.(e?.message || 'Failed to end sleep', 'error');
+                                // Don't unmount on failure — earlier impl set
+                                // isSleeping=false unconditionally, leaving the
+                                // server in stale-sleep state with the home
+                                // menu showing. Keep the user on SleepScreen,
+                                // bump the instance key so a fresh
+                                // ZoomOutOverlay replaces the exited one
+                                // (otherwise it sits invisible, blocking taps),
+                                // and surface the error so they can retry.
+                                onNotification?.(e?.message || 'Failed to end sleep — try again', 'error');
+                                setWakeRequested(false);
+                                setSleepInstanceKey((k) => k + 1);
                             }
-                            setIsSleeping(false);
-                            setWakeRequested(false);
                         }}
                     />
                 </View>

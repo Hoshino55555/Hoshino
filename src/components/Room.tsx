@@ -98,6 +98,12 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
+        // Explicit 100% dims force Android's native ImageView to a definite
+        // frame — without these, absolute edges alone can fall back to
+        // intrinsic bitmap size and ignore resizeMode, leaving the 1200×2672
+        // assets rendering at native pixels (upper-left visible only).
+        width: '100%',
+        height: '100%',
     },
     bandLayer: {
         position: 'absolute',

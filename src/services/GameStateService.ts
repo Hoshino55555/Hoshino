@@ -35,6 +35,7 @@ export interface GameState {
     level: number;
     experience: number;
     moodDecayProgressMs?: number;
+    energyDecayProgressMs?: number;
     foragedItems?: ForagedItem[];
     lastForagedAt?: number;
     foragedRecapDateKey?: string;

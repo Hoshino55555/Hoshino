@@ -300,6 +300,11 @@ function defaultState(characterId, nowMs, tz) {
     level: 1,
     experience: 0,
     moodDecayProgressMs: 0,
+    // Same accumulator pattern as mood: tracks fractional progress toward
+    // the next 4h energy decay tick so the clock can't be reset by frequent
+    // getGameState calls (which were rewriting lastResolvedAt and starving
+    // the old loop-based scheduler). Resets to 0 on wake from sleep.
+    energyDecayProgressMs: 0,
     // Foraging
     foragedItems: [],
     lastForagedAt: nowMs, // first event resolves at nowMs + forageInterval(hunger)
@@ -324,8 +329,43 @@ function normalize(state, nowMs) {
 // to enable foraging; without it, foraging is a no-op (used when engine is loaded
 // in environments without server RNG wired up, e.g. tests).
 function resolve(state, nowMs, opts = {}) {
-  // Apply stat decay first (paused by sleep), then foraging (runs regardless).
-  const withDecay = applyStatDecay(state, nowMs);
+  // Self-heal foraging split: if state has stale sleep (>=8h elapsed) and
+  // we have RNG, run foraging for the in-sleep window FIRST while the state
+  // still reads as asleep — that way those events get the sleep-rate slot
+  // probability and 'sleep' source tag (which morning-recap depends on).
+  // Then applyStatDecay self-heals the sleep below, and the second forage
+  // pass covers the awake window. Without this split, the entire away
+  // period would replay at awake-rate and the recap would never fire for
+  // users who closed the app mid-sleep.
+  let workingState = state;
+  if (
+    state.sleepStartedAt &&
+    nowMs - state.sleepStartedAt >= SLEEP_REQUIRED_MS &&
+    opts.randomBytes
+  ) {
+    const wakeMs = state.sleepStartedAt + SLEEP_REQUIRED_MS;
+    // Clamp lastForagedAt to at least sleepStartedAt before the sleep-window
+    // pass — legacy or corrupted state could carry a much older
+    // lastForagedAt that would otherwise emit pre-sleep ticks with the
+    // 'sleep' source tag, polluting the morning recap.
+    const sleepWindowState = {
+      ...state,
+      lastForagedAt: Math.max(state.lastForagedAt || state.sleepStartedAt, state.sleepStartedAt),
+    };
+    const sleepForage = resolveForaging(sleepWindowState, wakeMs, opts.randomBytes);
+    // Always write workingState in the self-heal branch — even if no finds
+    // were emitted, we want to commit the clamp (sleepWindowState's
+    // lastForagedAt may have advanced past state.lastForagedAt).
+    workingState = {
+      ...state,
+      lastForagedAt: sleepForage.lastForagedAt,
+      foragedItems: [...(state.foragedItems || []), ...sleepForage.finds],
+    };
+  }
+
+  // Apply stat decay (which also self-heals stale sleep), then awake-window
+  // foraging on the resulting state.
+  const withDecay = applyStatDecay(workingState, nowMs);
 
   if (!opts.randomBytes) {
     return withDecay;
@@ -346,7 +386,21 @@ function resolve(state, nowMs, opts = {}) {
 // regardless of sleep state.
 function applyStatDecay(state, nowMs) {
   if (state.sleepStartedAt) {
-    // No decay while asleep. Keep lastResolvedAt as-is.
+    // Self-heal stale sleep state: if the moonoko has been "asleep" longer
+    // than SLEEP_REQUIRED_MS, treat the sleep as completed and continue
+    // resolving. Covers (a) client crashed/force-quit before endSleep was
+    // ack'd, (b) endSleep network failure that left the server in
+    // sleepStartedAt-set state, (c) any future client desync. Without this
+    // safety net, decay was paused indefinitely — that was the "stats stuck
+    // after 48h" bug. Auto-wake at +SLEEP_REQUIRED_MS so the post-wake
+    // window's decay still counts.
+    const elapsed = nowMs - state.sleepStartedAt;
+    if (elapsed >= SLEEP_REQUIRED_MS) {
+      const wakeMs = state.sleepStartedAt + SLEEP_REQUIRED_MS;
+      const woken = applyEndSleep(state, wakeMs);
+      return applyStatDecay(woken, nowMs);
+    }
+    // Still mid-sleep — no decay. Keep lastResolvedAt as-is.
     return normalize(state, nowMs);
   }
 
@@ -367,10 +421,22 @@ function applyStatDecay(state, nowMs) {
       w.dateKey === claims.dateKey && claims[w.windowName];
     events.push({ t: w.endMs, type: 'hunger', claimed });
   }
+  // Energy decay scheduling. Earlier impl was `for (let i = 1; fromMs + i*step
+  // <= nowMs; ...)` which silently broke for frequent openers — every
+  // getGameState rewrote lastResolvedAt, so the loop never iterated for users
+  // who opened the app inside a single 4h window. Switched to an accumulator
+  // (energyDecayProgressMs) carried in state, mirroring the mood accumulator,
+  // so decay advances correctly regardless of read cadence.
   const energyStepMs = ENERGY_DECAY_HOURS * 3600000;
-  for (let i = 1; fromMs + i * energyStepMs <= nowMs; i++) {
-    events.push({ t: fromMs + i * energyStepMs, type: 'energy' });
+  const priorEnergyProgressMs = clamp(0, energyStepMs - 1, state.energyDecayProgressMs || 0);
+  for (
+    let t = fromMs + (energyStepMs - priorEnergyProgressMs);
+    t <= nowMs;
+    t += energyStepMs
+  ) {
+    events.push({ t, type: 'energy' });
   }
+  const nextEnergyProgressMs = (priorEnergyProgressMs + (nowMs - fromMs)) % energyStepMs;
   events.sort((a, b) => a.t - b.t);
 
   let hunger = state.hunger;
@@ -410,6 +476,7 @@ function applyStatDecay(state, nowMs) {
     mood: clamp(1, 5, state.mood - moodDrops),
     moodDecayProgressMs: moodRemainderMs,
     energy: clamp(1, 5, energy),
+    energyDecayProgressMs: nextEnergyProgressMs,
     mealBonusClaimed: nextClaims,
     lastResolvedAt: nowMs,
   };
@@ -422,10 +489,16 @@ function applyStatDecay(state, nowMs) {
 // opts.xp overrides the default +10 per feed (used by cook() to scale xp with
 // recipe complexity; slop/one-off feeds stick with the default).
 function applyFeed(state, nowMs, hungerBoost = 0, moodBoost = 0, opts = {}) {
-  if (state.sleepStartedAt) {
+  // Resolve first so the self-heal in applyStatDecay can clear a stale
+  // sleepStartedAt before we gate on it. Earlier impl checked the raw input
+  // state, which meant a moonoko stuck in stale sleep (>=8h) would reject
+  // every feed/play/chat with "moonoko is sleeping" until something else
+  // triggered a getGameState read. Now the action itself can break the
+  // user out of the desync.
+  const resolved = resolve(state, nowMs, opts);
+  if (resolved.sleepStartedAt) {
     throw new Error('Cannot feed: moonoko is sleeping');
   }
-  const resolved = resolve(state, nowMs, opts);
   const tz = resolved.timezone || 'UTC';
   const windowName = currentWindowName(nowMs, tz);
   const claims = { ...resolved.mealBonusClaimed };
@@ -452,10 +525,12 @@ function applyFeed(state, nowMs, hungerBoost = 0, moodBoost = 0, opts = {}) {
 }
 
 function applyPlay(state, nowMs, opts = {}) {
-  if (state.sleepStartedAt) {
+  // Resolve first — see applyFeed for the rationale (stale-sleep self-heal
+  // must run before the sleep guard, otherwise actions perma-reject).
+  const resolved = resolve(state, nowMs, opts);
+  if (resolved.sleepStartedAt) {
     throw new Error('Cannot play: moonoko is sleeping');
   }
-  const resolved = resolve(state, nowMs, opts);
   return {
     ...resolved,
     mood: clamp(1, 5, resolved.mood + 1),
@@ -467,10 +542,11 @@ function applyPlay(state, nowMs, opts = {}) {
 }
 
 function applyChat(state, nowMs, opts = {}) {
-  if (state.sleepStartedAt) {
+  // Resolve first — see applyFeed for the rationale.
+  const resolved = resolve(state, nowMs, opts);
+  if (resolved.sleepStartedAt) {
     throw new Error('Cannot chat: moonoko is sleeping');
   }
-  const resolved = resolve(state, nowMs, opts);
   return {
     ...resolved,
     mood: clamp(1, 5, resolved.mood + 1),
@@ -479,11 +555,15 @@ function applyChat(state, nowMs, opts = {}) {
 }
 
 function applyStartSleep(state, nowMs, opts = {}) {
-  if (state.sleepStartedAt) {
-    // Already sleeping — idempotent.
-    return state;
-  }
+  // Resolve first so a stale sleepStartedAt (>=8h) self-heals into an awake
+  // state before we decide whether to start a fresh sleep. Without this, the
+  // idempotent early-return below would refuse to start a new sleep on top
+  // of a stuck one until something else triggered a read.
   const resolved = resolve(state, nowMs, opts);
+  if (resolved.sleepStartedAt) {
+    // Genuinely sleeping — idempotent.
+    return resolved;
+  }
   return {
     ...resolved,
     sleepStartedAt: nowMs,
@@ -511,6 +591,10 @@ function applyEndSleep(state, nowMs, opts = {}) {
     energy: full ? 5 : clamp(1, 5, state.energy + Math.floor(elapsed / (60 * 60 * 1000) / 2)),
     mood: full ? clamp(1, 5, state.mood + 1) : state.mood,
     totalSleeps: (state.totalSleeps || 0) + (full ? 1 : 0),
+    // Reset the accumulator on wake — energy was just topped up, the next
+    // 4h tick should start counting from now, not from whatever fraction
+    // had built up before sleep.
+    energyDecayProgressMs: 0,
     lastResolvedAt: nowMs,
   };
 }

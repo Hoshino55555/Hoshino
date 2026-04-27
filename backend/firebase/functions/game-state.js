@@ -179,9 +179,19 @@ exports.endSleep = onCall(COMMON_OPTS, async (request) => {
   const force = !!(request.data && request.data.force);
   const nowMs = Date.now();
   const state = await loadOrDefault(uid, characterId, nowMs);
+  // Pre-resolve so a stale sleepStartedAt (>=8h) self-heals via the engine's
+  // foraging-split path before applyEndSleep sees it. If the self-heal already
+  // woke the moonoko, save+return that state instead of letting applyEndSleep
+  // throw "Not sleeping" — from the client's perspective the wake succeeded.
+  const opts = await getForagingOptsForUser(uid, nowMs);
+  const resolved = engine.resolve(state, nowMs, opts);
+  if (!resolved.sleepStartedAt) {
+    await saveState(uid, characterId, resolved);
+    return { state: resolved };
+  }
   let next;
   try {
-    next = engine.applyEndSleep(state, nowMs, { force });
+    next = engine.applyEndSleep(resolved, nowMs, { force });
   } catch (e) {
     if (e.code === 'sleep-in-progress') {
       throw new HttpsError('failed-precondition', e.message, {
