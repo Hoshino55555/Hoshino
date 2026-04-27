@@ -31,7 +31,54 @@
       "expo-font",
       "expo-dev-client",
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "react-native-android-widget",
+        {
+          "fonts": [
+            "./assets/fonts/PressStart2P-Regular.ttf",
+            "./assets/fonts/SpaceMono-Regular.ttf"
+          ],
+          "widgets": [
+            {
+              "name": "HoshinoCompact",
+              "label": "Hoshino — Compact",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "description": "Avatar + stat bars",
+              "previewImage": "./assets/images/widget/preview-compact.png",
+              "updatePeriodMillis": 1800000,
+              "resizeMode": "horizontal|vertical"
+            },
+            {
+              "name": "HoshinoWide",
+              "label": "Hoshino — Wide",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "description": "Avatar, stats, level, fragments",
+              "previewImage": "./assets/images/widget/preview-wide.png",
+              "updatePeriodMillis": 1800000,
+              "resizeMode": "horizontal|vertical"
+            },
+            {
+              "name": "HoshinoHero",
+              "label": "Hoshino — Hero",
+              "minWidth": "250dp",
+              "minHeight": "250dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 4,
+              "description": "Full moonoko poster with stats",
+              "previewImage": "./assets/images/widget/preview-hero.png",
+              "updatePeriodMillis": 1800000,
+              "resizeMode": "horizontal|vertical"
+            }
+          ]
+        }
+      ]
     ],
     "scheme": "hoshino"
   }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
@@ -187,6 +187,13 @@ function App() {
     const [welcomePhase, setWelcomePhase] = useState<string>('intro');
     const [shouldGoToCongratulations, setShouldGoToCongratulations] = useState(false);
     const [shouldFadeInInteraction, setShouldFadeInInteraction] = useState(false);
+    // Set when a hoshino:// deep link asks the interaction screen to do
+    // something on entry (e.g. drain pending forage finds from a widget tap).
+    // MoonokoInteraction reads this prop, runs the action once gameState is
+    // ready, and calls back to clear it. One-shot — never persisted.
+    const [pendingWidgetAction, setPendingWidgetAction] = useState<string | null>(
+        null
+    );
 
     const navigateToView = (view: string) => {
         setPreviousView(currentView);
@@ -626,6 +633,36 @@ function App() {
         }
     }, [currentView]);
 
+    // Deep-link router for widget taps and external launches.
+    // Supported URIs:
+    //   hoshino://forage/drain  -> jump to interaction view, auto-drain pending finds
+    useEffect(() => {
+        const handleUrl = (url: string | null) => {
+            if (!url) return;
+            try {
+                const parsed = new URL(url);
+                // expo-linking style: scheme://host/path. RN URL polyfill
+                // exposes hostname + pathname. We treat 'forage' as the host
+                // and 'drain' as the path so the matcher stays simple.
+                if (parsed.hostname === 'forage' && parsed.pathname === '/drain') {
+                    setCurrentView('interaction');
+                    setPendingWidgetAction('forage-drain');
+                }
+            } catch {
+                // Malformed URI — ignore rather than crash. The widget only
+                // emits known schemes, so this only fires on hand-crafted
+                // intents.
+            }
+        };
+        // Cold-start path: app was launched by the widget tap.
+        Linking.getInitialURL().then(handleUrl);
+        // Warm path: app was already alive and the OS hands us the URL.
+        const sub = Linking.addEventListener('url', (event) =>
+            handleUrl(event.url)
+        );
+        return () => sub.remove();
+    }, []);
+
     const moonokoInteractionElement = (
         <MoonokoInteraction
             selectedCharacter={selectedCharacter}
@@ -651,6 +688,8 @@ function App() {
             onSettings={() => setCurrentView('settings')}
             shouldFadeIn={shouldFadeInInteraction}
             onFadeInComplete={() => setShouldFadeInInteraction(false)}
+            pendingWidgetAction={pendingWidgetAction}
+            onWidgetActionConsumed={() => setPendingWidgetAction(null)}
         />
     );
 

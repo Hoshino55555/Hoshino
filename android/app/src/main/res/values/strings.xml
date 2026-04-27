@@ -1,4 +1,7 @@
 <resources>
   <string name="app_name">Hoshino</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
+  <string name="widget_hoshinocompact_description" translatable="false">Avatar + stat bars</string>
+  <string name="widget_hoshinowide_description" translatable="false">Avatar, stats, level, fragments</string>
+  <string name="widget_hoshinohero_description" translatable="false">Full moonoko poster with stats</string>
 </resources>

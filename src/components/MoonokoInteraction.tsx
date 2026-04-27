@@ -13,6 +13,7 @@ import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import ForagePopOut from './ForagePopOut';
 import type { ForagedItem } from '../services/GameStateService';
+import { pushMoonokoSnapshot, pushEmptySnapshot } from '../widgets/widgetService';
 
 const { height } = Dimensions.get('window');
 
@@ -64,6 +65,12 @@ interface Props {
     // Transition animation control
     shouldFadeIn?: boolean;
     onFadeInComplete?: () => void;
+    // Set by App when a hoshino:// deep link wants this screen to do
+    // something on entry (currently 'forage-drain' from a widget tap).
+    // We consume it once gameState is ready, then notify the parent so the
+    // action doesn't fire again on a re-mount.
+    pendingWidgetAction?: string | null;
+    onWidgetActionConsumed?: () => void;
 }
 
 const MoonokoInteraction: React.FC<Props> = ({
@@ -77,7 +84,9 @@ const MoonokoInteraction: React.FC<Props> = ({
     onSettings,
     onGallery,
     shouldFadeIn = false,
-    onFadeInComplete
+    onFadeInComplete,
+    pendingWidgetAction = null,
+    onWidgetActionConsumed,
 }) => {
     const { state: gameState, drainForaged, startSleep, endSleep } = useGameStateContext();
     const currentStats = {
@@ -107,6 +116,59 @@ const MoonokoInteraction: React.FC<Props> = ({
                 drainInFlightRef.current = false;
             });
     };
+
+    // Widget deep-link → auto-drain. We wait until gameState has resolved
+    // (so foragedItems is real, not the empty default) before invoking the
+    // same press handler the in-screen tap uses. If there are no pending
+    // finds we still consume the action so the badge doesn't re-fire.
+    useEffect(() => {
+        if (pendingWidgetAction !== 'forage-drain') return;
+        if (!gameState) return;
+        if (hasPendingFinds && !drainInFlightRef.current && !popOutItems) {
+            handleCharacterPress();
+        }
+        onWidgetActionConsumed?.();
+    }, [pendingWidgetAction, gameState, hasPendingFinds]);
+
+    // Push the home-screen widget a fresh snapshot whenever the state that
+    // drives its rendering changes. The widget runs in the launcher process
+    // and can't see React state — this is the only way it learns that
+    // mood/hunger/energy/foraging have moved. Cheap to over-call: the
+    // launcher coalesces redraws.
+    useEffect(() => {
+        if (!selectedCharacter || !gameState) {
+            pushEmptySnapshot().catch(() => {});
+            return;
+        }
+        const avatarKey = selectedCharacter.image.replace(/\.gif$/i, '');
+        // gameState stats are on a 0..5 scale — same as the in-app 5-star
+        // readout. Widget contract is 0..100, so multiply by 20.
+        const scale = (n: number) => n * 20;
+        pushMoonokoSnapshot({
+            characterId: gameState.characterId,
+            name: selectedCharacter.name,
+            avatarKey,
+            mood: scale(gameState.mood),
+            hunger: scale(gameState.hunger),
+            energy: scale(gameState.energy),
+            level: gameState.level,
+            // Player-wide currency lives outside gameState; for now we omit
+            // it (widget shows 0). Wiring GlobalPointSystem here is a
+            // follow-up — the forage interaction doesn't depend on it.
+            fragments: 0,
+            isSleeping: gameState.sleepStartedAt != null,
+            foragedCount: pendingFinds.length,
+        }).catch(() => {});
+    }, [
+        selectedCharacter,
+        gameState?.characterId,
+        gameState?.mood,
+        gameState?.hunger,
+        gameState?.energy,
+        gameState?.level,
+        gameState?.sleepStartedAt,
+        pendingFinds.length,
+    ]);
 
     const [currentGame, setCurrentGame] = useState<string | null>(null);
     // Arcade hub gates access to individual games. Tapping the games menu
