@@ -13,25 +13,9 @@ import {
 import InnerScreen from './InnerScreen';
 
 import { MOONOKOS } from '../data/moonokos';
+import { Backgrounds, getCharacterAnim } from '../assets';
 
-
-// Helper function to get image source based on character image name
-const getImageSource = (imageName: string) => {
-    switch (imageName) {
-        case 'LYRA.gif':
-            return require('../../assets/images/anim/LYRA.gif');
-        case 'ORION.gif':
-            return require('../../assets/images/anim/ORION.gif');
-        case 'ARO.gif':
-            return require('../../assets/images/anim/ARO.gif');
-        case 'SIRIUS.gif':
-            return require('../../assets/images/anim/SIRIUS.gif');
-        case 'ZANIAH.gif':
-            return require('../../assets/images/anim/ZANIAH.gif');
-        default:
-            return require('../../assets/images/anim/LYRA.gif'); // fallback
-    }
-};
+const getImageSource = (imageName: string) => getCharacterAnim(imageName);
 
 
 
@@ -251,7 +235,7 @@ const MoonokoSelection: React.FC<Props> = ({
             >
             {/* Main Display Area */}
             <View style={styles.mainDisplayArea}>
-                <Image source={require('../../assets/images/screen bg.png')} style={styles.backgroundImage as any} resizeMode="cover" />
+                <Image source={Backgrounds.screen} style={styles.backgroundImage as any} resizeMode="cover" />
                 {/* Character Selection Scroller */}
                 <View style={styles.slotMachineContainer}>
                     <ScrollView

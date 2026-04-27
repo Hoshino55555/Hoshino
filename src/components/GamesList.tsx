@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ZoomOutOverlay from './ZoomOutOverlay';
+import { Backgrounds } from '../assets';
 
 interface GamesListProps {
     onClose: () => void;
@@ -53,7 +54,7 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
     return (
         <ZoomOutOverlay exiting={isClosing} onExitComplete={onClose} backgroundColor="#1a1033">
             <ImageBackground
-                source={require('../../assets/images/ARCADE-bg.png')}
+                source={Backgrounds.arcade}
                 style={styles.bg}
                 resizeMode="cover"
             >

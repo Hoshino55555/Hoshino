@@ -8,6 +8,7 @@ import {
     Dimensions,
 } from 'react-native';
 import { useChrome } from '../contexts/ChromeContext';
+import { Chrome } from '../assets';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
@@ -19,7 +20,7 @@ export const DeviceCasing: React.FC = () => {
     return (
         <View style={styles.casingLayer} pointerEvents="none">
             <Image
-                source={require('../../assets/images/casing.png')}
+                source={Chrome.casing}
                 style={[styles.mainBackground, overlayMode && styles.darkenedBackground]}
                 resizeMode="cover"
             />
@@ -52,7 +53,7 @@ export const DeviceButtons: React.FC = () => {
                     style={[styles.bottomButton, styles.left, leftButtonDisabled && styles.disabled]}
                     onPress={!leftButtonDisabled ? onLeftButtonPress : undefined}
                 >
-                    <Image source={require('../../assets/images/button.png')} style={styles.buttonImage} />
+                    <Image source={Chrome.button} style={styles.buttonImage} />
                     <Text style={[styles.buttonText, leftButtonText === 'YES' && styles.yesButtonText]}>
                         {leftButtonText}
                     </Text>
@@ -62,7 +63,7 @@ export const DeviceButtons: React.FC = () => {
                     style={[styles.bottomButton, styles.center, centerButtonDisabled && styles.disabled]}
                     onPress={!centerButtonDisabled ? onCenterButtonPress : undefined}
                 >
-                    <Image source={require('../../assets/images/button.png')} style={styles.buttonImage} />
+                    <Image source={Chrome.button} style={styles.buttonImage} />
                     <Text style={styles.buttonText}>{centerButtonText}</Text>
                 </TouchableOpacity>
 
@@ -70,7 +71,7 @@ export const DeviceButtons: React.FC = () => {
                     style={[styles.bottomButton, styles.right, rightButtonDisabled && styles.disabled]}
                     onPress={!rightButtonDisabled ? onRightButtonPress : undefined}
                 >
-                    <Image source={require('../../assets/images/button.png')} style={styles.buttonImage} />
+                    <Image source={Chrome.button} style={styles.buttonImage} />
                     <Text style={[styles.buttonText, rightButtonText === 'NO' && styles.noButtonText]}>
                         {rightButtonText}
                     </Text>

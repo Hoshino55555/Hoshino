@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image, Keyboard, Animated, Easing } from 'react-native';
 import { useChromeConfig } from '../contexts/ChromeContext';
+import { Backgrounds } from '../assets';
 
 // Get screen dimensions for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -152,7 +153,7 @@ const InnerScreen: React.FC<InnerScreenProps> = ({
                     {/* Screen background */}
                     {showBackgroundImage && (
                         <Image
-                            source={backgroundImageSource || require('../../assets/images/screen bg.png')}
+                            source={backgroundImageSource || Backgrounds.screen}
                             style={styles.innerBackground}
                             resizeMode="cover"
                         />

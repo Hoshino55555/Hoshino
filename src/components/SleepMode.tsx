@@ -1,24 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, Image, TouchableOpacity, TextInput, Switch, StyleSheet, Animated, Easing } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { getCharacterStill } from '../assets';
 
-// Helper function to get image source based on character image name
-const getImageSource = (imageName: string) => {
-    switch (imageName) {
-        case 'LYRA.png':
-            return require('../../assets/images/LYRA.png');
-        case 'ORION.png':
-            return require('../../assets/images/ORION.png');
-        case 'ARO.png':
-            return require('../../assets/images/ARO.png');
-        case 'SIRIUS.png':
-            return require('../../assets/images/SIRIUS.png');
-        case 'ZANIAH.png':
-            return require('../../assets/images/ZANIAH.png');
-        default:
-            return require('../../assets/images/LYRA.png'); // fallback
-    }
-};
+const getImageSource = (imageName: string) => getCharacterStill(imageName);
 
 interface Character {
     id: string;

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import ZoomOutOverlay from './ZoomOutOverlay';
 import chatService from '../services/ChatService';
+import { getCharacterAnim } from '../assets';
 
 interface Character {
     id: string;
@@ -47,22 +48,7 @@ interface Props {
     onNotification?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
-const getImageSource = (imageName: string) => {
-    switch (imageName) {
-        case 'LYRA.gif':
-            return require('../../assets/images/anim/LYRA.gif');
-        case 'ORION.gif':
-            return require('../../assets/images/anim/ORION.gif');
-        case 'ARO.gif':
-            return require('../../assets/images/anim/ARO.gif');
-        case 'SIRIUS.gif':
-            return require('../../assets/images/anim/SIRIUS.gif');
-        case 'ZANIAH.gif':
-            return require('../../assets/images/anim/ZANIAH.gif');
-        default:
-            return require('../../assets/images/anim/LYRA.gif');
-    }
-};
+const getImageSource = (imageName: string) => getCharacterAnim(imageName);
 
 const CharacterChat = ({ character, onExit, playerName, onNotification }: Props) => {
     const insets = useSafeAreaInsets();

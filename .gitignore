@@ -46,3 +46,7 @@ test-ledger/
 # Agent/editor state (local to contributor)
 .claude/
 skills-lock.json
+
+# Asset staging — drop new art here, then move into the proper namespace.
+# Not shipped, so skip Metro indexing.
+assets/_incoming/

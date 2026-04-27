@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, TextInput 
 import Frame from './Frame';
 import { useWallet } from '../contexts/WalletContext';
 import InnerScreen from './InnerScreen';
+import { Logos, Misc } from '../assets';
 
 // Get screen dimensions for responsive sizing
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -592,7 +593,7 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                 <>
                     <View style={styles.storyCharacterCentered}>
                         <Image
-                            source={require('../../assets/images/anim/hoshino star.gif')}
+                            source={Logos.starAnim}
                             style={styles.starCharacterImage}
                         />
                     </View>
@@ -644,7 +645,7 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                 <>
                     <View style={styles.eyesSection}>
                         <Image
-                            source={require('../../assets/images/eyes.png')}
+                            source={Misc.eyes}
                             style={styles.eyesImage}
                         />
                     </View>
@@ -684,7 +685,7 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                 <View style={styles.completeSection}>
                     <View style={styles.starCharacterSection}>
                         <Image
-                            source={require('../../assets/images/hoshino star.png')}
+                            source={Logos.star}
                             style={styles.starCharacterImage}
                         />
                     </View>

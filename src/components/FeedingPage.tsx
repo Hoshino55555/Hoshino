@@ -22,14 +22,15 @@ import {
     type IngredientTier,
 } from '../services/RecipeCatalog';
 import type { CookResponse, IngredientCounts } from '../services/GameStateService';
+import { Backgrounds, Ingredients } from '../assets';
 
 // Per-recipe dish art hasn't been authored yet. Until it lands, each recipe
 // picks one of the three existing ingredient sprites via a hash of its id so
 // the same recipe always shows the same placeholder.
 const PLACEHOLDER_DISH_IMAGES = [
-    require('../../assets/images/Mira Berry.png'),
-    require('../../assets/images/Nova Egg.png'),
-    require('../../assets/images/Pink Sugar.png'),
+    Ingredients.miraBerry,
+    Ingredients.novaEgg,
+    Ingredients.pinkSugar,
 ];
 function placeholderDishFor(id: string) {
     let h = 0;
@@ -193,7 +194,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     return (
         <ZoomOutOverlay exiting={isClosing} onExitComplete={onBack} backgroundColor="#1a1033">
             <ImageBackground
-                source={require('../../assets/images/cooking-bg.png')}
+                source={Backgrounds.cooking}
                 style={styles.bg}
                 resizeMode="cover"
             >

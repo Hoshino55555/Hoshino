@@ -3,16 +3,16 @@
 // the runtime can't resolve them dynamically the way RN's Image does. So we
 // keep an explicit table here; adding a new moonoko means one new line.
 //
-// Static PNG mirrors of the in-app GIFs live next to the existing animations.
-// Widgets can't render animated GIFs reliably across launchers, so we pair
-// each animation with a still frame at assets/images/widget/<NAME>.png.
+// Avatars share the same PNG the app uses (assets/images/characters/) so we
+// don't carry duplicate files. Animated GIFs aren't reliable across
+// launchers, so the widget always uses the still frame.
 
 const AVATAR_MAP: Record<string, ReturnType<typeof require>> = {
-    LYRA: require('../../assets/images/widget/LYRA.png'),
-    ORION: require('../../assets/images/widget/ORION.png'),
-    ARO: require('../../assets/images/widget/ARO.png'),
-    SIRIUS: require('../../assets/images/widget/SIRIUS.png'),
-    ZANIAH: require('../../assets/images/widget/ZANIAH.png'),
+    LYRA: require('../../assets/images/characters/LYRA.png'),
+    ORION: require('../../assets/images/characters/ORION.png'),
+    ARO: require('../../assets/images/characters/ARO.png'),
+    SIRIUS: require('../../assets/images/characters/SIRIUS.png'),
+    ZANIAH: require('../../assets/images/characters/ZANIAH.png'),
     EMPTY: require('../../assets/images/widget/EMPTY.png'),
 };
 
@@ -27,19 +27,21 @@ export const WIDGET_BG_COMPACT = require('../../assets/images/widget/widget-bg-c
 export const WIDGET_BG_HERO = require('../../assets/images/widget/widget-bg-hero.png');
 export const WIDGET_BG_WIDE = require('../../assets/images/widget/widget-bg-wide.png');
 
-// Same star sprites the in-app stat readout uses, mirrored into the widget
-// asset folder so the widget can require() them at build time.
-export const STAR_FILLED = require('../../assets/images/widget/star_filled.png');
-export const STAR_EMPTY = require('../../assets/images/widget/star_empty.png');
+// Widget-specific star sprites — smaller than the in-app stat-readout stars
+// and tuned for launcher rendering. Lives under ui/stars/ alongside the
+// in-app variants but kept out of the central manifest so the widget bundle
+// stays self-contained.
+export const STAR_FILLED = require('../../assets/images/ui/stars/star-filled.png');
+export const STAR_EMPTY = require('../../assets/images/ui/stars/star-empty.png');
 
 // Ingredient sprites for the forage pile. Mirrors the three placeholder
 // foragables in `ForagePopOut`. The widget cycles through these by index so
 // the pile looks like a mix of finds without the snapshot having to carry
 // per-item metadata.
 export const FORAGE_SPRITES = [
-    require('../../assets/images/widget/forage_berry.png'),
-    require('../../assets/images/widget/forage_egg.png'),
-    require('../../assets/images/widget/forage_sugar.png'),
+    require('../../assets/images/widget/forage-berry.png'),
+    require('../../assets/images/widget/forage-egg.png'),
+    require('../../assets/images/widget/forage-sugar.png'),
 ];
 
 // Filename prefix is what `react-native-android-widget` resolves at runtime

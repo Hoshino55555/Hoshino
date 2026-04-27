@@ -19,6 +19,7 @@ import {
 } from '@privy-io/expo/connectors';
 import { mobileWalletService, useWallet } from '../contexts/WalletContext';
 import type { ExternalWalletProvider } from '../contexts/WalletContext';
+import { Logos } from '../assets';
 
 const WALLET_APP_URL = 'https://hoshino.gg';
 const WALLET_REDIRECT_PATH = '/wallet-auth';
@@ -303,7 +304,7 @@ const LoginScreen: React.FC = () => {
                                 </View>
 
                                 <Image
-                                    source={require('../../assets/images/logo_clean.png')}
+                                    source={Logos.clean}
                                     style={styles.logo}
                                     resizeMode="contain"
                                 />

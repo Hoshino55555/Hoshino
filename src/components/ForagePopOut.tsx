@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Image, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import type { ForagedItem } from '../services/GameStateService';
+import { Ingredients } from '../assets';
 
 // Placeholder sprite set used until per-ingredient art lands. Each foraged
 // item deterministically picks one of these three via a hash of its id, so
 // a rerender during the animation doesn't swap sprites mid-flight.
 const PLACEHOLDER_IMAGES = [
-    require('../../assets/images/Mira Berry.png'),
-    require('../../assets/images/Nova Egg.png'),
-    require('../../assets/images/Pink Sugar.png'),
+    Ingredients.miraBerry,
+    Ingredients.novaEgg,
+    Ingredients.pinkSugar,
 ];
 
 function placeholderForId(id: string) {

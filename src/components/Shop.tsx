@@ -5,9 +5,10 @@ import { GlobalPointSystem } from '../services/GlobalPointSystem';
 import { useWallet } from '../contexts/WalletContext';
 import { Connection } from '@solana/web3.js';
 import InnerScreen from './InnerScreen';
-const PinkSugar = require('../../assets/images/Pink Sugar.png');
-const NovaEgg = require('../../assets/images/Nova Egg.png');
-const MiraBerry = require('../../assets/images/Mira Berry.png');
+import { Ingredients } from '../assets';
+const PinkSugar = Ingredients.pinkSugar;
+const NovaEgg = Ingredients.novaEgg;
+const MiraBerry = Ingredients.miraBerry;
 
 interface ShopProps {
     connection: Connection;

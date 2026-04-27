@@ -15,29 +15,14 @@ import ForagePopOut from './ForagePopOut';
 import type { ForagedItem } from '../services/GameStateService';
 import { pushMoonokoSnapshot } from '../widgets/widgetService';
 import type { PendingWidgetAction } from '../../App';
+import { Backgrounds, Menu, Stars, getCharacterAnim } from '../assets';
 
 const WIDGET_ACTION_TTL_MS = 60_000;
 
 const { height } = Dimensions.get('window');
 
 
-// Helper function to get image source based on character image name
-const getImageSource = (imageName: string) => {
-    switch (imageName) {
-        case 'LYRA.gif':
-            return require('../../assets/images/anim/LYRA.gif');
-        case 'ORION.gif':
-            return require('../../assets/images/anim/ORION.gif');
-        case 'ARO.gif':
-            return require('../../assets/images/anim/ARO.gif');
-        case 'SIRIUS.gif':
-            return require('../../assets/images/anim/SIRIUS.gif');
-        case 'ZANIAH.gif':
-            return require('../../assets/images/anim/ZANIAH.gif');
-        default:
-            return require('../../assets/images/anim/LYRA.gif'); // fallback
-    }
-};
+const getImageSource = (imageName: string) => getCharacterAnim(imageName);
 
 interface Character {
     id: string;
@@ -371,15 +356,15 @@ const MoonokoInteraction: React.FC<Props> = ({
     };
 
     const imageSources = {
-        background: require('../../assets/images/screen bg.png'),
-        feed: require('../../assets/images/feed.png'),
-        chat: require('../../assets/images/chat.png'),
-        games: require('../../assets/images/games.png'),
-        sleep: require('../../assets/images/sleepzzzz.png'),
-        shop: require('../../assets/images/shop.png'),
-        inventory: require('../../assets/images/backpack.png'),
-        gallery: require('../../assets/images/gallery.png'),
-        settings: require('../../assets/images/settings.png'),
+        background: Backgrounds.screen,
+        feed: Menu.feed,
+        chat: Menu.chat,
+        games: Menu.games,
+        sleep: Menu.sleep,
+        shop: Menu.shop,
+        inventory: Menu.inventory,
+        gallery: Menu.gallery,
+        settings: Menu.settings,
     };
 
     // Render menu button
@@ -424,7 +409,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                             {[...Array(5)].map((_, index) => (
                                 <Image
                                     key={`mood-${index}`}
-                                    source={index < currentStats.mood ? require('../../assets/images/star_life_3.png') : require('../../assets/images/star_life.png')}
+                                    source={index < currentStats.mood ? Stars.lifeFilled : Stars.lifeEmpty}
                                     style={styles.starImage}
                                 />
                             ))}
@@ -436,7 +421,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                             {[...Array(5)].map((_, index) => (
                                 <Image
                                     key={`hunger-${index}`}
-                                    source={index < currentStats.hunger ? require('../../assets/images/star_life_3.png') : require('../../assets/images/star_life.png')}
+                                    source={index < currentStats.hunger ? Stars.lifeFilled : Stars.lifeEmpty}
                                     style={styles.starImage}
                                 />
                             ))}
@@ -448,7 +433,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                             {[...Array(5)].map((_, index) => (
                                 <Image
                                     key={`energy-${index}`}
-                                    source={index < currentStats.energy ? require('../../assets/images/star_life_3.png') : require('../../assets/images/star_life.png')}
+                                    source={index < currentStats.energy ? Stars.lifeFilled : Stars.lifeEmpty}
                                     style={styles.starImage}
                                 />
                             ))}

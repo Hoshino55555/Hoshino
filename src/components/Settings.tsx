@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Switch, StyleSheet, ScrollView, Alert, Image, PanResponder, Animated } from 'react-native';
 import SettingsService, { MenuButton } from '../services/SettingsService';
 import InnerScreen from './InnerScreen';
+import { Menu } from '../assets';
 
 interface Props {
     onBack: () => void;
@@ -28,19 +29,8 @@ const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSet
         });
     }, [menuButtons]);
 
-    const getImageSource = (iconName: string) => {
-        switch (iconName) {
-            case 'feed': return require('../../assets/images/feed.png');
-            case 'chat': return require('../../assets/images/chat.png');
-            case 'games': return require('../../assets/images/games.png');
-            case 'sleep': return require('../../assets/images/sleepzzzz.png');
-            case 'shop': return require('../../assets/images/shop.png');
-            case 'inventory': return require('../../assets/images/backpack.png');
-            case 'gallery': return require('../../assets/images/gallery.png');
-            case 'settings': return require('../../assets/images/settings.png');
-            default: return require('../../assets/images/settings.png');
-        }
-    };
+    const getImageSource = (iconName: string) =>
+        (Menu as Record<string, ReturnType<typeof require>>)[iconName] ?? Menu.settings;
 
     useEffect(() => {
         loadSettings();
