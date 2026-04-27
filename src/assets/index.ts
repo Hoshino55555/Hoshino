@@ -6,6 +6,8 @@
 // Metro statically analyzes require() at build time, so the requires must
 // stay as plain string literals (no template strings, no dynamic paths).
 
+import type { IngredientId } from '../services/RecipeCatalog';
+
 export const Characters = {
     ARO: {
         still: require('../../assets/images/characters/ARO.png'),
@@ -44,11 +46,54 @@ export const getCharacterStill = (id: string | null | undefined) =>
 export const getCharacterAnim = (id: string | null | undefined) =>
     Characters[normalizeId(id)]?.anim ?? Characters.LYRA.anim;
 
+// `Ingredients.*` is the namespaced grab-bag — useful when a screen wants a
+// specific sprite by name. The recipe/cooking system uses `getIngredientArt`
+// below instead, which keys off the IngredientId union and falls back when
+// art hasn't landed yet.
 export const Ingredients = {
     miraBerry: require('../../assets/images/ingredients/mira-berry.png'),
     novaEgg: require('../../assets/images/ingredients/nova-egg.png'),
     pinkSugar: require('../../assets/images/ingredients/pink-sugar.png'),
+    gouda: require('../../assets/images/ingredients/gouda.png'),
+    lettuce: require('../../assets/images/ingredients/lettuce.png'),
+    potato: require('../../assets/images/ingredients/potato.png'),
+    rice: require('../../assets/images/ingredients/rice.png'),
+    tomato: require('../../assets/images/ingredients/tomato.png'),
 } as const;
+
+// Real ingredient art keyed by RecipeCatalog.IngredientId. Filled in as
+// art drops; ids without entries fall back via `getIngredientArt` to a
+// celestial placeholder so the cooking/forage UI never shows a broken slot.
+//
+// Backed by a Map so untrusted runtime ids (server payloads, IngredientCounts
+// keys) can't accidentally hit prototype-chain properties like `toString`.
+// The entry tuple is typed as `[IngredientId, ...]` so a typo'd key is a
+// compile error without forcing IngredientId casts at call sites.
+const INGREDIENT_ART = new Map<string, ReturnType<typeof require>>([
+    ['gouda', Ingredients.gouda],
+    ['lettuce', Ingredients.lettuce],
+    ['potato', Ingredients.potato],
+    ['rice', Ingredients.rice],
+    ['tomato', Ingredients.tomato],
+] satisfies [IngredientId, ReturnType<typeof require>][]);
+
+const INGREDIENT_PLACEHOLDERS = [
+    Ingredients.miraBerry,
+    Ingredients.novaEgg,
+    Ingredients.pinkSugar,
+];
+
+// Stable hash → placeholder index. Same id always maps to the same
+// placeholder so the UI doesn't reshuffle on every render.
+function placeholderForId(id: string) {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+    return INGREDIENT_PLACEHOLDERS[Math.abs(h) % INGREDIENT_PLACEHOLDERS.length];
+}
+
+export function getIngredientArt(id: string) {
+    return INGREDIENT_ART.get(id) ?? placeholderForId(id);
+}
 
 export const Backgrounds = {
     screen: require('../../assets/images/ui/backgrounds/screen-bg.png'),

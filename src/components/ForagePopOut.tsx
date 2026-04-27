@@ -1,22 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Image, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import type { ForagedItem } from '../services/GameStateService';
-import { Ingredients } from '../assets';
-
-// Placeholder sprite set used until per-ingredient art lands. Each foraged
-// item deterministically picks one of these three via a hash of its id, so
-// a rerender during the animation doesn't swap sprites mid-flight.
-const PLACEHOLDER_IMAGES = [
-    Ingredients.miraBerry,
-    Ingredients.novaEgg,
-    Ingredients.pinkSugar,
-];
-
-function placeholderForId(id: string) {
-    let h = 0;
-    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-    return PLACEHOLDER_IMAGES[Math.abs(h) % PLACEHOLDER_IMAGES.length];
-}
+import { getIngredientArt } from '../assets';
 
 // Hash to a deterministic float in [-1, 1] so each item gets stable jitter
 // across rerenders without using random (which would reshuffle on every render).
@@ -162,7 +147,7 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
                 const translateY = yRefs[i]; // pixels, driven by the sequence
                 const opacity = fadeRefs[i];
 
-                const img = placeholderForId(item.id);
+                const img = getIngredientArt(item.id);
                 return (
                     <Animated.View
                         key={item.id}

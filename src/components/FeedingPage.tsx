@@ -22,11 +22,12 @@ import {
     type IngredientTier,
 } from '../services/RecipeCatalog';
 import type { CookResponse, IngredientCounts } from '../services/GameStateService';
-import { Backgrounds, Ingredients } from '../assets';
+import { Backgrounds, Ingredients, getIngredientArt } from '../assets';
 
 // Per-recipe dish art hasn't been authored yet. Until it lands, each recipe
-// picks one of the three existing ingredient sprites via a hash of its id so
-// the same recipe always shows the same placeholder.
+// picks one of the three celestial sprites via a hash of its id so the same
+// recipe always shows the same placeholder. Ingredient slots use real art
+// via `getIngredientArt`, which falls back to the same celestial pool.
 const PLACEHOLDER_DISH_IMAGES = [
     Ingredients.miraBerry,
     Ingredients.novaEgg,
@@ -322,7 +323,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                                                             style={styles.ingredientRow}
                                                         >
                                                             <Image
-                                                                source={placeholderDishFor(ing)}
+                                                                source={getIngredientArt(ing)}
                                                                 style={styles.ingredientIcon}
                                                                 resizeMode="contain"
                                                             />
