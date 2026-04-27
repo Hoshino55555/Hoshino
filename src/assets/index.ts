@@ -70,6 +70,7 @@ export const Ingredients = {
 // The entry tuple is typed as `[IngredientId, ...]` so a typo'd key is a
 // compile error without forcing IngredientId casts at call sites.
 const INGREDIENT_ART = new Map<string, ReturnType<typeof require>>([
+    ['egg', Ingredients.novaEgg],
     ['gouda', Ingredients.gouda],
     ['lettuce', Ingredients.lettuce],
     ['potato', Ingredients.potato],
