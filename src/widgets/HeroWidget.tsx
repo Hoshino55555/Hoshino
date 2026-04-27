@@ -96,7 +96,10 @@ const HeroWidget: React.FC<Props> = ({ snapshot }) => {
                         />
                     </FlexWidget>
                     {snapshot.foragedCount > 0 && (
-                        <ForageBadge count={snapshot.foragedCount} />
+                        <ForageBadge
+                            count={snapshot.foragedCount}
+                            characterId={snapshot.characterId}
+                        />
                     )}
                 </FlexWidget>
             )}

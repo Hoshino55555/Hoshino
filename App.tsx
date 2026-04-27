@@ -41,6 +41,20 @@ import { ENABLE_VRF_DEV_SCREEN } from './src/config/vrf';
 import { FirebaseAuthProvider, useFirebaseAuth } from './src/contexts/FirebaseAuthContext';
 import { GameStateProvider } from './src/contexts/GameStateContext';
 import { GameStateService } from './src/services/GameStateService';
+import { pushEmptySnapshot } from './src/widgets/widgetService';
+
+// Pending one-shot action requested by a widget tap. Includes characterId so
+// MoonokoInteraction can refuse to drain if the active character doesn't
+// match (e.g. user swapped moonokos between widget refresh and tap), plus a
+// setAt timestamp to drop actions older than the freshness window — a stale
+// intent surviving in OS state shouldn't drain forage minutes later.
+export interface PendingWidgetAction {
+    type: 'forage-drain';
+    characterId: string;
+    setAt: number;
+}
+
+const WIDGET_ACTION_TTL_MS = 60_000;
 
 interface Character {
     id: string;
@@ -190,10 +204,12 @@ function App() {
     // Set when a hoshino:// deep link asks the interaction screen to do
     // something on entry (e.g. drain pending forage finds from a widget tap).
     // MoonokoInteraction reads this prop, runs the action once gameState is
-    // ready, and calls back to clear it. One-shot — never persisted.
-    const [pendingWidgetAction, setPendingWidgetAction] = useState<string | null>(
-        null
-    );
+    // ready, and calls back to clear it. One-shot — never persisted. The
+    // characterId in the URI must match the active character before MI will
+    // honor it, so a stale tap on a widget bound to a different moonoko is
+    // a no-op rather than a drain on the wrong pet.
+    const [pendingWidgetAction, setPendingWidgetAction] =
+        useState<PendingWidgetAction | null>(null);
 
     const navigateToView = (view: string) => {
         setPreviousView(currentView);
@@ -635,18 +651,23 @@ function App() {
 
     // Deep-link router for widget taps and external launches.
     // Supported URIs:
-    //   hoshino://forage/drain  -> jump to interaction view, auto-drain pending finds
+    //   hoshino://forage/drain?characterId=ABC -> jump to interaction view,
+    //     auto-drain pending finds for ABC. The characterId must match the
+    //     active character at consume time or the action is dropped.
     useEffect(() => {
         const handleUrl = (url: string | null) => {
             if (!url) return;
             try {
                 const parsed = new URL(url);
-                // expo-linking style: scheme://host/path. RN URL polyfill
-                // exposes hostname + pathname. We treat 'forage' as the host
-                // and 'drain' as the path so the matcher stays simple.
                 if (parsed.hostname === 'forage' && parsed.pathname === '/drain') {
+                    const characterId = parsed.searchParams.get('characterId');
+                    if (!characterId) return;
                     setCurrentView('interaction');
-                    setPendingWidgetAction('forage-drain');
+                    setPendingWidgetAction({
+                        type: 'forage-drain',
+                        characterId,
+                        setAt: Date.now(),
+                    });
                 }
             } catch {
                 // Malformed URI — ignore rather than crash. The widget only
@@ -662,6 +683,50 @@ function App() {
         );
         return () => sub.remove();
     }, []);
+
+    // True once the profile-hydrate flow has settled: either no wallet is
+    // connected (nothing to hydrate) or the connected wallet's profile has
+    // loaded from server/cache. Used to gate effects that branch on
+    // "selectedCharacter is null" — without this gate, those effects fire
+    // during the cold-start window when selectedCharacter is *temporarily*
+    // null and would either drop a valid pending widget action or blank the
+    // widget before the real character lands.
+    const profileSettled =
+        !publicKey || profileHydratedWallet === publicKey.toString();
+
+    // Drop pending widget action if the active character doesn't match the
+    // one the tap was bound to. Gated on profileSettled so a cold-start
+    // widget tap survives the hydrate window — without that gate, the
+    // initial-null selectedCharacter would clear the action immediately.
+    useEffect(() => {
+        if (!pendingWidgetAction) return;
+        if (!profileSettled) return;
+        if (
+            !selectedCharacter ||
+            selectedCharacter.id !== pendingWidgetAction.characterId
+        ) {
+            setPendingWidgetAction(null);
+        }
+    }, [selectedCharacter?.id, pendingWidgetAction, profileSettled]);
+
+    // Clear the home-screen widget when the profile has settled with no
+    // active character (fresh install, profile reset, wallet disconnect, or
+    // a cold start into an already-empty account). We dedupe via a ref so
+    // we push empty exactly once per no-character session — the launcher
+    // coalesces redraws but a per-render call would still spam IPC.
+    // Re-armed when a character becomes active again.
+    const emptyPushedForSessionRef = React.useRef(false);
+    useEffect(() => {
+        if (!profileSettled) return;
+        const currentId = selectedCharacter?.id ?? null;
+        if (currentId) {
+            emptyPushedForSessionRef.current = false;
+            return;
+        }
+        if (emptyPushedForSessionRef.current) return;
+        pushEmptySnapshot().catch(() => {});
+        emptyPushedForSessionRef.current = true;
+    }, [profileSettled, selectedCharacter?.id]);
 
     const moonokoInteractionElement = (
         <MoonokoInteraction

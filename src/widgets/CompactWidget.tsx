@@ -96,7 +96,11 @@ const CompactWidget: React.FC<Props> = ({ snapshot }) => {
                         />
                     </FlexWidget>
                     {snapshot.foragedCount > 0 && (
-                        <ForageBadge count={snapshot.foragedCount} compact />
+                        <ForageBadge
+                            count={snapshot.foragedCount}
+                            compact
+                            characterId={snapshot.characterId}
+                        />
                     )}
                 </FlexWidget>
             )}

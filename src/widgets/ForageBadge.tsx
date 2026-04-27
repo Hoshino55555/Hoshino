@@ -16,6 +16,10 @@ interface Props {
     // Compact shrinks every dimension so the pile fits next to a 2x2 stat
     // column. The non-compact variant is for Hero where there's room.
     compact?: boolean;
+    // Pinned to the character whose snapshot drove this render. Embedded in
+    // the deep-link URI so App can refuse to drain if the active character
+    // has changed since the widget last refreshed (stale tap).
+    characterId: string;
 }
 
 // Triangle-pile arrangement: each successive find adds another sprite to the
@@ -46,8 +50,9 @@ const PILE_FILL_ORDER = [
 ];
 const MAX_PILE = PILE_FILL_ORDER.length;
 
-const ForageBadge: React.FC<Props> = ({ count, compact = false }) => {
+const ForageBadge: React.FC<Props> = ({ count, compact = false, characterId }) => {
     if (count <= 0) return null;
+    const drainUri = `hoshino://forage/drain?characterId=${encodeURIComponent(characterId)}`;
 
     const visible = Math.min(count, MAX_PILE);
     const overflow = count - MAX_PILE;
@@ -63,7 +68,7 @@ const ForageBadge: React.FC<Props> = ({ count, compact = false }) => {
     return (
         <FlexWidget
             clickAction="OPEN_URI"
-            clickActionData={{ uri: 'hoshino://forage/drain' }}
+            clickActionData={{ uri: drainUri }}
             style={{
                 flexDirection: 'column',
                 alignItems: 'center',

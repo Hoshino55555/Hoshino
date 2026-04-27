@@ -109,7 +109,11 @@ const WideWidget: React.FC<Props> = ({ snapshot }) => {
 
                 {!empty && snapshot.foragedCount > 0 && (
                     <FlexWidget style={{ marginLeft: 6 }}>
-                        <ForageBadge count={snapshot.foragedCount} compact />
+                        <ForageBadge
+                            count={snapshot.foragedCount}
+                            compact
+                            characterId={snapshot.characterId}
+                        />
                     </FlexWidget>
                 )}
             </FlexWidget>

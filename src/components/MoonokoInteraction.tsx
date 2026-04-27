@@ -13,7 +13,10 @@ import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import ForagePopOut from './ForagePopOut';
 import type { ForagedItem } from '../services/GameStateService';
-import { pushMoonokoSnapshot, pushEmptySnapshot } from '../widgets/widgetService';
+import { pushMoonokoSnapshot } from '../widgets/widgetService';
+import type { PendingWidgetAction } from '../../App';
+
+const WIDGET_ACTION_TTL_MS = 60_000;
 
 const { height } = Dimensions.get('window');
 
@@ -66,10 +69,11 @@ interface Props {
     shouldFadeIn?: boolean;
     onFadeInComplete?: () => void;
     // Set by App when a hoshino:// deep link wants this screen to do
-    // something on entry (currently 'forage-drain' from a widget tap).
-    // We consume it once gameState is ready, then notify the parent so the
-    // action doesn't fire again on a re-mount.
-    pendingWidgetAction?: string | null;
+    // something on entry (currently forage-drain from a widget tap). We
+    // consume it once gameState is ready, then notify the parent so the
+    // action doesn't fire again on a re-mount. Validation against the
+    // current character + TTL happens here, not in App.
+    pendingWidgetAction?: PendingWidgetAction | null;
     onWidgetActionConsumed?: () => void;
 }
 
@@ -117,13 +121,25 @@ const MoonokoInteraction: React.FC<Props> = ({
             });
     };
 
-    // Widget deep-link → auto-drain. We wait until gameState has resolved
-    // (so foragedItems is real, not the empty default) before invoking the
-    // same press handler the in-screen tap uses. If there are no pending
-    // finds we still consume the action so the badge doesn't re-fire.
+    // Widget deep-link → auto-drain. Wait until gameState has resolved so
+    // foragedItems is real, then validate the action targets the active
+    // character and is fresh before invoking the same press handler the
+    // in-screen tap uses. Stale or mismatched actions are silently dropped.
     useEffect(() => {
-        if (pendingWidgetAction !== 'forage-drain') return;
+        if (!pendingWidgetAction || pendingWidgetAction.type !== 'forage-drain') return;
         if (!gameState) return;
+        if (pendingWidgetAction.characterId !== gameState.characterId) {
+            // Different character active than the one the widget tap was
+            // bound to — drop the action without draining anyone's finds.
+            onWidgetActionConsumed?.();
+            return;
+        }
+        if (Date.now() - pendingWidgetAction.setAt > WIDGET_ACTION_TTL_MS) {
+            // Stale intent — likely a deep link that survived in OS state
+            // longer than expected. Don't drain on a minutes-old tap.
+            onWidgetActionConsumed?.();
+            return;
+        }
         if (hasPendingFinds && !drainInFlightRef.current && !popOutItems) {
             handleCharacterPress();
         }
@@ -134,12 +150,11 @@ const MoonokoInteraction: React.FC<Props> = ({
     // drives its rendering changes. The widget runs in the launcher process
     // and can't see React state — this is the only way it learns that
     // mood/hunger/energy/foraging have moved. Cheap to over-call: the
-    // launcher coalesces redraws.
+    // launcher coalesces redraws. Empty-state pushes happen at the App
+    // lifecycle level on profile reset, not here — pushing empty during
+    // the cold-start gameState load window would briefly blank the widget.
     useEffect(() => {
-        if (!selectedCharacter || !gameState) {
-            pushEmptySnapshot().catch(() => {});
-            return;
-        }
+        if (!selectedCharacter || !gameState) return;
         const avatarKey = selectedCharacter.image.replace(/\.gif$/i, '');
         // gameState stats are on a 0..5 scale — same as the in-app 5-star
         // readout. Widget contract is 0..100, so multiply by 20.
