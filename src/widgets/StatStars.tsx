@@ -3,13 +3,15 @@
 // invokes widget components as raw functions when building the remote views
 // tree. Disabling the compiler for this file keeps that contract intact.
 import React from 'react';
-import { FlexWidget, ImageWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, ImageWidget, TextWidget, type ColorProp } from 'react-native-android-widget';
 import { FONT_PIXEL, STAR_FILLED, STAR_EMPTY } from './assets';
 
 interface Props {
     label: string;
     value: number;
-    color: string;
+    // ColorProp is a template literal union (`#${string}` | rgba) — using
+    // `string` here would propagate to the widget's typed slots and fail.
+    color: ColorProp;
     starSize?: number;
     labelSize?: number;
     showLabel?: boolean;

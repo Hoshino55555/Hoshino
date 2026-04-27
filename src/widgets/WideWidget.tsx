@@ -11,7 +11,7 @@ import {
 } from 'react-native-android-widget';
 import StatStars from './StatStars';
 import ForageBadge from './ForageBadge';
-import { WidgetSnapshot } from './types';
+import { WidgetSnapshot, isFilledSnapshot } from './types';
 import {
     resolveAvatar,
     WIDGET_BG_WIDE,
@@ -26,7 +26,10 @@ interface Props {
 // Wide 4x2 — landscape canvas. Avatar fills the left half centered, stat
 // stars stack on the right, forage badge tucked far right.
 const WideWidget: React.FC<Props> = ({ snapshot }) => {
-    const empty = snapshot.characterId === null;
+    // Type predicate gives us a narrowed `filled: WidgetMoonokoSnapshot | null`
+    // — see types.ts for why we route through a predicate instead of a plain
+    // discriminator check.
+    const filled = isFilledSnapshot(snapshot) ? snapshot : null;
 
     return (
         <OverlapWidget
@@ -53,9 +56,9 @@ const WideWidget: React.FC<Props> = ({ snapshot }) => {
                     alignItems: 'center',
                 }}
             >
-                {!empty && (
+                {filled && (
                     <ImageWidget
-                        image={resolveAvatar(snapshot.avatarKey)}
+                        image={resolveAvatar(filled.avatarKey)}
                         imageHeight={170}
                         imageWidth={170}
                     />
@@ -69,7 +72,7 @@ const WideWidget: React.FC<Props> = ({ snapshot }) => {
                         justifyContent: 'center',
                     }}
                 >
-                    {empty && (
+                    {!filled && (
                         <TextWidget
                             text="TAP TO BEGIN"
                             style={{
@@ -80,25 +83,25 @@ const WideWidget: React.FC<Props> = ({ snapshot }) => {
                         />
                     )}
 
-                    {!empty && (
+                    {filled && (
                         <FlexWidget style={{ flexDirection: 'column' }}>
                             <StatStars
                                 label="MOOD"
-                                value={snapshot.mood}
+                                value={filled.mood}
                                 color={STAT_COLORS.mood}
                                 starSize={16}
                                 labelSize={10}
                             />
                             <StatStars
                                 label="HNGR"
-                                value={snapshot.hunger}
+                                value={filled.hunger}
                                 color={STAT_COLORS.hunger}
                                 starSize={16}
                                 labelSize={10}
                             />
                             <StatStars
                                 label="ENGY"
-                                value={snapshot.energy}
+                                value={filled.energy}
                                 color={STAT_COLORS.energy}
                                 starSize={16}
                                 labelSize={10}
@@ -107,12 +110,12 @@ const WideWidget: React.FC<Props> = ({ snapshot }) => {
                     )}
                 </FlexWidget>
 
-                {!empty && snapshot.foragedCount > 0 && (
+                {filled && filled.foragedCount > 0 && (
                     <FlexWidget style={{ marginLeft: 6 }}>
                         <ForageBadge
-                            count={snapshot.foragedCount}
+                            count={filled.foragedCount}
                             compact
-                            characterId={snapshot.characterId}
+                            characterId={filled.characterId}
                         />
                     </FlexWidget>
                 )}

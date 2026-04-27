@@ -42,3 +42,17 @@ export interface WidgetEmptySnapshot {
 }
 
 export type WidgetSnapshot = WidgetMoonokoSnapshot | WidgetEmptySnapshot;
+
+// Discriminator predicate. `tsconfig.strict` is currently off, which keeps
+// TypeScript from narrowing the union via a plain `s.characterId !== null`
+// ternary. Routing through an explicit `s is WidgetMoonokoSnapshot` predicate
+// forces the narrowing so widget code can write `if (isFilledSnapshot(s))`
+// and access stat properties without `!` or casts.
+//
+// Body uses `typeof === 'string'` rather than `!== null`: snapshots are
+// re-hydrated from SharedPreferences JSON on the launcher side, so a
+// malformed or schema-drifted entry could carry `undefined` or another
+// falsy non-null value. `typeof` keeps the predicate strict in that case.
+export function isFilledSnapshot(s: WidgetSnapshot): s is WidgetMoonokoSnapshot {
+    return typeof s.characterId === 'string';
+}

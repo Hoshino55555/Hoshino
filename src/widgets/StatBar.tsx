@@ -3,13 +3,15 @@
 // invokes widget components as raw functions when building the remote views
 // tree. Disabling the compiler for this file keeps that contract intact.
 import React from 'react';
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget, type ColorProp } from 'react-native-android-widget';
 import { FONT_PIXEL } from './assets';
 
 interface StatBarProps {
     label: string;
     value: number;
-    color: string;
+    // ColorProp is a template literal union (`#${string}` | rgba) — using
+    // `string` here would propagate to the widget's typed slots and fail.
+    color: ColorProp;
     width: number;
     // Compact tiles can't fit the full label; they get a single colored letter
     // instead so the stat is still identifiable at a glance.

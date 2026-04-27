@@ -11,7 +11,7 @@ import {
 } from 'react-native-android-widget';
 import StatStars from './StatStars';
 import ForageBadge from './ForageBadge';
-import { WidgetSnapshot } from './types';
+import { WidgetSnapshot, isFilledSnapshot } from './types';
 import {
     resolveAvatar,
     WIDGET_BG_COMPACT,
@@ -26,7 +26,10 @@ interface Props {
 // Compact 2x2 — avatar floats centered on the starfield, stat stars and
 // forage badge overlay along the bottom edge.
 const CompactWidget: React.FC<Props> = ({ snapshot }) => {
-    const empty = snapshot.characterId === null;
+    // Type predicate gives us a narrowed `filled: WidgetMoonokoSnapshot | null`
+    // — see types.ts for why we route through a predicate instead of a plain
+    // discriminator check.
+    const filled = isFilledSnapshot(snapshot) ? snapshot : null;
 
     return (
         <OverlapWidget
@@ -44,7 +47,7 @@ const CompactWidget: React.FC<Props> = ({ snapshot }) => {
                 style={{ width: 'match_parent', height: 'match_parent' }}
             />
 
-            {!empty && (
+            {filled && (
                 <FlexWidget
                     style={{
                         width: 'match_parent',
@@ -54,14 +57,14 @@ const CompactWidget: React.FC<Props> = ({ snapshot }) => {
                     }}
                 >
                     <ImageWidget
-                        image={resolveAvatar(snapshot.avatarKey)}
+                        image={resolveAvatar(filled.avatarKey)}
                         imageHeight={170}
                         imageWidth={170}
                     />
                 </FlexWidget>
             )}
 
-            {!empty && (
+            {filled && (
                 <FlexWidget
                     style={{
                         width: 'match_parent',
@@ -75,37 +78,37 @@ const CompactWidget: React.FC<Props> = ({ snapshot }) => {
                     <FlexWidget style={{ flexDirection: 'column' }}>
                         <StatStars
                             label="M"
-                            value={snapshot.mood}
+                            value={filled.mood}
                             color={STAT_COLORS.mood}
                             starSize={14}
                             labelSize={9}
                         />
                         <StatStars
                             label="H"
-                            value={snapshot.hunger}
+                            value={filled.hunger}
                             color={STAT_COLORS.hunger}
                             starSize={14}
                             labelSize={9}
                         />
                         <StatStars
                             label="E"
-                            value={snapshot.energy}
+                            value={filled.energy}
                             color={STAT_COLORS.energy}
                             starSize={14}
                             labelSize={9}
                         />
                     </FlexWidget>
-                    {snapshot.foragedCount > 0 && (
+                    {filled.foragedCount > 0 && (
                         <ForageBadge
-                            count={snapshot.foragedCount}
+                            count={filled.foragedCount}
                             compact
-                            characterId={snapshot.characterId}
+                            characterId={filled.characterId}
                         />
                     )}
                 </FlexWidget>
             )}
 
-            {empty && (
+            {!filled && (
                 <FlexWidget
                     style={{
                         width: 'match_parent',
