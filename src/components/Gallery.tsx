@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import InnerScreen from './InnerScreen';
+import Room from './Room';
 
 interface Props {
     onBack: () => void;
     onCloseStart?: () => void;
 }
 
+// "Gallery" is the legacy file/route name; the page itself is the Room — a
+// decoratable space the user fills with cosmetics. Keeping the filename for
+// now so all the menu/navigation wiring stays put; rename in a polish pass
+// once the room feature is locked in.
 const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
     const [isClosing, setIsClosing] = useState(false);
 
@@ -29,11 +34,7 @@ const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
             onLeftButtonPress={handleClose}
         >
             <View style={styles.content}>
-                <Text style={styles.title}>Gallery</Text>
-                <Text style={styles.subtitle}>Coming Soon</Text>
-                <Text style={styles.placeholder}>
-                    Character achievements, milestones, and memories will appear here.
-                </Text>
+                <Room />
             </View>
         </InnerScreen>
     );
@@ -42,30 +43,7 @@ const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
 const styles = StyleSheet.create({
     content: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    title: {
-        fontSize: 20,
-        color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
-        marginBottom: 16,
-    },
-    subtitle: {
-        fontSize: 12,
-        color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
-        opacity: 0.75,
-        marginBottom: 24,
-    },
-    placeholder: {
-        fontSize: 10,
-        color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
-        textAlign: 'center',
-        lineHeight: 16,
-        opacity: 0.7,
+        width: '100%',
     },
 });
 

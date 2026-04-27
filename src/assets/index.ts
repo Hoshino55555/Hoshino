@@ -134,6 +134,32 @@ export const Logos = {
     starAnim: require('../../assets/images/logos/hoshino-star.gif'),
 } as const;
 
+// Room cosmetics for the decoratable Room page. Sub-grouped by where they
+// can land: `frame` is the outer container (always rendered), `walls` is the
+// wall-band background, `decals` are wall-mounted, `floor` items sit on the
+// brick band, and `minis` are character figurines that live on the floor.
+// New cosmetic drops slot into one of these sub-groups so the layout schema
+// can stay narrow without touching the editor.
+export const Rooms = {
+    frame: {
+        default: require('../../assets/images/rooms/room-bg.png'),
+    },
+    walls: {
+        blue: require('../../assets/images/rooms/backwall.png'),
+    },
+    decals: {
+        cobweb: require('../../assets/images/rooms/cobweb.png'),
+        porthole: require('../../assets/images/rooms/porthole-window.png'),
+        bloodsplatter: require('../../assets/images/rooms/bloodsplatter.png'),
+    },
+    floor: {
+        placemat: require('../../assets/images/rooms/placemat.png'),
+    },
+    minis: {
+        aro: require('../../assets/images/rooms/aro-mini.png'),
+    },
+} as const;
+
 // One-offs that don't fit the namespaces above. Add new entries to a proper
 // namespace if a category emerges; this bucket is a smell, not a target.
 export const Misc = {
