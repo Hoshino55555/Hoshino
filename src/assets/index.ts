@@ -8,26 +8,31 @@
 
 import type { IngredientId } from '../services/RecipeCatalog';
 
+// Anim GIFs use a `-anim` suffix to avoid colliding with the still PNG when
+// Android Gradle Plugin folds the asset path into a resource name (it strips
+// extensions and lowercases — without the suffix, `LYRA.png` and `LYRA.gif`
+// both fold to `assets_images_characters_lyra` and the build fails at
+// :app:mergeReleaseResources with "Duplicate resources".
 export const Characters = {
     ARO: {
         still: require('../../assets/images/characters/ARO.png'),
-        anim: require('../../assets/images/characters/ARO.gif'),
+        anim: require('../../assets/images/characters/ARO-anim.gif'),
     },
     LYRA: {
         still: require('../../assets/images/characters/LYRA.png'),
-        anim: require('../../assets/images/characters/LYRA.gif'),
+        anim: require('../../assets/images/characters/LYRA-anim.gif'),
     },
     ORION: {
         still: require('../../assets/images/characters/ORION.png'),
-        anim: require('../../assets/images/characters/ORION.gif'),
+        anim: require('../../assets/images/characters/ORION-anim.gif'),
     },
     SIRIUS: {
         still: require('../../assets/images/characters/SIRIUS.png'),
-        anim: require('../../assets/images/characters/SIRIUS.gif'),
+        anim: require('../../assets/images/characters/SIRIUS-anim.gif'),
     },
     ZANIAH: {
         still: require('../../assets/images/characters/ZANIAH.png'),
-        anim: require('../../assets/images/characters/ZANIAH.gif'),
+        anim: require('../../assets/images/characters/ZANIAH-anim.gif'),
     },
 } as const;
 
@@ -131,7 +136,7 @@ export const Logos = {
     clean: require('../../assets/images/logos/logo-clean.png'),
     final: require('../../assets/images/logos/logo-final.png'),
     star: require('../../assets/images/logos/hoshino-star.png'),
-    starAnim: require('../../assets/images/logos/hoshino-star.gif'),
+    starAnim: require('../../assets/images/logos/hoshino-star-anim.gif'),
 } as const;
 
 // Room cosmetics for the decoratable Room page. Sub-grouped by where they
