@@ -857,6 +857,19 @@ function App() {
     const miRoutes = ['interaction', 'feeding', 'shop', 'gallery', 'inventory', 'settings', 'chat', 'profile'];
     const miMounted = miRoutes.includes(currentView);
 
+    // Hold a splash-colored shim until the wallet has resolved AND its
+    // profile has hydrated. Without this, returning users paint a frame
+    // of WelcomeScreen — currentView's useState default is 'welcome',
+    // and applyProfile only flips it to 'interaction' after the server
+    // round-trip. Don't reuse `profileSettled` (line 695): it treats a
+    // null publicKey as settled, which is wrong inside App() where we
+    // always have a Privy user and just haven't auto-provisioned yet.
+    const hydrationComplete =
+        !!publicKey && profileHydratedWallet === publicKey.toString();
+    if (!hydrationComplete) {
+        return <View style={styles.splashFill} />;
+    }
+
     return (
         <GameStateProvider characterId={selectedCharacter?.id ?? null}>
         <SafeAreaView style={styles.container}>

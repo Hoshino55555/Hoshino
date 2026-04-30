@@ -446,6 +446,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                 style={styles.menuIcon}
                 onPress={() => handleMenuButtonAction(button.action)}
                 activeOpacity={0.7}
+                testID={`menu-${button.action}`}
             >
                 <Image source={getImageSource(button.icon)} style={styles.menuImage} />
             </TouchableOpacity>

@@ -139,6 +139,7 @@ const SleepScreen: React.FC<Props> = ({
                         hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                         activeOpacity={0.85}
                         style={styles.wakeTouchable}
+                        testID="sleep-wake-button"
                     >
                         <Image
                             source={Sleep.wakeupButton}

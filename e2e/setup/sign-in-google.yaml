@@ -1,0 +1,28 @@
+appId: com.socks.hoshino
+name: sign-in-google
+# Reusable setup sub-flow. Tap Google → pick the device account → wait
+# for the Privy→Firebase exchange to land us on the main screen.
+#
+# Lives outside e2e/flows/ so config.yaml's flows/*.yaml glob doesn't
+# treat it as a standalone scenario. Other flows pull it in via:
+#   - runFlow: ../setup/sign-in-google.yaml
+#
+# Assumes the Seeker has exactly one Google account signed in
+# (socksironed@gmail.com per memory). If the device has multiple
+# accounts, the chooser will require an extra tap that this flow
+# doesn't handle yet — extend with a conditional account-pick step
+# when we hit that.
+---
+- extendedWaitUntil:
+    visible:
+      id: "login-screen"
+    timeout: 30000
+- tapOn: "Google"
+- extendedWaitUntil:
+    visible: "socksironed@gmail.com"
+    timeout: 20000
+- tapOn: "socksironed@gmail.com"
+- extendedWaitUntil:
+    notVisible:
+      id: "login-screen"
+    timeout: 60000
