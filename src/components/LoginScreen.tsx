@@ -278,6 +278,7 @@ const LoginScreen: React.FC = () => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.fullScreen}
+            testID="login-screen"
         >
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}

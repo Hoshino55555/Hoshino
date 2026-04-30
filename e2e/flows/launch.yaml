@@ -1,0 +1,15 @@
+appId: com.socks.hoshino
+name: launch
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "login-screen"
+    timeout: 30000
+- assertVisible: "Sign In"
+- assertVisible: "Email"
+- assertVisible: "Google"
