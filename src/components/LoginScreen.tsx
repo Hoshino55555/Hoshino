@@ -103,23 +103,6 @@ const LoginScreen: React.FC = () => {
             ? backpackConnector.isConnected
             : false;
 
-    const statusLabel = useMemo(() => {
-        if (pendingWalletProvider && !isPendingWalletConnected) return 'OPENING WALLET';
-        if (pendingWalletProvider) return 'SIGN MESSAGE';
-        if (isSubmittingCode) return 'VERIFYING';
-        if (isAwaitingCode) return 'CODE SENT';
-        if (isSendingCode) return 'SENDING';
-        if (isOauthPending) return 'GOOGLE';
-        return 'READY';
-    }, [
-        isAwaitingCode,
-        isOauthPending,
-        isPendingWalletConnected,
-        isSendingCode,
-        isSubmittingCode,
-        pendingWalletProvider,
-    ]);
-
     const helperText = useMemo(() => {
         if (pendingWalletProvider) {
             return 'Approve in wallet.';
@@ -294,16 +277,6 @@ const LoginScreen: React.FC = () => {
                     <View style={styles.panel}>
                         <View style={styles.panelInner}>
                             <View style={styles.heroBlock}>
-                                <View style={styles.heroTopRow}>
-                                    <View style={styles.badge}>
-                                        <Text style={styles.badgeText}>HOSHINO</Text>
-                                    </View>
-                                    <View style={styles.statusBadge}>
-                                        <View style={styles.statusDot} />
-                                        <Text style={styles.statusBadgeText}>{statusLabel}</Text>
-                                    </View>
-                                </View>
-
                                 <Image
                                     source={Logos.clean}
                                     style={styles.logo}
@@ -562,50 +535,6 @@ const styles = StyleSheet.create({
         gap: 16,
         paddingBottom: 24,
         alignItems: 'center',
-    },
-    heroTopRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 10,
-        width: '100%',
-    },
-    badge: {
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: 'rgba(201, 236, 248, 0.55)',
-        backgroundColor: 'rgba(10, 24, 36, 0.55)',
-    },
-    badgeText: {
-        fontFamily: 'PressStart2P',
-        fontSize: 8,
-        color: '#e2f8ff',
-        letterSpacing: 1,
-    },
-    statusBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 7,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 999,
-        backgroundColor: 'rgba(255, 246, 209, 0.14)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 228, 155, 0.30)',
-    },
-    statusDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#8be2ff',
-    },
-    statusBadgeText: {
-        fontFamily: 'PressStart2P',
-        fontSize: 7,
-        color: '#fff0bf',
-        letterSpacing: 0.8,
     },
     logo: {
         width: 200,

@@ -549,6 +549,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                 {popOutItems && (
                     <ForagePopOut
                         items={popOutItems}
+                        bottomInset={menuBarLayout.height}
                         onComplete={() => setPopOutItems(null)}
                     />
                 )}

@@ -198,6 +198,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                 source={Backgrounds.cooking}
                 style={styles.bg}
                 resizeMode="cover"
+                testID="feeding-screen"
             >
                 <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
                     <TouchableOpacity

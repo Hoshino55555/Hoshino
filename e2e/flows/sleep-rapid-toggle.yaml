@@ -1,0 +1,42 @@
+appId: com.socks.hoshino
+name: sleep-rapid-toggle
+tags:
+  - sleep
+  - regression
+# Regression for the bug fixed in v0.1.11-preview: opening sleep then
+# immediately closing it left the SleepScreen's invisible absoluteFill
+# overlay rendered for the duration of the endSleep server round-trip,
+# blocking every touch on the home screen for several seconds. The fix
+# (pendingEndSleep flag in MoonokoInteraction) drops the overlay the
+# instant the exit animation completes.
+#
+# Test idea: open sleep, wake, then immediately tap a different menu
+# button. If the overlay were still blocking, the menu tap wouldn't
+# register and feeding-screen wouldn't appear.
+---
+- launchApp:
+    clearState: true
+    stopApp: true
+- runFlow: ../setup/sign-in-google.yaml
+- extendedWaitUntil:
+    visible:
+      id: "menu-sleep"
+    timeout: 30000
+- tapOn:
+    id: "menu-sleep"
+- extendedWaitUntil:
+    visible:
+      id: "sleep-screen"
+    timeout: 10000
+- tapOn:
+    id: "sleep-wake-button"
+- extendedWaitUntil:
+    visible:
+      id: "menu-feed"
+    timeout: 10000
+- tapOn:
+    id: "menu-feed"
+- extendedWaitUntil:
+    visible:
+      id: "feeding-screen"
+    timeout: 5000

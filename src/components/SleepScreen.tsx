@@ -99,6 +99,7 @@ const SleepScreen: React.FC<Props> = ({
                 source={Backgrounds.sleep}
                 style={styles.bg}
                 resizeMode="cover"
+                testID="sleep-screen"
             >
                 <View style={[styles.header, { paddingTop: insets.top + 64 }]}>
                     <Text style={styles.clock}>{clockText}</Text>

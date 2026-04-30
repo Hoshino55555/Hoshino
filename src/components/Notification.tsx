@@ -1,5 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    Animated,
+    Easing,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 
 interface NotificationProps {
@@ -8,85 +16,122 @@ interface NotificationProps {
     onClose: () => void;
     autoClose?: boolean;
     deploymentStatus?: string;
+    /** Stacking index — each notification offsets vertically by this * (height + gap). */
+    index?: number;
 }
+
+// Vertical buffer below the safe-area top to clear the in-game header (username
+// + crescent moon currently sit there). Tuned by eye against /tmp/hoshino_main
+// screenshots — anything less and the toast clipped the username row.
+const TOP_OFFSET = 80;
+const STACK_GAP = 8;
+const APPROX_ROW_HEIGHT = 56;
+const SLIDE_DISTANCE = 140;
+
+type ToneStyle = {
+    accent: string;
+    accentSoft: string;
+    glyph: string;
+};
+
+const TONES: Record<NotificationProps['type'], ToneStyle> = {
+    success: { accent: '#7ce0a4', accentSoft: 'rgba(124, 224, 164, 0.22)', glyph: '+' },
+    info:    { accent: '#8be2ff', accentSoft: 'rgba(139, 226, 255, 0.20)', glyph: 'i' },
+    warning: { accent: '#ffd27c', accentSoft: 'rgba(255, 210, 124, 0.22)', glyph: '!' },
+    error:   { accent: '#ff8a8a', accentSoft: 'rgba(255, 138, 138, 0.22)', glyph: 'x' },
+};
 
 const Notification: React.FC<NotificationProps> = ({
     message,
     type,
     onClose,
     autoClose = true,
-    deploymentStatus
+    deploymentStatus,
+    index = 0,
 }) => {
-    const [isVisible, setIsVisible] = useState(true);
+    const insets = useSafeAreaInsets();
+    const translateY = useRef(new Animated.Value(-SLIDE_DISTANCE)).current;
+    const opacity = useRef(new Animated.Value(0)).current;
+    const closingRef = useRef(false);
+
+    const tone = TONES[type] ?? TONES.info;
+
+    const slideOut = useCallback(() => {
+        if (closingRef.current) return;
+        closingRef.current = true;
+        Animated.parallel([
+            Animated.timing(translateY, {
+                toValue: -SLIDE_DISTANCE,
+                duration: 220,
+                easing: Easing.in(Easing.cubic),
+                useNativeDriver: true,
+            }),
+            Animated.timing(opacity, {
+                toValue: 0,
+                duration: 200,
+                easing: Easing.in(Easing.cubic),
+                useNativeDriver: true,
+            }),
+        ]).start(() => onClose());
+    }, [onClose, opacity, translateY]);
 
     useEffect(() => {
-        if (autoClose) {
-            const timer = setTimeout(() => {
-                setIsVisible(false);
-                onClose();
-            }, 2500);
+        Animated.parallel([
+            Animated.timing(translateY, {
+                toValue: 0,
+                duration: 280,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+            }),
+            Animated.timing(opacity, {
+                toValue: 1,
+                duration: 260,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [opacity, translateY]);
 
-            return () => clearTimeout(timer);
-        }
-    }, [autoClose, onClose]);
+    useEffect(() => {
+        if (!autoClose) return;
+        const timer = setTimeout(slideOut, 2500);
+        return () => clearTimeout(timer);
+    }, [autoClose, slideOut]);
 
-    const getTypeStyles = () => {
-        switch (type) {
-            case 'success':
-                return { backgroundColor: '#22c55e', borderColor: '#16a34a' };
-            case 'warning':
-                return { backgroundColor: '#eab308', borderColor: '#ca8a04' };
-            case 'info':
-                return { backgroundColor: '#3b82f6', borderColor: '#2563eb' };
-            case 'error':
-                return { backgroundColor: '#ef4444', borderColor: '#dc2626' };
-            default:
-                return { backgroundColor: '#6b7280', borderColor: '#4b5563' };
-        }
-    };
-
-    const getIcon = () => {
-        switch (type) {
-            case 'success':
-                return '✅';
-            case 'warning':
-                return '⚠️';
-            case 'info':
-                return 'ℹ️';
-            case 'error':
-                return '❌';
-            default:
-                return '📢';
-        }
-    };
-
-    if (!isVisible) return null;
+    const top = insets.top + TOP_OFFSET + index * (APPROX_ROW_HEIGHT + STACK_GAP);
 
     return (
-        <View style={[styles.notificationContainer, getTypeStyles()]}>
-            <View style={styles.rowJustifyBetween}>
-                <View style={styles.rowItemsStart}>
-                    <Text style={styles.icon}>{getIcon()}</Text>
-                    <View style={styles.flex1}>
-                        <Text style={styles.message}>{message}</Text>
-                        {deploymentStatus && (
-                            <View style={styles.statusContainer}>
-                                <Text style={styles.statusText}>{deploymentStatus}</Text>
-                            </View>
-                        )}
-                    </View>
+        <Animated.View
+            style={[
+                styles.container,
+                { top, transform: [{ translateY }], opacity, borderColor: tone.accent },
+            ]}
+            pointerEvents="box-none"
+        >
+            <View style={[styles.accentStripe, { backgroundColor: tone.accent }]} />
+            <View style={styles.body}>
+                <View style={[styles.glyphBadge, { backgroundColor: tone.accentSoft, borderColor: tone.accent }]}>
+                    <Text style={[styles.glyphText, { color: tone.accent }]}>{tone.glyph}</Text>
+                </View>
+                <View style={styles.messageWrap}>
+                    <Text style={styles.message} numberOfLines={3}>
+                        {message}
+                    </Text>
+                    {deploymentStatus ? (
+                        <Text style={styles.statusText} numberOfLines={2}>
+                            {deploymentStatus}
+                        </Text>
+                    ) : null}
                 </View>
                 <TouchableOpacity
-                    onPress={() => {
-                        setIsVisible(false);
-                        onClose();
-                    }}
+                    onPress={slideOut}
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                     style={styles.closeButton}
                 >
-                    <Text style={styles.closeText}>✕</Text>
+                    <Text style={styles.closeText}>×</Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </Animated.View>
     );
 };
 
@@ -103,21 +148,21 @@ export const DeploymentStatusBanner: React.FC<{
                 type: 'success' as const,
                 icon: '🚀',
                 title: 'Enhanced Mode Active',
-                description: 'Custom Solana programs deployed - All features optimized!'
+                description: 'Custom Solana programs deployed - All features optimized!',
             };
         } else if (status.includes('enhanced fallback')) {
             return {
                 type: 'info' as const,
                 icon: '⏳',
                 title: 'Enhanced Fallback Mode',
-                description: 'All features working perfectly with programmable NFTs'
+                description: 'All features working perfectly with programmable NFTs',
             };
         } else {
             return {
                 type: 'warning' as const,
                 icon: '❓',
                 title: 'Status Unknown',
-                description: 'Game should work normally'
+                description: 'Game should work normally',
             };
         }
     };
@@ -153,62 +198,74 @@ export const DeploymentStatusBanner: React.FC<{
 };
 
 const styles = StyleSheet.create({
-    notificationContainer: {
+    container: {
         position: 'absolute',
-        top: 16,
-        right: 16,
+        left: 12,
+        right: 12,
         zIndex: 9999,
-        padding: 14,
-        borderRadius: 8,
+        backgroundColor: '#101a2c',
         borderWidth: 2,
+        borderRadius: 6,
+        overflow: 'hidden',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.2,
-        shadowRadius: 25,
-        elevation: 5,
-        maxWidth: 320,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 6,
     },
-    rowJustifyBetween: {
+    accentStripe: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 4,
+    },
+    body: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingLeft: 14,
+        paddingRight: 8,
     },
-    rowItemsStart: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
+    glyphBadge: {
+        width: 28,
+        height: 28,
+        borderRadius: 4,
+        borderWidth: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
     },
-    icon: {
-        fontSize: 18,
-        color: 'white',
-        marginRight: 8,
+    glyphText: {
+        fontFamily: 'PressStart2P',
+        fontSize: 11,
+        lineHeight: 13,
     },
-    flex1: {
+    messageWrap: {
         flex: 1,
     },
     message: {
-        fontWeight: '500',
-        color: 'white',
-        fontSize: 12,
-        lineHeight: 16.8,
-        fontFamily: 'monospace',
-    },
-    statusContainer: {
-        marginTop: 8,
-        backgroundColor: 'rgba(0,0,0,0.2)',
-        padding: 8,
-        borderRadius: 4,
+        color: '#f0f7ff',
+        fontFamily: 'PressStart2P',
+        fontSize: 9,
+        lineHeight: 14,
     },
     statusText: {
-        fontSize: 10,
-        color: 'white',
+        marginTop: 4,
+        color: '#9bb4c7',
         fontFamily: 'monospace',
+        fontSize: 10,
     },
     closeButton: {
-        padding: 4,
+        marginLeft: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
     },
     closeText: {
-        color: 'white',
-        fontSize: 16,
+        color: '#9bb4c7',
+        fontSize: 18,
+        lineHeight: 18,
+        fontWeight: '600',
     },
     bannerContainer: {
         position: 'absolute',

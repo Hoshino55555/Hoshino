@@ -11,9 +11,42 @@ function jitterForId(id: string, salt: number) {
     return ((h & 0xffff) / 0xffff) * 2 - 1;
 }
 
+// Triangular row layout: bottom row holds the most items, each subsequent row
+// holds one fewer. Returns which row the i-th item belongs to, its slot
+// within that row, and the row's total size — enough to compute lift +
+// horizontal placement so items pile up like a pyramid instead of a column.
+// Base width tuned for typical forage drops (1–5 items): a 4-wide base reads
+// as a clear pyramid for small piles. Larger batches taper down and any
+// overflow stacks vertically at the apex (Math.max(1, …) below).
+const BASE_ROW_SIZE = 4;
+function placeOnPile(i: number, total: number) {
+    const baseRowSize = Math.min(BASE_ROW_SIZE, Math.max(1, total));
+    let row = 0;
+    let placed = 0;
+    let rowSize = baseRowSize;
+    while (placed + rowSize <= i) {
+        placed += rowSize;
+        row++;
+        rowSize = Math.max(1, rowSize - 1);
+    }
+    // Last row may be partial — clamp rowSize to remaining items so slot
+    // math stays in range.
+    const remaining = total - placed;
+    const actualRowSize = Math.min(rowSize, remaining);
+    return { row, slot: i - placed, rowSize: actualRowSize, baseRowSize };
+}
+
 interface Props {
     items: ForagedItem[];
     onComplete: () => void;
+    /**
+     * Pixels to subtract from the parent's bottom — i.e. the height of any
+     * absolutely-positioned bottom chrome (menu bar) that the parent doesn't
+     * already exclude from its layout. Without this, the pile's `top: 78%`
+     * lands inside the menu bar overlay because mainDisplayArea is flex:1
+     * and the menu sits on top of its lower portion.
+     */
+    bottomInset?: number;
 }
 
 // Snappier pile-at-feet feel:
@@ -31,6 +64,9 @@ const FADE_DURATION_MS = 400;
 const PILE_BASE_SPREAD_X = 52; // ±px at the base of the pile
 const PILE_LIFT_PER_ITEM = 12; // px each subsequent item sits higher
 const PILE_LIFT_CAP = 72;     // hard cap on stack height (~6 items high)
+// Gap between the menu bar's top edge (or screen bottom if no chrome) and
+// the visual base of the pile. Tunable by eye.
+const PILE_BASE_GAP = 30;
 
 const flightMs = () => ARC_HALF_MS * 2;
 
@@ -40,7 +76,7 @@ export const FORAGE_FLIGHT_MS = ARC_HALF_MS * 2;
 // feet. Each item is tappable for a quick pop-dismiss. Leftovers fade on a
 // global timer. Inventory was already credited by the parent's drain call —
 // this overlay is the reward flourish, not the source of truth.
-const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
+const ForagePopOut: React.FC<Props> = ({ items, onComplete, bottomInset = 0 }) => {
     const xRefs = useRef(items.map(() => new Animated.Value(0))).current;
     const yRefs = useRef(items.map(() => new Animated.Value(0))).current;
     const fadeRefs = useRef(items.map(() => new Animated.Value(1))).current;
@@ -85,7 +121,12 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
                 useNativeDriver: true,
             }).start();
             // Single arc: up (decel) then down (accel) — no rebound.
-            const stackOffset = -Math.min(i * PILE_LIFT_PER_ITEM, PILE_LIFT_CAP);
+            // Per-item Y jitter on the landing height so items in the same
+            // row don't sit on a perfectly flat line — looks more like a
+            // real pile.
+            const { row } = placeOnPile(i, items.length);
+            const yJitter = jitterForId(item.id, 19) * 6;
+            const stackOffset = -Math.min(row * PILE_LIFT_PER_ITEM, PILE_LIFT_CAP) + yJitter;
             Animated.sequence([
                 Animated.delay(delayMs),
                 Animated.timing(yRefs[i], {
@@ -150,16 +191,30 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
 
     // `box-none` lets taps pass through the empty overlay to the menu below,
     // while the item Pressables still receive their own hits.
+    // Pile base sits a fixed pad above whatever bottom chrome the parent owns
+    // (menu bar). This is what `bottomInset` is for — without it, items land
+    // inside the menu overlay because `popItem` uses `bottom: 0` of the
+    // overlay, and the overlay extends to the bottom of mainDisplayArea.
+    const pileBaseBottom = bottomInset + PILE_BASE_GAP;
     return (
-        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+        <View
+            pointerEvents="box-none"
+            style={StyleSheet.absoluteFill}
+        >
             {items.map((item, i) => {
-                // Triangular pile: bottom items spread to the full base
-                // width, higher items get progressively tighter spread so
-                // the apex tapers to ~15% of the base.
-                const liftPx = Math.min(i * PILE_LIFT_PER_ITEM, PILE_LIFT_CAP);
-                const heightFrac = liftPx / PILE_LIFT_CAP;
-                const spreadFactor = 1 - heightFrac * 0.85;
-                const landingX = jitterForId(item.id, 11) * PILE_BASE_SPREAD_X * spreadFactor;
+                // Triangular pile: each row holds one fewer item than the
+                // one below it. Slot positions evenly spread across the
+                // row's available width, with a small id-derived jitter
+                // so identical sprites don't sit on perfectly straight
+                // lines.
+                const { row, slot, rowSize, baseRowSize } = placeOnPile(i, items.length);
+                const spreadFactor = (baseRowSize - row) / baseRowSize;
+                const slotBase = rowSize > 1 ? (slot / (rowSize - 1)) * 2 - 1 : 0;
+                const xJitter = jitterForId(item.id, 11) * 0.4;
+                const landingX = (slotBase + xJitter) * PILE_BASE_SPREAD_X * spreadFactor;
+                // Per-item rotation so sprites don't all lie flat. ±18° read
+                // as a tossed-in pile rather than placed.
+                const rotateDeg = jitterForId(item.id, 23) * 18;
 
                 const translateX = xRefs[i].interpolate({
                     inputRange: [0, 1],
@@ -180,7 +235,15 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
                         pointerEvents={dismissed.has(item.id) ? 'none' : 'box-none'}
                         style={[
                             styles.popItem,
-                            { opacity, transform: [{ translateX }, { translateY }] },
+                            {
+                                bottom: pileBaseBottom,
+                                opacity,
+                                transform: [
+                                    { translateX },
+                                    { translateY },
+                                    { rotate: `${rotateDeg}deg` },
+                                ],
+                            },
                         ]}
                     >
                         <Pressable
@@ -198,15 +261,14 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
 };
 
 const styles = StyleSheet.create({
-    // Origin sits at the moonoko's feet on the ground line. characterImage
-    // is 250x250 with contain + marginTop:-80; the sprite's feet land
-    // ~78% down the display area, which is where the pile bottoms out.
+    // Pile base sits a fixed dp above the menu bar (or screen bottom if no
+    // chrome). `bottom` is supplied per-render from the parent's bottomInset
+    // — see ForagePopOut props.
     popItem: {
         position: 'absolute',
-        top: '78%',
         left: '50%',
         marginLeft: -20,
-        marginTop: -20,
+        marginBottom: -20,
         width: 40,
         height: 40,
         alignItems: 'center',

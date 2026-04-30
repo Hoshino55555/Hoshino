@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Linking } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Linking, Image } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
@@ -40,6 +40,7 @@ import { HoshinoPrivyProvider } from './src/contexts/PrivyContext';
 import { usePrivy } from '@privy-io/expo';
 import LoginScreen from './src/components/LoginScreen';
 import { DeviceCasing, DeviceButtons } from './src/components/DeviceChrome';
+import { Logos } from './src/assets';
 import { Connection, PublicKey } from '@solana/web3.js';
 
 // NEW: Programmable NFT Integration
@@ -47,7 +48,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { getGameCharacters, MOONOKOS_BY_ID, toGameCharacter } from './src/data/moonokos';
 import { ENABLE_VRF_DEV_SCREEN } from './src/config/vrf';
 import { FirebaseAuthProvider, useFirebaseAuth } from './src/contexts/FirebaseAuthContext';
-import { GameStateProvider } from './src/contexts/GameStateContext';
+import { GameStateProvider, useGameStateContext } from './src/contexts/GameStateContext';
 import { GameStateService } from './src/services/GameStateService';
 import { pushEmptySnapshot } from './src/widgets/widgetService';
 
@@ -245,6 +246,11 @@ function App() {
     const [profileHydratedWallet, setProfileHydratedWallet] = useState<string | null>(
         null
     );
+    // Tracks wallets we've already shown the "Welcome back" toast for in this
+    // session. Without this, the hydrate effect fires once on cache-hit then
+    // again when firebaseUid lands and the server profile arrives — both go
+    // through applyProfile and both fire the toast.
+    const welcomedWalletsRef = useRef<Set<string>>(new Set());
 
     const addNotification = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => {
         const id = Date.now().toString();
@@ -471,14 +477,21 @@ function App() {
             setOwnedCharacters(restoredOwnedCharacters);
             setSelectedCharacter(restoredCharacter);
 
+            const alreadyWelcomed = welcomedWalletsRef.current.has(walletAddress);
+            const shouldWelcome = !alreadyWelcomed && profile.playerName.trim().length > 0;
+
             if (hasStoredCompanion) {
                 setCurrentView(restoredCharacter ? 'interaction' : 'selection');
-                if (profile.playerName.trim()) {
+                if (shouldWelcome) {
                     addNotification(`🌟 Welcome back, ${profile.playerName}!`, 'success');
+                    welcomedWalletsRef.current.add(walletAddress);
                 }
             } else if (profile.playerName.trim()) {
                 setCurrentView('selection');
-                addNotification(`🌟 Welcome back, ${profile.playerName}!`, 'success');
+                if (shouldWelcome) {
+                    addNotification(`🌟 Welcome back, ${profile.playerName}!`, 'success');
+                    welcomedWalletsRef.current.add(walletAddress);
+                }
             } else {
                 setCurrentView('welcome');
             }
@@ -523,22 +536,30 @@ function App() {
             }
 
             // Fallback: AsyncStorage cache (offline, pre-auth, or server error).
-            // If no cache either, land on welcome.
             const cached = await loadStoredPlayerProfile(walletAddress);
             if (isCancelled) return;
             if (cached) {
                 applyProfile(walletAddress, cached, 'cache');
-            } else {
-                console.log(
-                    '🔍 No stored player profile for wallet:',
-                    walletAddress.slice(0, 8) + '...'
-                );
-                setPlayerName('');
-                setOwnedCharacters([]);
-                setSelectedCharacter(null);
-                setCurrentView('welcome');
-                setProfileHydratedWallet(walletAddress);
+                return;
             }
+
+            // No cache. If Firebase isn't ready yet, don't declare the
+            // profile hydrated as "welcome" — that flashes WelcomeScreen
+            // for the duration of the Privy→Firebase exchange even for
+            // returning users who have server-side data. Bail; the
+            // effect re-fires when firebaseUid lands and we'll try the
+            // server then.
+            if (!firebaseUid) return;
+
+            console.log(
+                '🔍 No stored player profile for wallet:',
+                walletAddress.slice(0, 8) + '...'
+            );
+            setPlayerName('');
+            setOwnedCharacters([]);
+            setSelectedCharacter(null);
+            setCurrentView('welcome');
+            setProfileHydratedWallet(walletAddress);
         };
 
         hydrateStoredProfile();
@@ -867,11 +888,12 @@ function App() {
     const hydrationComplete =
         !!publicKey && profileHydratedWallet === publicKey.toString();
     if (!hydrationComplete) {
-        return <View style={styles.splashFill} />;
+        return <SplashShim />;
     }
 
     return (
         <GameStateProvider characterId={selectedCharacter?.id ?? null}>
+        <GameStateGate hasCharacter={!!selectedCharacter}>
         <SafeAreaView style={styles.container}>
             <StatusBar style="light" hidden={true} />
             <DeviceCasing />
@@ -977,15 +999,17 @@ function App() {
                 </View>
             )}
 
-            {notifications.map(notification => (
+            {notifications.map((notification, i) => (
                 <Notification
                     key={notification.id}
                     message={notification.message}
                     type={notification.type}
+                    index={i}
                     onClose={() => removeNotification(notification.id)}
                 />
             ))}
         </SafeAreaView>
+        </GameStateGate>
         </GameStateProvider>
     );
 }
@@ -998,6 +1022,24 @@ const styles = StyleSheet.create({
     splashFill: {
         flex: 1,
         backgroundColor: '#211F37',
+    },
+    // Composed onto splashFill in the AuthGate not-ready and App-level
+    // hydration shims. Kept as a separate style so splashFill's children
+    // (LoginScreen / <App />) layout normally when ready=true and we're
+    // not painting the shim.
+    splashCenter: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    // Absolute dp (RN treats unitless numbers as dp on Android) so the
+    // JS shim matches the native Android 12 splash icon size, which is
+    // also dp-based — the OS splash framework renders the icon at
+    // ~108dp visible inside a 192dp safezone. Percentage-based widths
+    // were drifting by enough to feel like a size jump on the native →
+    // JS hand-off; absolute dp makes both sides identical.
+    splashLogo: {
+        width: 192,
+        height: 192,
     },
 
     statusMessage: {
@@ -1080,6 +1122,44 @@ const styles = StyleSheet.create({
 
 });
 
+// Shared splash shim: same image + bg as the native splash, sized to
+// match the native Android 12 icon safezone. Used by AuthGate (Privy +
+// Firebase exchange), App's profile-hydration gate, and GameStateGate
+// (first server fetch) so the user sees one continuous splash across
+// all three async windows.
+function SplashShim() {
+    return (
+        <View style={[styles.splashFill, styles.splashCenter]}>
+            <Image
+                source={Logos.star}
+                style={styles.splashLogo}
+                resizeMode="contain"
+            />
+        </View>
+    );
+}
+
+// Holds the splash through the first GameStateService.getState() round-
+// trip when a character is selected. Without this, MoonokoInteraction
+// mounts with `gameState === null` and renders fallback default stats
+// (mood:3, hunger:5, energy:3) for a few hundred ms before the server
+// response repaints them — visible as the stat stars jumping at first
+// paint. New users with no selectedCharacter bypass the gate so they
+// can reach the selection flow.
+function GameStateGate({
+    hasCharacter,
+    children,
+}: {
+    hasCharacter: boolean;
+    children: ReactNode;
+}) {
+    const { state } = useGameStateContext();
+    if (hasCharacter && !state) {
+        return <SplashShim />;
+    }
+    return <>{children}</>;
+}
+
 interface AuthGateProps {
     fontsLoaded: boolean;
 }
@@ -1117,16 +1197,18 @@ function AuthGate({ fontsLoaded }: AuthGateProps) {
         return () => cancelAnimationFrame(id);
     }, [ready]);
 
+    if (!ready) {
+        return <SplashShim />;
+    }
+
     return (
         <View style={styles.splashFill}>
-            {ready && (
-                user ? (
-                    <App />
-                ) : (
-                    <SafeAreaView style={styles.container}>
-                        <LoginScreen />
-                    </SafeAreaView>
-                )
+            {user ? (
+                <App />
+            ) : (
+                <SafeAreaView style={styles.container}>
+                    <LoginScreen />
+                </SafeAreaView>
             )}
         </View>
     );
