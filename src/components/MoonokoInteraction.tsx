@@ -192,8 +192,17 @@ const MoonokoInteraction: React.FC<Props> = ({
     // flips the screen instantly while the startSleep callable is in flight.
     // Cleared in the success/failure paths below.
     const [pendingStartSleep, setPendingStartSleep] = useState(false);
+    // Symmetric optimistic flag for waking. Without this, opening + closing
+    // sleep quickly left an invisible absoluteFill overlay (zIndex 50)
+    // blocking every touch for the duration of the endSleep round-trip:
+    // the exit animation finished but `serverSleeping` was still true until
+    // the callable resolved, so SleepScreen kept rendering with opacity 0.
+    // pendingEndSleep dismisses the overlay the instant the exit animation
+    // completes; endSleep continues in the background and clears the flag
+    // when it resolves.
+    const [pendingEndSleep, setPendingEndSleep] = useState(false);
     const serverSleeping = gameState?.sleepStartedAt != null;
-    const isSleeping = serverSleeping || pendingStartSleep;
+    const isSleeping = (serverSleeping || pendingStartSleep) && !pendingEndSleep;
     // When true, SleepScreen plays its exit animation and then fires onWake.
     // Used so a second tap on the sleep menu button reads the same as
     // tapping the in-screen Wake button (no instant unmount jump).
@@ -211,8 +220,18 @@ const MoonokoInteraction: React.FC<Props> = ({
     // reason — its meaning is per-character.
     useEffect(() => {
         setPendingStartSleep(false);
+        setPendingEndSleep(false);
         setWakeRequested(false);
     }, [selectedCharacter?.id]);
+
+    // Sync the optimistic end-sleep flag with the server. Once serverSleeping
+    // flips false (endSleep succeeded), the optimistic flag is no longer
+    // doing anything — clear it so a subsequent sleep tap doesn't get
+    // suppressed. Same idea as pendingStartSleep's `.then` clear, just
+    // driven by the derived server state instead of the promise.
+    useEffect(() => {
+        if (!serverSleeping && pendingEndSleep) setPendingEndSleep(false);
+    }, [serverSleeping, pendingEndSleep]);
     const [isTransitioning, setIsTransitioning] = useState(true);
     const [transitionOpacity, setTransitionOpacity] = useState(1);
 
@@ -607,22 +626,27 @@ const MoonokoInteraction: React.FC<Props> = ({
                     <SleepScreen
                         key={sleepInstanceKey}
                         wakeRequested={wakeRequested}
+                        characterId={selectedCharacter?.id}
+                        sleepStartedAt={gameState?.sleepStartedAt ?? null}
                         onWake={async () => {
+                            // Optimistically dismiss the overlay the instant
+                            // the exit animation reports complete. Without
+                            // this, the absoluteFill wrapper kept blocking
+                            // taps until endSleep returned (1–3s on slow
+                            // networks) — felt like the UI was frozen.
+                            setPendingEndSleep(true);
                             try {
                                 await endSleep(true);
-                                // Success: server cleared sleepStartedAt, the
-                                // derived isSleeping flips false on next render
-                                // and SleepScreen unmounts.
+                                // Server cleared sleepStartedAt; the
+                                // serverSleeping/pendingEndSleep sync effect
+                                // clears the flag.
                                 setWakeRequested(false);
                             } catch (e: any) {
-                                // Don't unmount on failure — earlier impl set
-                                // isSleeping=false unconditionally, leaving the
-                                // server in stale-sleep state with the home
-                                // menu showing. Keep the user on SleepScreen,
-                                // bump the instance key so a fresh
-                                // ZoomOutOverlay replaces the exited one
-                                // (otherwise it sits invisible, blocking taps),
-                                // and surface the error so they can retry.
+                                // Roll back: server is still in sleep state,
+                                // so put the user back on SleepScreen with a
+                                // fresh ZoomOutOverlay (the previous one
+                                // already animated to its exited state).
+                                setPendingEndSleep(false);
                                 onNotification?.(e?.message || 'Failed to end sleep — try again', 'error');
                                 setWakeRequested(false);
                                 setSleepInstanceKey((k) => k + 1);

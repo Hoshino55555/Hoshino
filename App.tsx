@@ -4,12 +4,20 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import {
     PressStart2P_400Regular,
 } from '@expo-google-fonts/press-start-2p';
 import {
     SpaceMono_400Regular,
 } from '@expo-google-fonts/space-mono';
+
+// Hold the native splash up until the auth handshake + fonts have all
+// resolved. Without this, the user sees: native splash → brief "Loading…"
+// text → blank frame while fonts load → finally the real UI. AuthGate is
+// the single place that calls hideAsync (see below) once everything we
+// need to first-paint is ready.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 import MoonokoSelection from './src/components/MoonokoSelection';
 import MoonokoInteraction from './src/components/MoonokoInteraction';
@@ -187,13 +195,6 @@ const validateCharacterInput = (character: Character): boolean => {
 };
 
 function App() {
-    const [fontsLoaded] = useFonts({
-        'PressStart2P': PressStart2P_400Regular,
-        'SpaceMono': SpaceMono_400Regular,
-    });
-
-
-
     const { connected, publicKey, connect, disconnect, email, walletSource } = useWallet();
     const { firebaseUid } = useFirebaseAuth();
     const [currentView, setCurrentView] = useState('welcome');
@@ -853,10 +854,6 @@ function App() {
         }
     };
 
-    if (!fontsLoaded) {
-        return null; // or a loading screen
-    }
-
     const miRoutes = ['interaction', 'feeding', 'shop', 'gallery', 'inventory', 'settings', 'chat', 'profile'];
     const miMounted = miRoutes.includes(currentView);
 
@@ -985,6 +982,10 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'black',
     },
+    splashFill: {
+        flex: 1,
+        backgroundColor: '#211F37',
+    },
 
     statusMessage: {
         position: 'absolute',
@@ -1066,38 +1067,72 @@ const styles = StyleSheet.create({
 
 });
 
-function AuthGate() {
-    const { user, isReady } = usePrivy();
+interface AuthGateProps {
+    fontsLoaded: boolean;
+}
 
-    if (!isReady) {
-        return (
-            <SafeAreaView style={styles.container}>
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: '#e5dcf5', fontFamily: 'monospace' }}>Loading…</Text>
-                </View>
-            </SafeAreaView>
-        );
-    }
+function AuthGate({ fontsLoaded }: AuthGateProps) {
+    const { user, isReady: privyReady } = usePrivy();
+    const { ready: firebaseReady } = useFirebaseAuth();
 
-    if (!user) {
-        return (
-            <SafeAreaView style={styles.container}>
-                <LoginScreen />
-            </SafeAreaView>
-        );
-    }
+    // Hold the native splash until everything required for the first
+    // visible frame has resolved. For logged-out users that's just Privy
+    // + fonts (we're about to show LoginScreen). For logged-in users we
+    // also wait for the Privy→Firebase token exchange so the first frame
+    // of <App /> already has firebaseUid in hand and game state can fire
+    // its initial fetch immediately rather than after a perceptible beat.
+    const ready = fontsLoaded && privyReady && (!user || firebaseReady);
 
-    return <App />;
+    // Always render a full-bleed View painted in the splash background
+    // color (#211F37) so the splash → first-content transition stays one
+    // continuous color. The Activity's windowBackground is also #211F37
+    // (set via android.backgroundColor in app.json), so even if the JS
+    // splashFill hasn't painted by the time we hide, there's nothing to
+    // flash to.
+    //
+    // Why useEffect + RAF instead of onLayout: onLayout only fires when
+    // the host view's geometry changes. The outer splashFill View stays
+    // flex:1 throughout, so onLayout fires once on mount (when ready is
+    // still false) and never again — the splash would stay up forever
+    // even after auth completes. RAF defers one frame so the conditional
+    // child has painted before we drop the OS splash.
+    useEffect(() => {
+        if (!ready) return;
+        const id = requestAnimationFrame(() => {
+            SplashScreen.hideAsync().catch(() => {});
+        });
+        return () => cancelAnimationFrame(id);
+    }, [ready]);
+
+    return (
+        <View style={styles.splashFill}>
+            {ready && (
+                user ? (
+                    <App />
+                ) : (
+                    <SafeAreaView style={styles.container}>
+                        <LoginScreen />
+                    </SafeAreaView>
+                )
+            )}
+        </View>
+    );
 }
 
 function AppWrapper() {
+    const [fontsLoaded] = useFonts({
+        'PressStart2P': PressStart2P_400Regular,
+        'SpaceMono': SpaceMono_400Regular,
+        '04b03': require('./assets/fonts/04b03.ttf'),
+    });
+
     return (
         <SafeAreaProvider>
             <HoshinoPrivyProvider>
                 <FirebaseAuthProvider>
                     <WalletProvider>
                         <ChromeProvider>
-                            <AuthGate />
+                            <AuthGate fontsLoaded={fontsLoaded} />
                         </ChromeProvider>
                     </WalletProvider>
                 </FirebaseAuthProvider>

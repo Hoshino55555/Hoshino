@@ -18,16 +18,19 @@ interface Props {
 
 // Snappier pile-at-feet feel:
 // - One arc (up + down), no rebounds — items thud and stay put.
-// - Items land in a small footprint and stack vertically so successive finds
-//   read as a "pile" instead of a horizontal line on the ground line.
+// - Items land in a triangular pile at the moonoko's feet: the first
+//   items in form the wide base, later items stack higher and narrower
+//   toward the apex.
 const ARC_HALF_MS = 220;
 const STAGGER_MS = 55;
 const GROUND_HOLD_MS = 10000;
 const FADE_DURATION_MS = 400;
-// Pile footprint at the moonoko's feet.
-const PILE_SPREAD_X = 28; // ±px horizontal jitter around centerline
-const PILE_LIFT_PER_ITEM = 5; // px each subsequent item sits higher (stack height)
-const PILE_LIFT_CAP = 60; // never lift higher than this — keeps the pile near the ground
+// Pile footprint at the moonoko's feet. SPREAD is the half-width of the
+// base row; higher items get a narrower spread (see spreadFactor below)
+// so the silhouette reads as a triangle rather than a vertical column.
+const PILE_BASE_SPREAD_X = 52; // ±px at the base of the pile
+const PILE_LIFT_PER_ITEM = 12; // px each subsequent item sits higher
+const PILE_LIFT_CAP = 72;     // hard cap on stack height (~6 items high)
 
 const flightMs = () => ARC_HALF_MS * 2;
 
@@ -50,9 +53,20 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
         onComplete();
     }, [onComplete]);
 
+    // Stash `finish` in a ref so the throw-animation effect doesn't list
+    // it as a dependency. Parent (`MoonokoInteraction`) passes
+    // `onComplete={() => setPopOutItems(null)}` — a fresh arrow every
+    // render — which made `finish` a new reference on every parent tick
+    // and re-fired the effect, re-launching Animated.timing on items
+    // that had already landed (read on screen as a periodic re-bounce).
+    const finishRef = useRef(finish);
+    useEffect(() => {
+        finishRef.current = finish;
+    }, [finish]);
+
     useEffect(() => {
         if (items.length === 0) {
-            finish();
+            finishRef.current();
             return;
         }
         const flight = flightMs();
@@ -96,7 +110,7 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
         const timeout = setTimeout(() => {
             const remaining = items.filter((it) => !dismissed.has(it.id));
             if (remaining.length === 0) {
-                finish();
+                finishRef.current();
                 return;
             }
             Animated.parallel(
@@ -107,13 +121,16 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
                         useNativeDriver: true,
                     })
                 )
-            ).start(finish);
+            ).start(() => finishRef.current());
         }, lastLandingMs + GROUND_HOLD_MS);
 
         return () => clearTimeout(timeout);
-        // dismissed deliberately omitted — we read it at timer fire, not setup.
+        // dismissed and finish deliberately omitted from deps — dismissed
+        // is read at timer fire (not setup), and finish is read via
+        // finishRef to avoid re-firing the throw animation on every
+        // parent re-render.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [items, finish]);
+    }, [items]);
 
     const dismissItem = (id: string, index: number) => {
         setDismissed((prev) => {
@@ -136,9 +153,13 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
     return (
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
             {items.map((item, i) => {
-                // Small horizontal jitter around the centerline so the pile
-                // has natural width without scattering across the screen.
-                const landingX = jitterForId(item.id, 11) * PILE_SPREAD_X;
+                // Triangular pile: bottom items spread to the full base
+                // width, higher items get progressively tighter spread so
+                // the apex tapers to ~15% of the base.
+                const liftPx = Math.min(i * PILE_LIFT_PER_ITEM, PILE_LIFT_CAP);
+                const heightFrac = liftPx / PILE_LIFT_CAP;
+                const spreadFactor = 1 - heightFrac * 0.85;
+                const landingX = jitterForId(item.id, 11) * PILE_BASE_SPREAD_X * spreadFactor;
 
                 const translateX = xRefs[i].interpolate({
                     inputRange: [0, 1],
@@ -147,7 +168,12 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
                 const translateY = yRefs[i]; // pixels, driven by the sequence
                 const opacity = fadeRefs[i];
 
-                const img = getIngredientArt(item.id);
+                // Look up by `ingredient` (e.g. "tomato"), not by `id`. The
+                // server emits id as `${eventMs}-${slot}-${ingredient}` —
+                // a unique per-instance handle — so the INGREDIENT_ART map
+                // never hits a match on it and every find was rendering as
+                // a placeholder despite real art being shipped.
+                const img = getIngredientArt(item.ingredient);
                 return (
                     <Animated.View
                         key={item.id}
@@ -172,12 +198,12 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete }) => {
 };
 
 const styles = StyleSheet.create({
-    // Origin sits near the Moonoko's feet. characterImage is 250x250 with
-    // contain + marginTop:-80, placing the sprite's feet ~65% down the
-    // display area.
+    // Origin sits at the moonoko's feet on the ground line. characterImage
+    // is 250x250 with contain + marginTop:-80; the sprite's feet land
+    // ~78% down the display area, which is where the pile bottoms out.
     popItem: {
         position: 'absolute',
-        top: '65%',
+        top: '78%',
         left: '50%',
         marginLeft: -20,
         marginTop: -20,

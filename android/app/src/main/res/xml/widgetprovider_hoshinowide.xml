@@ -14,6 +14,8 @@
     android:initialLayout="@layout/rn_widget"
     android:previewImage="@drawable/hoshinowide_preview"
 
+
+
     android:updatePeriodMillis="1800000"
     android:widgetCategory="home_screen">
 </appwidget-provider>

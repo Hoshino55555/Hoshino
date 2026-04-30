@@ -2,14 +2,14 @@
   "expo": {
     "name": "Hoshino",
     "slug": "hoshino",
-    "version": "0.1.9-preview-widget",
+    "version": "0.1.11-preview",
     "orientation": "portrait",
     "icon": "./assets/icons/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/icons/splash-icon.png",
+      "image": "./assets/images/logos/hoshino-star.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#211F37"
     },
     "ios": {
       "supportsTablet": true
@@ -19,9 +19,10 @@
         "foregroundImage": "./assets/icons/adaptive-icon.png",
         "backgroundColor": "#211F37"
       },
+      "backgroundColor": "#211F37",
       "package": "com.socks.hoshino",
       "softwareKeyboardLayoutMode": "resize",
-      "versionCode": 22
+      "versionCode": 24
     },
     "extra": {
       "eas": {

@@ -13,18 +13,26 @@ import type { IngredientId } from '../services/RecipeCatalog';
 // extensions and lowercases — without the suffix, `LYRA.png` and `LYRA.gif`
 // both fold to `assets_images_characters_lyra` and the build fails at
 // :app:mergeReleaseResources with "Duplicate resources".
+// Sleep poses are added per-character as art lands. Characters without
+// their own sleep PNG fall back to LYRA's pose (see getCharacterSleep) —
+// keeps the sleep screen visually coherent (sleep theme + closed eyes)
+// rather than reusing the awake still, which reads as "the moonoko is
+// just standing there in the dark."
 export const Characters = {
     ARO: {
         still: require('../../assets/images/characters/ARO.png'),
         anim: require('../../assets/images/characters/ARO-anim.gif'),
+        sleep: require('../../assets/images/characters/ARO-sleep.png'),
     },
     LYRA: {
         still: require('../../assets/images/characters/LYRA.png'),
         anim: require('../../assets/images/characters/LYRA-anim.gif'),
+        sleep: require('../../assets/images/characters/LYRA-sleep.png'),
     },
     ORION: {
         still: require('../../assets/images/characters/ORION.png'),
         anim: require('../../assets/images/characters/ORION-anim.gif'),
+        sleep: require('../../assets/images/characters/ORION-sleep.png'),
     },
     SIRIUS: {
         still: require('../../assets/images/characters/SIRIUS.png'),
@@ -50,6 +58,15 @@ export const getCharacterStill = (id: string | null | undefined) =>
 
 export const getCharacterAnim = (id: string | null | undefined) =>
     Characters[normalizeId(id)]?.anim ?? Characters.LYRA.anim;
+
+// Sleep pose lookup — falls back to LYRA's sleep pose when the requested
+// character doesn't have its own sleep art yet (currently SIRIUS/ZANIAH).
+// Reusing the awake still here would break the sleep-theme look; LYRA's
+// pose at least keeps the closed-eyes/sleeping silhouette consistent.
+export const getCharacterSleep = (id: string | null | undefined) => {
+    const c = Characters[normalizeId(id)];
+    return ('sleep' in c ? c.sleep : null) ?? Characters.LYRA.sleep;
+};
 
 // `Ingredients.*` is the namespaced grab-bag — useful when a screen wants a
 // specific sprite by name. The recipe/cooking system uses `getIngredientArt`
@@ -105,6 +122,18 @@ export const Backgrounds = {
     screen: require('../../assets/images/ui/backgrounds/screen-bg.png'),
     cooking: require('../../assets/images/ui/backgrounds/cooking-bg.png'),
     arcade: require('../../assets/images/ui/backgrounds/arcade-bg.png'),
+    sleep: require('../../assets/images/ui/backgrounds/sleep-bg.png'),
+    shop: require('../../assets/images/ui/backgrounds/shop-bg.gif'),
+} as const;
+
+// Sleep-screen chrome — pillow the moonoko sleeps on, the alarm row's
+// painted box, and the wake-up button sprite. Authored together so the
+// screen reads as one cohesive scene rather than RN-default UI on top of
+// art.
+export const Sleep = {
+    pillow: require('../../assets/images/sleep/pillow.png'),
+    alarmBox: require('../../assets/images/sleep/alarm-box.png'),
+    wakeupButton: require('../../assets/images/sleep/wakeup-button.png'),
 } as const;
 
 // In-app stat readouts use the larger "life" star sprites; the home-screen

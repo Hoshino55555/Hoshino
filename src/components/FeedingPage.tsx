@@ -616,8 +616,8 @@ const styles = StyleSheet.create({
     },
     cardHeaderName: {
         color: '#ffffff',
-        fontFamily: 'PressStart2P',
-        fontSize: 8,
+        fontFamily: '04b03',
+        fontSize: 12,
         flexShrink: 1,
         paddingRight: 4,
         textShadowColor: '#3a2a1a',
@@ -626,8 +626,8 @@ const styles = StyleSheet.create({
     },
     cardHeaderLevel: {
         color: '#ffffff',
-        fontFamily: 'PressStart2P',
-        fontSize: 8,
+        fontFamily: '04b03',
+        fontSize: 12,
         textShadowColor: '#3a2a1a',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
@@ -668,8 +668,8 @@ const styles = StyleSheet.create({
     },
     ingredientCount: {
         color: '#3a2a1a',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: '04b03',
+        fontSize: 14,
     },
     pointsBadge: {
         alignSelf: 'flex-end',
@@ -694,16 +694,16 @@ const styles = StyleSheet.create({
     },
     pointsBadgeText: {
         color: '#ffffff',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: '04b03',
+        fontSize: 14,
         textShadowColor: '#3a2a1a',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
     },
     recipeNote: {
         color: '#c14a4a',
-        fontFamily: 'PressStart2P',
-        fontSize: 7,
+        fontFamily: '04b03',
+        fontSize: 11,
         paddingHorizontal: 6,
         paddingBottom: 4,
         textAlign: 'center',

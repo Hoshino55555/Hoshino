@@ -1,11 +1,21 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    ScrollView,
+    Image,
+    ImageBackground,
+    Dimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MarketplaceService, MarketplaceItem, ItemCategory, ItemRarity } from '../services/MarketplaceService';
 import { GlobalPointSystem } from '../services/GlobalPointSystem';
 import { useWallet } from '../contexts/WalletContext';
 import { Connection } from '@solana/web3.js';
-import InnerScreen from './InnerScreen';
-import { Ingredients } from '../assets';
+import ZoomOutOverlay from './ZoomOutOverlay';
+import { Backgrounds, Ingredients } from '../assets';
 const PinkSugar = Ingredients.pinkSugar;
 const NovaEgg = Ingredients.novaEgg;
 const MiraBerry = Ingredients.miraBerry;
@@ -19,6 +29,14 @@ interface ShopProps {
 }
 
 const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onCloseStart, onItemsPurchased }) => {
+    const insets = useSafeAreaInsets();
+    // The painted SHOP banner sits at the top of shop-bg.png; reserve ~25%
+    // of the screen so interactive content lands below it. Same fraction
+    // as FeedingPage/GamesList so the three full-page screens read as one
+    // family rather than ad-hoc layouts.
+    const screenHeight = Dimensions.get('window').height;
+    const bannerReserve = screenHeight * 0.25;
+
     const [selectedCategory, setSelectedCategory] = useState<string>('food');
     const [items, setItems] = useState<MarketplaceItem[]>([]);
     const [dust, setDust] = useState<number>(100);
@@ -188,17 +206,28 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
     }, [items, selectedCategory]);
 
     return (
-        <InnerScreen
-            onLeftButtonPress={handleClose}
-            leftButtonText=""
-            centerButtonText=""
-            rightButtonText=""
-            expanded
-            animateIn
-            exiting={isClosing}
-            onExitComplete={onClose}
-        >
-            <View style={styles.shopContent}>
+        <ZoomOutOverlay exiting={isClosing} onExitComplete={onClose} backgroundColor="#1a1033">
+            <ImageBackground
+                source={Backgrounds.shop}
+                style={styles.bg}
+                resizeMode="cover"
+            >
+                <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={handleClose}
+                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                    >
+                        <Text style={styles.backButtonText}>{'<'} Back</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                    contentContainerStyle={[
+                        styles.scrollBody,
+                        { paddingTop: bannerReserve, paddingBottom: insets.bottom + 16 },
+                    ]}
+                >
             <View style={styles.balanceRow}>
                 <View style={styles.dustIconContainer}>
                     <Image
@@ -348,17 +377,37 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                     </View>
                 )}
             </View>
-
-            </View>
-        </InnerScreen>
+                </ScrollView>
+            </ImageBackground>
+        </ZoomOutOverlay>
     );
 };
 
 const styles = StyleSheet.create({
-    shopContent: {
-        flex: 1,
-        width: '100%',
-        padding: 8,
+    bg: { flex: 1, width: '100%', height: '100%' },
+    topBar: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    backButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        backgroundColor: 'rgba(46, 90, 62, 0.85)',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#E8F5E8',
+    },
+    backButtonText: {
+        color: '#E8F5E8',
+        fontFamily: 'PressStart2P',
+        fontSize: 10,
+    },
+    scrollBody: {
+        paddingHorizontal: 16,
     },
     balanceRow: {
         flexDirection: 'row',
