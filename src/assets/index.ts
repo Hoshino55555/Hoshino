@@ -143,6 +143,10 @@ export const Sleep = {
 export const Stars = {
     lifeEmpty: require('../../assets/images/ui/stars/star-life.png'),
     lifeFilled: require('../../assets/images/ui/stars/star-life-3.png'),
+    // Currency sprite for Star Fragments — distinct from the yellow stat-rating
+    // stars (lifeFilled / star-filled) used by the home-screen widget.
+    // Originally hot-linked from Google Drive; pulled local in 2026-05-01.
+    fragment: require('../../assets/images/ui/stars/star-fragment.png'),
 } as const;
 
 export const Menu = {

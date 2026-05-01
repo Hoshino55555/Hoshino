@@ -1,5 +1,41 @@
 import { Connection, PublicKey } from '@solana/web3.js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { httpsCallable } from 'firebase/functions'
+import { functions } from '../config/firebase'
+
+// Server-authoritative balance + spin endpoints. Missions/streaks still live
+// in AsyncStorage for now; only the SF balance and daily spin moved.
+type ServerBalance = {
+    balance: number;
+    dailySpin: { lastClaimedAtMs: number; nextEligibleAtMs: number; available: boolean };
+};
+const callGetStarFragments = httpsCallable<Record<string, never>, ServerBalance>(
+    functions,
+    'getStarFragments'
+);
+const callSpendStarFragments = httpsCallable<
+    { amount: number; reason: string },
+    { newBalance: number }
+>(functions, 'spendStarFragments');
+
+export type DailySpinReward =
+    | { kind: 'starFragments'; amount: number }
+    | { kind: 'ingredient'; id: string; qty: number; tier: string };
+
+const callClaimDailySpin = httpsCallable<
+    Record<string, never>,
+    { reward: DailySpinReward; newBalance: number; nextEligibleAtMs: number }
+>(functions, 'claimDailySpin');
+
+const callPurchaseIngredients = httpsCallable<
+    { counts: Record<string, number> },
+    { newBalance: number; granted: Record<string, number>; totalCost: number }
+>(functions, 'purchaseIngredients');
+
+const callClaimHackathonSpecial = httpsCallable<
+    Record<string, never>,
+    { newBalance: number; granted: number }
+>(functions, 'claimHackathonSpecial');
 
 export interface Mission {
     id: string
@@ -67,24 +103,38 @@ export class StarFragmentService {
         this.connection = connection
     }
 
-    // Get player's current star fragment balance and progress
+    // Get player's current star fragment balance and progress.
+    //
+    // The SF *balance* now comes from the server (authoritative). Missions,
+    // streaks, season progress are still AsyncStorage-backed — those will be
+    // moved server-side as they get wired into real gameplay.
     async getPlayerProgress(walletAddress: string): Promise<PlayerProgress> {
+        let cached: PlayerProgress | null = null
         try {
             const stored = await AsyncStorage.getItem(`${this.storageKey}_${walletAddress}`)
             if (stored) {
                 const progress = JSON.parse(stored)
-                // Convert date strings back to Date objects
                 progress.lastLoginDate = new Date(progress.lastLoginDate)
                 progress.seasonProgress.seasonStartDate = new Date(progress.seasonProgress.seasonStartDate)
                 progress.seasonProgress.seasonEndDate = new Date(progress.seasonProgress.seasonEndDate)
-                return progress
+                cached = progress
             }
         } catch (error) {
             console.error('Error loading player progress:', error)
         }
 
-        // Return default progress for new players
-        return this.createNewPlayerProgress(walletAddress)
+        const base = cached ?? this.createNewPlayerProgress(walletAddress)
+
+        try {
+            const res = await callGetStarFragments({})
+            base.starFragments = res.data.balance
+        } catch (error) {
+            // Server unreachable — fall back to whatever the cache had. The
+            // shop will refresh on the next render cycle.
+            console.warn('getStarFragments failed, using cached balance', error)
+        }
+
+        return base
     }
 
     private createNewPlayerProgress(walletAddress: string): PlayerProgress {
@@ -319,32 +369,42 @@ export class StarFragmentService {
         }
     }
 
-    // Spend star fragments
+    // Spend star fragments — server-authoritative.
     async spendStarFragments(walletAddress: string, amount: number, description: string): Promise<{ success: boolean; newBalance?: number; error?: string }> {
         try {
-            const progress = await this.getPlayerProgress(walletAddress)
-
-            if (progress.starFragments < amount) {
-                return { success: false, error: 'Insufficient star fragments' }
-            }
-
-            progress.starFragments -= amount
-            await this.savePlayerProgress(progress)
-
-            // Record transaction
-            await this.recordTransaction(walletAddress, {
-                id: `spend_${Date.now()}`,
-                type: 'spent',
-                amount,
-                source: 'purchase',
-                description,
-                timestamp: new Date()
-            })
-
-            return { success: true, newBalance: progress.starFragments }
-        } catch (error) {
-            return { success: false, error: 'Failed to spend star fragments' }
+            const res = await callSpendStarFragments({ amount, reason: description })
+            return { success: true, newBalance: res.data.newBalance }
+        } catch (error: any) {
+            // Firebase HttpsError surfaces as { code, message }
+            const message = error?.message || 'Failed to spend star fragments'
+            return { success: false, error: message }
         }
+    }
+
+    // Live wallet status — balance + daily spin cooldown info. Cheaper than
+    // getPlayerProgress (no AsyncStorage I/O) and includes the spin metadata.
+    async getWalletStatus(): Promise<ServerBalance> {
+        const res = await callGetStarFragments({})
+        return res.data
+    }
+
+    // Daily spin gacha. Server enforces the 24h cooldown and returns the
+    // reward atomically.
+    async claimDailySpin(): Promise<{ reward: DailySpinReward; newBalance: number; nextEligibleAtMs: number }> {
+        const res = await callClaimDailySpin({})
+        return res.data
+    }
+
+    // Atomic shop purchase — server deducts SF and grants ingredients in one
+    // transaction. Counts not matching IngredientId are silently dropped.
+    async purchaseIngredients(counts: Record<string, number>): Promise<{ newBalance: number; granted: Record<string, number>; totalCost: number }> {
+        const res = await callPurchaseIngredients({ counts })
+        return res.data
+    }
+
+    async claimHackathonSpecial(): Promise<{ newBalance: number; granted: number }> {
+        const res = await callClaimHackathonSpecial({})
+        return res.data
     }
 
     // Check daily login and update streak

@@ -24,6 +24,7 @@ import MoonokoInteraction from './src/components/MoonokoInteraction';
 import MoonokoCollection from './src/components/MoonokoCollection';
 import Shop from './src/components/Shop';
 import FeedingPage from './src/components/FeedingPage';
+import InventoryPage from './src/components/InventoryPage';
 import Gallery from './src/components/Gallery';
 import WelcomeScreen from './src/components/WelcomeScreen';
 import CharacterChat from './src/components/CharacterChat';
@@ -930,15 +931,7 @@ function App() {
             )}
             {currentView === 'inventory' && (
                 <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                    <MoonokoCollection
-                        characters={getGameCharacters(ownedCharacters, 'png')}
-                        selectedCharacter={selectedCharacter}
-                        onSelectCharacter={handleCharacterSelect}
-                        onExit={() => setCurrentView('interaction')}
-                        walletAddress={publicKey?.toString()}
-                        connected={connected}
-                        onNotification={addNotification}
-                    />
+                    <InventoryPage onBack={() => setCurrentView('interaction')} />
                 </View>
             )}
             {currentView === 'settings' && (

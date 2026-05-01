@@ -12,6 +12,7 @@ const authBridge = require('./auth-bridge');
 const gameState = require('./game-state');
 const cooking = require('./cooking');
 const playerProfile = require('./player-profile');
+const starFragments = require('./star-fragments');
 
 // AI chat
 exports.chat = aiChatFunctions.chat;
@@ -47,6 +48,13 @@ exports.getCookingProfile = cooking.getCookingProfile;
 // reinstalls don't wipe identity.
 exports.getPlayerProfile = playerProfile.getPlayerProfile;
 exports.setPlayerProfile = playerProfile.setPlayerProfile;
+
+// Server-authoritative Star Fragments wallet + daily spin
+exports.getStarFragments = starFragments.getStarFragments;
+exports.spendStarFragments = starFragments.spendStarFragments;
+exports.claimDailySpin = starFragments.claimDailySpin;
+exports.purchaseIngredients = starFragments.purchaseIngredients;
+exports.claimHackathonSpecial = starFragments.claimHackathonSpecial;
 
 // Health check
 exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) => {
