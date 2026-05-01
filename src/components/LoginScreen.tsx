@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     subtitle: {
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontSize: 14,
         lineHeight: 20,
         color: '#bdd7e0',
@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
         paddingVertical: Platform.OS === 'ios' ? 14 : 12,
         fontSize: 15,
         color: '#103142',
-        fontFamily: 'monospace',
+        fontFamily: 'SpaceMono',
     },
     emailPreview: {
         paddingHorizontal: 14,
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
         color: '#4c7e90',
     },
     emailPreviewValue: {
-        fontFamily: 'monospace',
+        fontFamily: 'SpaceMono',
         fontSize: 14,
         color: '#14394b',
         fontWeight: '600',
@@ -725,7 +725,7 @@ const styles = StyleSheet.create({
         color: '#9d3e36',
     },
     errorText: {
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontSize: 13,
         lineHeight: 18,
         color: '#7b2e27',

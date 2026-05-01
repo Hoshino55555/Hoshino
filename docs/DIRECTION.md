@@ -155,14 +155,17 @@ Current problem: pages like Shop, Gallery, Feeding are full-screen and ignore th
 Practical implications:
 - `InnerScreen.tsx` becomes the canonical page container for every interactive surface
 - Full-screen takeovers are banned except for specific transitions (zoom-in, zoom-out, ascension)
-- Consistent border, shadow, and typography (PressStart2P) across all zoomed surfaces
+- Consistent border, shadow, and typography across all zoomed surfaces. Three fonts in use:
+    - **PressStart2P** — universal default (titles, buttons, body, chat, auth)
+    - **04b03** — pixel body font for the cooking + sleep surfaces: recipe cards ([FeedingPage.tsx](../src/components/FeedingPage.tsx)), inventory ([InventoryPage.tsx](../src/components/InventoryPage.tsx)), sleep ([SleepScreen.tsx](../src/components/SleepScreen.tsx), [SleepConfirmationModal.tsx](../src/components/SleepConfirmationModal.tsx)).
+    - **SpaceMono** — readable monospace for identifier-shaped content (wallet addresses, email inputs/previews) and conversational running text where PressStart2P is too chunky and 04b03 is too pixelated to read at length: AI chat ([CharacterChat.tsx](../src/components/CharacterChat.tsx)), email input + preview ([LoginScreen.tsx](../src/components/LoginScreen.tsx)), wallet display ([Profile.tsx](../src/components/Profile.tsx)), Android widgets ([src/widgets/assets.ts](../src/widgets/assets.ts)).
 - Animation: pages "zoom in" from the device screen's normal view, so the transition sells the device metaphor
 
 ### Known inconsistencies to resolve
 
 - Border styles and shadows vary across [Shop.tsx](../src/components/Shop.tsx), [Gallery.tsx](../src/components/Gallery.tsx), [FeedingPage.tsx](../src/components/FeedingPage.tsx), [IngredientSelection.tsx](../src/components/IngredientSelection.tsx)
 - Some screens bleed into safe areas; some respect them
-- Font usage drifts; PressStart2P should be universal
+- ~~Font usage drifts~~ — three-font model documented above; remaining drift gets fixed as it's spotted
 
 ---
 

@@ -58,13 +58,13 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginBottom: 16,
         textAlign: 'center',
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
     },
     errorBody: {
         color: '#e5dcf5',
         fontSize: 13,
         textAlign: 'center',
         lineHeight: 20,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
     },
 });

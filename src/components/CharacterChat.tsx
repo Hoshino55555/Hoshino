@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
     emptyHint: {
         textAlign: 'center',
         color: '#b8c6ff',
-        fontFamily: 'monospace',
+        fontFamily: 'SpaceMono',
         fontSize: 12,
         marginTop: 32,
         paddingHorizontal: 24,
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     messageText: {
         fontSize: 14,
         lineHeight: 19,
-        fontFamily: 'monospace',
+        fontFamily: 'SpaceMono',
     },
     userMessageText: {
         color: '#F5F0FF',
@@ -427,14 +427,14 @@ const styles = StyleSheet.create({
     thinkingText: {
         fontSize: 12,
         color: '#FFB6C1',
-        fontFamily: 'monospace',
+        fontFamily: 'SpaceMono',
         letterSpacing: 0.5,
         flex: 1,
     },
     thinkingDots: {
         fontSize: 12,
         color: '#FFB6C1',
-        fontFamily: 'monospace',
+        fontFamily: 'SpaceMono',
         marginLeft: 8,
     },
     inputContainer: {
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
         marginRight: 8,
         color: '#E6E6FA',
         fontSize: 14,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         maxHeight: 120,
         minHeight: 40,
     },
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
         color: '#F5F0FF',
         fontWeight: 'bold',
         fontSize: 12,
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         letterSpacing: 0.5,
     },
     sendButtonDisabled: {

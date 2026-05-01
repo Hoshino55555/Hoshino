@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 'bold',
         color: '#2d1b69', // Deep purple text
-        fontFamily: 'monospace',
+        fontFamily: '04b03',
         letterSpacing: 1,
     },
     contentArea: {
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#2d1b69', // Deep purple text for contrast
         textAlign: 'center',
-        fontFamily: 'monospace',
+        fontFamily: '04b03',
         fontWeight: 'bold',
         lineHeight: 22,
         letterSpacing: 0.5,
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     typingCursor: {
         fontSize: 16,
         color: '#2d1b69',
-        fontFamily: 'monospace',
+        fontFamily: '04b03',
         fontWeight: 'bold',
         position: 'absolute',
         right: 0,
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: 'bold',
         color: '#2d1b69', // Dark purple text for both buttons
-        fontFamily: 'monospace',
+        fontFamily: '04b03',
         letterSpacing: 1,
     },
 });

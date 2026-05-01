@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     statusText: {
         marginTop: 4,
         color: '#9bb4c7',
-        fontFamily: 'monospace',
+        fontFamily: 'PressStart2P',
         fontSize: 10,
     },
     closeButton: {

@@ -224,13 +224,21 @@ const MoonokoInteraction: React.FC<Props> = ({
         setWakeRequested(false);
     }, [selectedCharacter?.id]);
 
-    // Sync the optimistic end-sleep flag with the server. Once serverSleeping
-    // flips false (endSleep succeeded), the optimistic flag is no longer
-    // doing anything — clear it so a subsequent sleep tap doesn't get
-    // suppressed. Same idea as pendingStartSleep's `.then` clear, just
-    // driven by the derived server state instead of the promise.
+    // Clear the optimistic end-sleep flag only when serverSleeping actually
+    // *transitions* true→false (i.e. endSleep succeeded). Without the
+    // transition guard, the effect fires the moment setPendingEndSleep(true)
+    // runs — if the user wakes before startSleep has resolved, serverSleeping
+    // is still false at that moment, so the bare `!serverSleeping &&
+    // pendingEndSleep` check immediately clears the flag. With pendingStartSleep
+    // still true, isSleeping flips back to true and the SleepScreen remounts
+    // mid-exit, producing a visible "reappear for a beat" flicker.
+    const prevServerSleeping = useRef(false);
     useEffect(() => {
-        if (!serverSleeping && pendingEndSleep) setPendingEndSleep(false);
+        const wasSleeping = prevServerSleeping.current;
+        prevServerSleeping.current = serverSleeping;
+        if (wasSleeping && !serverSleeping && pendingEndSleep) {
+            setPendingEndSleep(false);
+        }
     }, [serverSleeping, pendingEndSleep]);
     const [isTransitioning, setIsTransitioning] = useState(true);
     const [transitionOpacity, setTransitionOpacity] = useState(1);
