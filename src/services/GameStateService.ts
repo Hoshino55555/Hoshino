@@ -85,6 +85,14 @@ const callDrainForaged = httpsCallable<
     { state: GameState; drained: ForagedItem[] }
 >(functions, 'drainForaged');
 
+export type BoosterStat = 'mood' | 'energy' | 'hunger';
+export type BoosterSkuId = 'booster-mood' | 'booster-sleep' | 'booster-hunger';
+
+const callApplyBooster = httpsCallable<
+    { characterId: string; skuId: BoosterSkuId; requestId?: string; timezone?: string },
+    { newBalance: number; state: GameState; stat: BoosterStat; priceSF: number; replayed: boolean }
+>(functions, 'applyBooster');
+
 const callExchangePrivyToken = httpsCallable<
     { privyAccessToken: string },
     { firebaseToken: string; uid: string }
@@ -226,6 +234,20 @@ export const GameStateService = {
         characterId: string
     ): Promise<{ state: GameState; drained: ForagedItem[] }> {
         const res = await callDrainForaged({ characterId });
+        return res.data;
+    },
+
+    async applyBooster(
+        characterId: string,
+        skuId: BoosterSkuId,
+        requestId?: string
+    ): Promise<{ newBalance: number; state: GameState; stat: BoosterStat; priceSF: number; replayed: boolean }> {
+        const res = await callApplyBooster({
+            characterId,
+            skuId,
+            requestId,
+            timezone: localTimezone(),
+        });
         return res.data;
     },
 

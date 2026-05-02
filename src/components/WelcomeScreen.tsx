@@ -12,7 +12,7 @@ const isTablet = screenWidth > 768; // Common tablet breakpoint
 interface Props {
     onContinue: (playerName?: string) => void;
     onGoToInteraction?: (playerName?: string) => void;
-    onGoToSelection?: (fromPhase?: string) => void;
+    onGoToSelection?: (fromPhase?: string, playerName?: string) => void;
     connected: boolean;
     onConnectWallet?: () => void;
     playerName?: string;
@@ -328,7 +328,7 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                 case 'chooseMoonoko':
                     // Go to moonoko selection screen
                     if (onGoToSelection) {
-                        onGoToSelection(currentPhase);
+                        onGoToSelection(currentPhase, playerName);
                     } else {
                         onContinue(playerName); // Fallback
                     }
@@ -402,7 +402,7 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
         } else if (currentPhase === 'mintMore') {
             // Go back to selection screen (NO = mint more)
             if (onGoToSelection) {
-                onGoToSelection(currentPhase);
+                onGoToSelection(currentPhase, playerName);
             }
         }
     };

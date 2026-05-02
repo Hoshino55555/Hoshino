@@ -238,9 +238,23 @@ function pickTier(u, mood) {
 //   bytes[0..slots-1]            gate each slot (find/no-find)
 //   bytes[slots..2*slots-1]      pick tier for successful slots
 //   bytes[2*slots..3*slots-1]    pick ingredient within the chosen tier
-function resolveForaging(state, nowMs, randomBytes) {
+function resolveForaging(state, nowMs, randomBytes, intervalMult) {
   const asleep = !!state.sleepStartedAt;
-  const interval = forageInterval(state.hunger);
+  const baseInterval = forageInterval(state.hunger);
+  // intervalMult can be a constant number (legacy) OR a function (eventMs) =>
+  // multiplier so callers can time-window buffs like Sleeping Camp. Returning
+  // 0.8 only inside [campStartMs, campExpiresMs) means foraging backlog
+  // earned outside the paid window keeps base spacing — buying camp doesn't
+  // retroactively densify pre-purchase catch-up, and post-expiry events
+  // revert to base instead of being lost.
+  const multAt =
+    typeof intervalMult === 'function'
+      ? intervalMult
+      : () => (typeof intervalMult === 'number' && intervalMult > 0 ? intervalMult : 1);
+  // Floor each event's interval so a future buff stack can't accidentally
+  // produce a 0-ms interval and DOS the catchup loop.
+  const intervalAt = (eventMs) =>
+    Math.max(60_000, Math.round(baseInterval * (multAt(eventMs) || 1)));
   const slotProb = forageSlotProb(state.energy, asleep);
 
   // Fast-forward lastForagedAt if the gap exceeds the catchup cap — we honor
@@ -251,7 +265,7 @@ function resolveForaging(state, nowMs, randomBytes) {
   }
 
   const finds = [];
-  let eventMs = lastForagedAt + interval;
+  let eventMs = lastForagedAt + intervalAt(lastForagedAt);
   let lastEventMs = lastForagedAt;
   let replayed = 0;
 
@@ -278,7 +292,7 @@ function resolveForaging(state, nowMs, randomBytes) {
       }
     }
     lastEventMs = eventMs;
-    eventMs += interval;
+    eventMs += intervalAt(eventMs);
     replayed++;
   }
   return { finds, lastForagedAt: lastEventMs };
@@ -329,6 +343,15 @@ function normalize(state, nowMs) {
 // to enable foraging; without it, foraging is a no-op (used when engine is loaded
 // in environments without server RNG wired up, e.g. tests).
 function resolve(state, nowMs, opts = {}) {
+  // Carry-cap enforcement: opts.carryCap (if provided) bounds the foragedItems
+  // queue so passive forage tops out at the user's purchased capacity. Drops
+  // are silent — foraging is free, so the user just gets fewer finds. When
+  // unset (e.g. tests), foraging is unbounded.
+  const carryCap =
+    typeof opts.carryCap === 'number' && opts.carryCap > 0 ? opts.carryCap : null;
+  const roomFor = (current) =>
+    carryCap == null ? Infinity : Math.max(0, carryCap - current.length);
+
   // Self-heal foraging split: if state has stale sleep (>=8h elapsed) and
   // we have RNG, run foraging for the in-sleep window FIRST while the state
   // still reads as asleep — that way those events get the sleep-rate slot
@@ -352,14 +375,18 @@ function resolve(state, nowMs, opts = {}) {
       ...state,
       lastForagedAt: Math.max(state.lastForagedAt || state.sleepStartedAt, state.sleepStartedAt),
     };
-    const sleepForage = resolveForaging(sleepWindowState, wakeMs, opts.randomBytes);
-    // Always write workingState in the self-heal branch — even if no finds
-    // were emitted, we want to commit the clamp (sleepWindowState's
-    // lastForagedAt may have advanced past state.lastForagedAt).
+    const sleepForage = resolveForaging(
+      sleepWindowState,
+      wakeMs,
+      opts.randomBytes,
+      opts.forageIntervalMultiplier
+    );
+    const existing = state.foragedItems || [];
+    const slice = sleepForage.finds.slice(0, roomFor(existing));
     workingState = {
       ...state,
       lastForagedAt: sleepForage.lastForagedAt,
-      foragedItems: [...(state.foragedItems || []), ...sleepForage.finds],
+      foragedItems: [...existing, ...slice],
     };
   }
 
@@ -371,14 +398,21 @@ function resolve(state, nowMs, opts = {}) {
     return withDecay;
   }
 
-  const { finds, lastForagedAt } = resolveForaging(withDecay, nowMs, opts.randomBytes);
-  if (finds.length === 0 && lastForagedAt === withDecay.lastForagedAt) {
+  const { finds, lastForagedAt } = resolveForaging(
+    withDecay,
+    nowMs,
+    opts.randomBytes,
+    opts.forageIntervalMultiplier
+  );
+  const existing = withDecay.foragedItems || [];
+  const slice = finds.slice(0, roomFor(existing));
+  if (slice.length === 0 && lastForagedAt === withDecay.lastForagedAt) {
     return withDecay;
   }
   return {
     ...withDecay,
     lastForagedAt,
-    foragedItems: [...(withDecay.foragedItems || []), ...finds],
+    foragedItems: [...existing, ...slice],
   };
 }
 
@@ -554,6 +588,39 @@ function applyChat(state, nowMs, opts = {}) {
   };
 }
 
+// Booster restores 2 points to the named stat, clamped to 5. Boosters are
+// purchased from the Shop with Star Fragments; each booster consumed = one
+// applyBooster call. Refuses while the moonoko is sleeping (don't waste a
+// purchase silently — surface "wake up first" to the client).
+const BOOSTER_AMOUNT = 2;
+const BOOSTER_STATS = new Set(['mood', 'hunger', 'energy']);
+function applyBooster(state, nowMs, stat, opts = {}) {
+  if (!BOOSTER_STATS.has(stat)) {
+    throw new Error(`Unknown booster stat: ${stat}`);
+  }
+  const resolved = resolve(state, nowMs, opts);
+  if (resolved.sleepStartedAt) {
+    throw new Error('Cannot use booster: moonoko is sleeping');
+  }
+  const cur = typeof resolved[stat] === 'number' ? resolved[stat] : 1;
+  if (cur >= 5) {
+    throw new Error(`${stat} is already full`);
+  }
+  // Reset the matching decay accumulator so a paid +2 isn't immediately eaten
+  // by a partial decay tick the user already accumulated.
+  const decayKey =
+    stat === 'mood' ? 'moodDecayProgressMs' :
+    stat === 'energy' ? 'energyDecayProgressMs' :
+    null;
+  const next = {
+    ...resolved,
+    [stat]: clamp(1, 5, cur + BOOSTER_AMOUNT),
+    lastResolvedAt: nowMs,
+  };
+  if (decayKey) next[decayKey] = 0;
+  return next;
+}
+
 function applyStartSleep(state, nowMs, opts = {}) {
   // Resolve first so a stale sleepStartedAt (>=8h) self-heals into an awake
   // state before we decide whether to start a fresh sleep. Without this, the
@@ -632,6 +699,8 @@ module.exports = {
   applyFeed,
   applyPlay,
   applyChat,
+  applyBooster,
+  BOOSTER_AMOUNT,
   applyStartSleep,
   applyEndSleep,
   applyDrainForaged,

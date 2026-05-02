@@ -6,6 +6,8 @@ import type {
     IngredientCounts,
     CookResponse,
     RecipeProgressMap,
+    BoosterSkuId,
+    BoosterStat,
 } from '../services/GameStateService';
 
 interface GameStateContextType {
@@ -26,6 +28,10 @@ interface GameStateContextType {
     refreshPantry: () => Promise<void>;
     cookManual: (ingredients: string[]) => Promise<CookResponse>;
     cookRecipe: (recipeId: string) => Promise<CookResponse>;
+    applyBooster: (
+        skuId: BoosterSkuId,
+        requestId?: string
+    ) => Promise<{ newBalance: number; state: GameState; stat: BoosterStat; priceSF: number; replayed: boolean }>;
 }
 
 const GameStateContext = createContext<GameStateContextType | undefined>(undefined);

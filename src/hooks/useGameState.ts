@@ -6,6 +6,8 @@ import {
     type IngredientCounts,
     type CookResponse,
     type RecipeProgressMap,
+    type BoosterSkuId,
+    type BoosterStat,
     SLEEP_REQUIRED_MS,
 } from '../services/GameStateService';
 import { useFirebaseAuth } from '../contexts/FirebaseAuthContext';
@@ -29,6 +31,10 @@ interface UseGameStateResult {
     refreshPantry: () => Promise<void>;
     cookManual: (ingredients: string[]) => Promise<CookResponse>;
     cookRecipe: (recipeId: string) => Promise<CookResponse>;
+    applyBooster: (
+        skuId: BoosterSkuId,
+        requestId?: string
+    ) => Promise<{ newBalance: number; state: GameState; stat: BoosterStat; priceSF: number; replayed: boolean }>;
 }
 
 export function useGameState(characterId: string | null | undefined): UseGameStateResult {
@@ -242,6 +248,19 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         [characterId]
     );
 
+    const applyBooster = useCallback(
+        async (skuId: BoosterSkuId, requestId?: string) => {
+            if (!characterId) throw new Error('No character selected');
+            const requestedFor = characterId;
+            const res = await GameStateService.applyBooster(characterId, skuId, requestId);
+            if (requestedFor !== currentCharacterIdRef.current) return res;
+            lastMutationAtRef.current = Date.now();
+            setState(res.state);
+            return res;
+        },
+        [characterId]
+    );
+
     let sleepRemainingMs = 0;
     if (state?.sleepStartedAt) {
         const elapsed = Date.now() - state.sleepStartedAt;
@@ -268,5 +287,6 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         refreshPantry,
         cookManual,
         cookRecipe,
+        applyBooster,
     };
 }

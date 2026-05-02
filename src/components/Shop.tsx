@@ -14,11 +14,22 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Modal } from 'react-native';
 import { MarketplaceItem, ItemRarity } from '../services/MarketplaceService';
-import StarFragmentService, { type DailySpinReward } from '../services/StarFragmentService';
+import StarFragmentService, {
+    type DailySpinReward,
+    type ServerCaps,
+    type ServerCapLimits,
+    type ActiveCamp,
+    type CampId,
+} from '../services/StarFragmentService';
 import { ingredientLabel } from '../services/RecipeCatalog';
 import { getIngredientArt } from '../assets';
 import { useWallet } from '../contexts/WalletContext';
 import { Connection } from '@solana/web3.js';
+import IAPService, {
+    type IAPPaymentToken,
+    type IAPSkuId,
+} from '../services/IAPService';
+import { useFundSolanaWallet } from '@privy-io/expo/ui';
 import ZoomOutOverlay from './ZoomOutOverlay';
 import { Backgrounds, Stars } from '../assets';
 import {
@@ -30,6 +41,25 @@ import {
 } from '../data/shopCatalog';
 import { INGREDIENT_TIER } from '../services/RecipeCatalog';
 import { useGameStateContext } from '../contexts/GameStateContext';
+import type { BoosterSkuId } from '../services/GameStateService';
+
+// Per-tap idempotency token. Server validates `[A-Za-z0-9_-]{1,128}` and
+// dedups inside a Firestore tx so retries / double-taps don't double-spend.
+const newRequestId = (prefix: string) =>
+    `${prefix}-${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 10)}`;
+
+const BOOSTER_SKU_IDS = new Set<BoosterSkuId>([
+    'booster-mood',
+    'booster-sleep',
+    'booster-hunger',
+]);
+const STAT_LABEL: Record<string, string> = {
+    mood: 'Mood',
+    energy: 'Energy',
+    hunger: 'Hunger',
+};
 
 interface ShopProps {
     connection: Connection;
@@ -109,13 +139,13 @@ const REEL_STEP = REEL_TILE_SIZE + REEL_TILE_GAP;
 
 const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onCloseStart, onItemsPurchased }) => {
     const insets = useSafeAreaInsets();
-    const { publicKey } = useWallet();
+    const { publicKey, walletSource, signer } = useWallet();
     const screenHeight = Dimensions.get('window').height;
     const bannerReserve = screenHeight * 0.25;
 
     const walletKey = publicKey ?? FALLBACK_WALLET;
     const starFragmentService = useMemo(() => new StarFragmentService(connection), [connection]);
-    const { refreshPantry } = useGameStateContext();
+    const { refreshPantry, applyBooster: applyBoosterCtx, refresh: refreshGameState } = useGameStateContext();
 
     const [selectedTab, setSelectedTab] = useState<ShopTab>('consumables');
     const [balance, setBalance] = useState<number>(0);
@@ -133,6 +163,23 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
     const revealScale = useRef(new Animated.Value(0.4)).current;
     const revealGlow = useRef(new Animated.Value(0)).current;
     const [purchasing, setPurchasing] = useState(false);
+    const [caps, setCaps] = useState<ServerCaps | null>(null);
+    const [capLimits, setCapLimits] = useState<ServerCapLimits | null>(null);
+    const [upgradingField, setUpgradingField] = useState<'carryCap' | 'inventoryCap' | null>(null);
+    const [activeCamp, setActiveCamp] = useState<ActiveCamp | null>(null);
+    const [purchasingCampId, setPurchasingCampId] = useState<string | null>(null);
+    const campInFlightRef = useRef(false);
+    // IAP modal state — opened when user taps an iap-pending SKU (SF packs,
+    // season pass, bundles). Picks payment rail then calls IAPService.
+    const [iapItem, setIapItem] = useState<ShopItem | null>(null);
+    const [iapToken, setIapToken] = useState<IAPPaymentToken>('USDC');
+    const [iapPurchasing, setIapPurchasing] = useState(false);
+    const [boosterPurchasingId, setBoosterPurchasingId] = useState<string | null>(null);
+    // Synchronous double-tap guard — React state updates are async, so two
+    // taps inside the same frame both saw boosterPurchasingId === null and
+    // could each fire applyBooster, draining 2x SF for one stat bump.
+    const boosterInFlightRef = useRef(false);
+    const { fundWallet } = useFundSolanaWallet();
     // 1s tick for spin cooldown countdown — only when locked + visible.
     const [, setNowTick] = useState(0);
     useEffect(() => {
@@ -147,6 +194,9 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
             setBalance(status.balance);
             setSpinAvailable(status.dailySpin.available);
             setSpinNextAtMs(status.dailySpin.nextEligibleAtMs);
+            if (status.caps) setCaps(status.caps);
+            if (status.capLimits) setCapLimits(status.capLimits);
+            setActiveCamp(status.activeCamp ?? null);
         } catch (err) {
             console.warn('Shop: failed to load star fragment balance', err);
         }
@@ -270,6 +320,177 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
         }
     }, [claimingHackathon, starFragmentService, onNotification]);
 
+    // Tracks which box is mid-purchase so we can disable just that card.
+    const [openingBoxId, setOpeningBoxId] = useState<string | null>(null);
+    const handleBoxPurchase = useCallback(async (item: ShopItem) => {
+        if (openingBoxId) return;
+        if (balance < item.priceStarFragments) {
+            onNotification?.(
+                `Not enough Star Fragments — need ${item.priceStarFragments}, have ${balance}.`,
+                'error'
+            );
+            return;
+        }
+        setOpeningBoxId(item.id);
+        try {
+            const res = await starFragmentService.purchaseIngredientBox(
+                item.id as 'box-ingredients-common' | 'box-ingredients-uncommon' | 'box-ingredients-rare',
+                newRequestId('box')
+            );
+            setBalance(res.newBalance);
+            await refreshPantry();
+            const summary = Object.entries(res.granted)
+                .map(([id, n]) => `${ingredientLabel(id)} ×${n}`)
+                .join(', ');
+            onNotification?.(`Opened ${item.name} — ${summary}`, 'success');
+        } catch (err: any) {
+            onNotification?.(err?.message || 'Box open failed', 'error');
+        } finally {
+            setOpeningBoxId(null);
+        }
+    }, [openingBoxId, balance, starFragmentService, refreshPantry, onNotification]);
+
+    const handleUpgrade = useCallback(async (
+        item: ShopItem,
+        kind: 'carryCap' | 'inventoryCap'
+    ) => {
+        if (upgradingField) return;
+        if (balance < item.priceStarFragments) {
+            onNotification?.(
+                `Not enough Star Fragments — need ${item.priceStarFragments}, have ${balance}.`,
+                'error'
+            );
+            return;
+        }
+        setUpgradingField(kind);
+        try {
+            const upgradeReqId = newRequestId('up');
+            const res =
+                kind === 'carryCap'
+                    ? await starFragmentService.upgradeCarryCapacity(upgradeReqId)
+                    : await starFragmentService.upgradeInventorySize(upgradeReqId);
+            setBalance(res.newBalance);
+            setCaps((prev) => ({
+                carryCap:
+                    kind === 'carryCap'
+                        ? (res as { carryCap: number }).carryCap
+                        : prev?.carryCap ?? 0,
+                inventoryCap:
+                    kind === 'inventoryCap'
+                        ? (res as { inventoryCap: number }).inventoryCap
+                        : prev?.inventoryCap ?? 0,
+            }));
+            const newValue =
+                kind === 'carryCap'
+                    ? (res as { carryCap: number }).carryCap
+                    : (res as { inventoryCap: number }).inventoryCap;
+            onNotification?.(
+                `${item.name} upgraded — now ${newValue}`,
+                'success'
+            );
+        } catch (err: any) {
+            onNotification?.(err?.message || 'Upgrade failed', 'error');
+        } finally {
+            setUpgradingField(null);
+        }
+    }, [upgradingField, balance, starFragmentService, onNotification]);
+
+    const handleCampPurchase = useCallback(async (item: ShopItem, campId: CampId) => {
+        if (campInFlightRef.current) return;
+        if (activeCamp && activeCamp.expiresAtMs > Date.now()) {
+            onNotification?.('A camp is already active.', 'info');
+            return;
+        }
+        if (balance < item.priceStarFragments) {
+            onNotification?.(
+                `Not enough Star Fragments — need ${item.priceStarFragments}, have ${balance}.`,
+                'error'
+            );
+            return;
+        }
+        campInFlightRef.current = true;
+        setPurchasingCampId(item.id);
+        try {
+            const res = await starFragmentService.purchaseCamp(
+                campId,
+                newRequestId('camp')
+            );
+            setBalance(res.newBalance);
+            setActiveCamp(res.activeCamp);
+            onNotification?.(`${item.name} active — boost engaged!`, 'success');
+        } catch (err: any) {
+            onNotification?.(err?.message || 'Camp purchase failed.', 'error');
+            await refreshBalance();
+        } finally {
+            setPurchasingCampId(null);
+            campInFlightRef.current = false;
+        }
+    }, [activeCamp, balance, starFragmentService, onNotification, refreshBalance]);
+
+    // Default rail: external wallets (MWA/Phantom/Backpack) lean on SKR/SOL,
+    // embedded (Privy) defaults to USDC since fiat onramp lands as USDC.
+    useEffect(() => {
+        if (!iapItem) return;
+        setIapToken(walletSource === 'mwa' ? 'SOL' : 'USDC');
+    }, [iapItem, walletSource]);
+
+    const handleFiatTopUp = useCallback(async () => {
+        if (!publicKey) {
+            onNotification?.('Connect a wallet first to top up.', 'warning');
+            return;
+        }
+        try {
+            // Onramp cluster must match the cluster the IAP backend is
+            // settling on, otherwise USDC lands on the wrong network.
+            // EXPO_PUBLIC_IAP_NETWORK should mirror functions IAP_NETWORK.
+            const net = process.env.EXPO_PUBLIC_IAP_NETWORK === 'mainnet-beta'
+                ? 'mainnet-beta' as const
+                : 'devnet' as const;
+            await fundWallet({
+                address: publicKey,
+                asset: 'USDC',
+                cluster: { name: net },
+            });
+        } catch (err: any) {
+            onNotification?.(err?.message || 'Top up flow failed', 'error');
+        }
+    }, [fundWallet, publicKey, onNotification]);
+
+    const handleIAPPurchase = useCallback(async () => {
+        if (!iapItem || iapPurchasing) return;
+        if (!signer) {
+            onNotification?.('Connect a wallet first to make a purchase.', 'warning');
+            return;
+        }
+        setIapPurchasing(true);
+        try {
+            const res = await IAPService.purchaseSku(
+                iapItem.id as IAPSkuId,
+                iapToken,
+                signer
+            );
+            if (res.granted?.kind === 'starFragments') {
+                setBalance(res.granted.newBalance);
+                onNotification?.(
+                    `+${res.granted.amount.toLocaleString()} Star Fragments — purchase complete!`,
+                    'success'
+                );
+            } else if (res.granted?.kind === 'seasonPass') {
+                onNotification?.('Season Pass active — enjoy!', 'success');
+            } else if (res.granted?.kind === 'bundle') {
+                onNotification?.(`Bundle unlocked — contents pending grant.`, 'success');
+            } else {
+                onNotification?.('Purchase complete.', 'success');
+            }
+            setIapItem(null);
+            await refreshBalance();
+        } catch (err: any) {
+            onNotification?.(err?.message || 'Purchase failed', 'error');
+        } finally {
+            setIapPurchasing(false);
+        }
+    }, [iapItem, iapToken, iapPurchasing, signer, onNotification, refreshBalance]);
+
     const formatCooldown = (ms: number) => {
         if (ms <= 0) return 'Ready';
         const h = Math.floor(ms / 3_600_000);
@@ -312,9 +533,48 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
         }
     };
 
+    const handleBoosterPurchase = useCallback(
+        async (item: ShopItem) => {
+            if (boosterInFlightRef.current) return;
+            if (!BOOSTER_SKU_IDS.has(item.id as BoosterSkuId)) return;
+            if (balance < item.priceStarFragments) {
+                onNotification?.(
+                    `Not enough Star Fragments — need ${item.priceStarFragments}, have ${balance}.`,
+                    'error'
+                );
+                return;
+            }
+            boosterInFlightRef.current = true;
+            setBoosterPurchasingId(item.id);
+            const requestId = newRequestId('b');
+            try {
+                const res = await applyBoosterCtx(item.id as BoosterSkuId, requestId);
+                setBalance(res.newBalance);
+                const label = STAT_LABEL[res.stat] || res.stat;
+                const newVal = res.state[res.stat as 'mood' | 'energy' | 'hunger'];
+                onNotification?.(`${label} restored — now ${newVal}/5.`, 'success');
+            } catch (err: any) {
+                onNotification?.(err?.message || 'Booster failed.', 'error');
+                // Server may have committed before throwing on retry/timeout —
+                // refresh both wallet and game state so the UI matches truth.
+                await Promise.all([refreshBalance(), refreshGameState()]);
+            } finally {
+                setBoosterPurchasingId(null);
+                boosterInFlightRef.current = false;
+            }
+        },
+        [balance, applyBoosterCtx, onNotification, refreshBalance, refreshGameState]
+    );
+
     const addToCart = (item: ShopItem) => {
+        if (BOOSTER_SKU_IDS.has(item.id as BoosterSkuId)) {
+            void handleBoosterPurchase(item);
+            return;
+        }
         if (item.status === 'iap-pending') {
-            onNotification?.('Coming soon — in-app purchases land in a future update.', 'info');
+            // IAP scaffolding is wired but treasury/SKR are still placeholders;
+            // open the rail picker anyway so QA can exercise the flow on devnet.
+            setIapItem(item);
             return;
         }
         if (item.status === 'effect-pending') {
@@ -385,7 +645,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
 
         setPurchasing(true);
         try {
-            const result = await starFragmentService.purchaseIngredients(ingredientCounts);
+            const result = await starFragmentService.purchaseIngredients(
+                ingredientCounts,
+                newRequestId('ing')
+            );
             setBalance(result.newBalance);
             await refreshPantry();
 
@@ -469,15 +732,149 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
         </View>
     );
 
+    const renderBoxCard = (item: ShopItem) => {
+        const opening = openingBoxId === item.id;
+        const insufficient = balance < item.priceStarFragments;
+        const disabled = opening || (openingBoxId !== null && !opening) || insufficient;
+        return (
+            <View
+                key={item.id}
+                style={[styles.itemCard, { borderColor: getRarityBorderColor(item.rarity) }]}
+            >
+                <TouchableOpacity
+                    style={[styles.itemClickArea, disabled && styles.disabledItem]}
+                    onPress={() => handleBoxPurchase(item)}
+                    disabled={disabled}
+                >
+                    <Image source={Stars.fragment} style={styles.itemImage} resizeMode="contain" />
+                    <Text style={styles.itemName} numberOfLines={2}>
+                        {item.name}
+                    </Text>
+                    <Text style={styles.itemSummary} numberOfLines={2}>
+                        {item.summary}
+                    </Text>
+                    <View style={styles.priceContainer}>
+                        <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
+                        <Text style={[styles.itemPrice, insufficient && styles.disabledText]}>
+                            {opening ? 'OPENING…' : item.priceStarFragments}
+                        </Text>
+                    </View>
+                    {insufficient && !opening && (
+                        <Text style={styles.insufficientText}>INSUFFICIENT</Text>
+                    )}
+                </TouchableOpacity>
+            </View>
+        );
+    };
+
+    const renderUpgradeCard = (
+        item: ShopItem,
+        kind: 'carryCap' | 'inventoryCap'
+    ) => {
+        const current = caps?.[kind] ?? null;
+        const max =
+            kind === 'carryCap'
+                ? capLimits?.carryCapMax ?? null
+                : capLimits?.inventoryCapMax ?? null;
+        const atMax = current != null && max != null && current >= max;
+        const upgrading = upgradingField === kind;
+        const otherUpgrading = upgradingField !== null && !upgrading;
+        const insufficient = balance < item.priceStarFragments;
+        const disabled = atMax || upgrading || otherUpgrading || insufficient;
+        const summary =
+            current != null && max != null
+                ? `Now ${current}${atMax ? ' (max)' : ` · max ${max}`}`
+                : item.summary || '';
+        return (
+            <View
+                key={item.id}
+                style={[styles.itemCard, { borderColor: getRarityBorderColor(item.rarity) }]}
+            >
+                <TouchableOpacity
+                    style={[styles.itemClickArea, disabled && styles.disabledItem]}
+                    onPress={() => handleUpgrade(item, kind)}
+                    disabled={disabled}
+                >
+                    <Image source={Stars.fragment} style={styles.itemImage} resizeMode="contain" />
+                    <Text style={styles.itemName} numberOfLines={2}>
+                        {item.name}
+                    </Text>
+                    <Text style={styles.itemSummary} numberOfLines={2}>
+                        {summary}
+                    </Text>
+                    <View style={styles.priceContainer}>
+                        <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
+                        <Text style={[styles.itemPrice, (insufficient || atMax) && styles.disabledText]}>
+                            {upgrading ? '…' : atMax ? 'MAX' : item.priceStarFragments}
+                        </Text>
+                    </View>
+                    {insufficient && !atMax && !upgrading && (
+                        <Text style={styles.insufficientText}>INSUFFICIENT</Text>
+                    )}
+                </TouchableOpacity>
+            </View>
+        );
+    };
+
+    const renderCampCard = (item: ShopItem, campId: CampId) => {
+        const nowMs = Date.now();
+        const isActive = !!activeCamp && activeCamp.id === campId && activeCamp.expiresAtMs > nowMs;
+        const purchasing = purchasingCampId === item.id;
+        const insufficient = !isActive && balance < item.priceStarFragments;
+        const disabled = isActive || purchasing || insufficient;
+        let summary = item.summary || item.description;
+        if (isActive) {
+            const remainingMs = activeCamp!.expiresAtMs - nowMs;
+            const days = Math.floor(remainingMs / 86_400_000);
+            const hours = Math.floor((remainingMs % 86_400_000) / 3_600_000);
+            summary = days > 0 ? `Active · ${days}d ${hours}h left` : `Active · ${hours}h left`;
+        }
+        return (
+            <View
+                key={item.id}
+                style={[styles.itemCard, { borderColor: getRarityBorderColor(item.rarity) }]}
+            >
+                <TouchableOpacity
+                    style={[styles.itemClickArea, disabled && styles.disabledItem]}
+                    onPress={() => handleCampPurchase(item, campId)}
+                    disabled={disabled}
+                >
+                    <Image source={Stars.fragment} style={styles.itemImage} resizeMode="contain" />
+                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                    <Text style={styles.itemSummary} numberOfLines={2}>{summary}</Text>
+                    <View style={styles.priceContainer}>
+                        <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
+                        <Text style={[styles.itemPrice, (insufficient || isActive) && styles.disabledText]}>
+                            {purchasing ? '…' : isActive ? 'ACTIVE' : item.priceStarFragments}
+                        </Text>
+                    </View>
+                    {insufficient && !isActive && !purchasing && (
+                        <Text style={styles.insufficientText}>INSUFFICIENT</Text>
+                    )}
+                </TouchableOpacity>
+            </View>
+        );
+    };
+
     const renderItemCard = (item: ShopItem) => {
         if (item.id === 'daily-spin') return renderDailySpinCard(item);
         if (item.id === 'hackathon-special') return renderHackathonCard(item);
+        if (item.id === 'upgrade-carry') return renderUpgradeCard(item, 'carryCap');
+        if (item.id === 'upgrade-inventory') return renderUpgradeCard(item, 'inventoryCap');
+        if (item.id === 'sleeping-camp') return renderCampCard(item, 'sleeping-camp');
+        if (item.id.startsWith('box-ingredients-')) return renderBoxCard(item);
         const pile = FRAGMENT_PILES[item.id];
-        const locked = item.status === 'iap-pending' || item.status === 'effect-pending';
-        const projected = cartTotal + item.priceStarFragments;
+        // iap-pending now opens the IAP modal (purchasable on devnet); only
+        // effect-pending stays as a hard "Coming Soon" lock.
+        const isIap = item.status === 'iap-pending';
+        const locked = item.status === 'effect-pending';
+        const isBooster = BOOSTER_SKU_IDS.has(item.id as BoosterSkuId);
+        const boosterBusy = boosterPurchasingId === item.id;
+        const otherBoosterBusy = !!boosterPurchasingId && !boosterBusy;
+        const projected = isBooster ? item.priceStarFragments : cartTotal + item.priceStarFragments;
         const insufficient =
             !locked && item.currency === 'starFragments' && projected > balance;
-        const disabled = locked || insufficient;
+        const disabled = locked || insufficient || boosterBusy || otherBoosterBusy;
 
         return (
             <View
@@ -491,7 +888,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                 <TouchableOpacity
                     style={[styles.itemClickArea, disabled && styles.disabledItem]}
                     onPress={() => addToCart(item)}
-                    disabled={insufficient && !locked}
+                    disabled={(insufficient && !locked) || boosterBusy || otherBoosterBusy}
                 >
                     {pile ? (
                         <View style={styles.pile}>
@@ -520,7 +917,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                         <Text style={styles.itemSummary} numberOfLines={2}>{item.summary}</Text>
                     ) : null}
 
-                    {locked ? (
+                    {locked || isIap ? (
                         <View style={styles.priceContainer}>
                             <Text style={styles.itemPrice}>
                                 {item.priceUsd != null ? `$${item.priceUsd.toFixed(2)}` : 'IAP'}
@@ -530,7 +927,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                         <View style={styles.priceContainer}>
                             <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
                             <Text style={[styles.itemPrice, insufficient && styles.disabledText]}>
-                                {item.priceStarFragments}
+                                {boosterBusy ? '…' : item.priceStarFragments}
                             </Text>
                         </View>
                     )}
@@ -783,6 +1180,95 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                                 </TouchableOpacity>
                             </>
                         )}
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={iapItem !== null}
+                transparent
+                animationType="fade"
+                onRequestClose={() => !iapPurchasing && setIapItem(null)}
+            >
+                <View style={styles.iapModalBackdrop}>
+                    <View style={styles.iapModalCard}>
+                        <Text style={styles.iapTitle}>{iapItem?.name}</Text>
+                        {iapItem?.summary ? (
+                            <Text style={styles.iapSummary}>{iapItem.summary}</Text>
+                        ) : null}
+                        <Text style={styles.iapPrice}>
+                            {iapItem?.priceUsd != null ? `$${iapItem.priceUsd.toFixed(2)} USD` : 'IAP'}
+                        </Text>
+
+                        <Text style={styles.iapSectionLabel}>Pay with</Text>
+                        <View style={styles.iapRailRow}>
+                            {(['SOL', 'USDC', 'SKR'] as IAPPaymentToken[]).map((tk) => (
+                                <TouchableOpacity
+                                    key={tk}
+                                    style={[
+                                        styles.iapRailBtn,
+                                        iapToken === tk && styles.iapRailBtnActive,
+                                    ]}
+                                    onPress={() => setIapToken(tk)}
+                                    disabled={iapPurchasing}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.iapRailText,
+                                            iapToken === tk && styles.iapRailTextActive,
+                                        ]}
+                                    >
+                                        {tk}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        {!signer ? (
+                            <Text style={styles.iapNote}>
+                                Connect a wallet to purchase. Embedded users can also top up
+                                with card via the button below.
+                            </Text>
+                        ) : (
+                            <Text style={styles.iapNote}>
+                                Signing wallet: {walletSource ?? 'unknown'} ·{' '}
+                                {publicKey ? publicKey.slice(0, 4) + '…' + publicKey.slice(-4) : '—'}
+                            </Text>
+                        )}
+
+                        {walletSource === 'embedded' && (
+                            <TouchableOpacity
+                                style={styles.iapTopUpBtn}
+                                onPress={handleFiatTopUp}
+                                disabled={iapPurchasing}
+                            >
+                                <Text style={styles.iapTopUpText}>
+                                    Top up with card (USDC)
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        <View style={styles.iapButtonRow}>
+                            <TouchableOpacity
+                                style={[styles.iapBtn, styles.iapCancelBtn]}
+                                onPress={() => !iapPurchasing && setIapItem(null)}
+                                disabled={iapPurchasing}
+                            >
+                                <Text style={styles.iapBtnText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.iapBtn,
+                                    styles.iapBuyBtn,
+                                    (!signer || iapPurchasing) && styles.iapBtnDisabled,
+                                ]}
+                                onPress={handleIAPPurchase}
+                                disabled={!signer || iapPurchasing}
+                            >
+                                <Text style={styles.iapBtnText}>
+                                    {iapPurchasing ? 'Processing…' : `Buy with ${iapToken}`}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -1307,6 +1793,98 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         fontSize: 12,
     },
+    iapModalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    iapModalCard: {
+        width: '100%',
+        maxWidth: 380,
+        backgroundColor: '#1a1033',
+        borderColor: '#9C27B0',
+        borderWidth: 2,
+        borderRadius: 12,
+        padding: 20,
+    },
+    iapTitle: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 4,
+    },
+    iapSummary: {
+        color: '#cfc4e6',
+        fontSize: 13,
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    iapPrice: {
+        color: '#FFD54F',
+        fontSize: 22,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 16,
+    },
+    iapSectionLabel: {
+        color: '#bba8d6',
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginBottom: 6,
+        textTransform: 'uppercase',
+    },
+    iapRailRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 12,
+    },
+    iapRailBtn: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#3d2a5e',
+        alignItems: 'center',
+    },
+    iapRailBtnActive: {
+        borderColor: '#FFD54F',
+        backgroundColor: '#2a1a4a',
+    },
+    iapRailText: { color: '#bba8d6', fontWeight: 'bold' },
+    iapRailTextActive: { color: '#FFD54F' },
+    iapNote: {
+        color: '#a99fc4',
+        fontSize: 11,
+        textAlign: 'center',
+        marginVertical: 10,
+    },
+    iapButtonRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 12,
+    },
+    iapBtn: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    iapCancelBtn: { backgroundColor: '#3d2a5e' },
+    iapBuyBtn: { backgroundColor: '#7B3FB8' },
+    iapBtnDisabled: { opacity: 0.5 },
+    iapBtnText: { color: '#fff', fontWeight: 'bold' },
+    iapTopUpBtn: {
+        marginTop: 8,
+        paddingVertical: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FFD54F',
+        alignItems: 'center',
+    },
+    iapTopUpText: { color: '#FFD54F', fontWeight: 'bold', fontSize: 12 },
 });
 
 export default Shop;

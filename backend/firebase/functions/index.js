@@ -13,6 +13,7 @@ const gameState = require('./game-state');
 const cooking = require('./cooking');
 const playerProfile = require('./player-profile');
 const starFragments = require('./star-fragments');
+const iap = require('./iap');
 
 // AI chat
 exports.chat = aiChatFunctions.chat;
@@ -37,6 +38,7 @@ exports.recordChat = gameState.recordChat;
 exports.startSleep = gameState.startSleep;
 exports.endSleep = gameState.endSleep;
 exports.drainForaged = gameState.drainForaged;
+exports.applyBooster = gameState.applyBooster;
 
 // Cooking
 exports.cook = cooking.cook;
@@ -54,7 +56,15 @@ exports.getStarFragments = starFragments.getStarFragments;
 exports.spendStarFragments = starFragments.spendStarFragments;
 exports.claimDailySpin = starFragments.claimDailySpin;
 exports.purchaseIngredients = starFragments.purchaseIngredients;
+exports.purchaseIngredientBox = starFragments.purchaseIngredientBox;
+exports.upgradeCarryCapacity = starFragments.upgradeCarryCapacity;
+exports.upgradeInventorySize = starFragments.upgradeInventorySize;
+exports.purchaseCamp = starFragments.purchaseCamp;
 exports.claimHackathonSpecial = starFragments.claimHackathonSpecial;
+
+// IAP (dual-rail: crypto SOL/USDC/SKR + fiat onramp via Privy useFundWallet)
+exports.createPurchaseIntent = iap.createPurchaseIntent;
+exports.confirmPurchase = iap.confirmPurchase;
 
 // Health check
 exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) => {
@@ -77,11 +87,15 @@ exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) 
       'startSleep',
       'endSleep',
       'drainForaged',
+      'applyBooster',
+      'purchaseCamp',
       'cook',
       'getInventory',
       'getCookingProfile',
       'getPlayerProfile',
       'setPlayerProfile',
+      'createPurchaseIntent',
+      'confirmPurchase',
       'health',
     ],
   });

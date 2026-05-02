@@ -219,9 +219,16 @@ function App() {
         setCurrentView(view);
     };
 
-    const navigateToSelection = (fromPhase?: string) => {
+    const navigateToSelection = (fromPhase?: string, name?: string) => {
         if (fromPhase) {
             setWelcomePhase(fromPhase);
+        }
+        const trimmed = name?.trim();
+        if (trimmed && trimmed.length > 0) {
+            setPlayerName(trimmed);
+            if (publicKey) {
+                persistPlayerProfile(publicKey.toString(), { playerName: trimmed });
+            }
         }
         setPreviousView(currentView);
         setCurrentView('selection');
@@ -229,7 +236,6 @@ function App() {
     const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(
         null
     );
-    const [statusMessage, setStatusMessage] = useState('');
     const [achievements, setAchievements] = useState<string[]>([]);
     const [ownedCharacters, setOwnedCharacters] = useState<string[]>([]);
 
@@ -321,13 +327,11 @@ function App() {
 
     useEffect(() => {
         return () => {
-            setStatusMessage('');
             setLastError(null);
         };
     }, []);
 
     const connectWallet = async () => {
-        setStatusMessage('');
         setLastError(null);
 
         try {
@@ -337,13 +341,12 @@ function App() {
             });
 
             if (connected) {
-                setStatusMessage('Wallet already connected! 🎉');
-                setTimeout(() => setStatusMessage(''), 3000);
+                addNotification('Wallet already connected! 🎉', 'success');
                 return;
             }
 
             console.log('🔄 Attempting to connect to wallet...');
-            setStatusMessage('Connecting to wallet...');
+            addNotification('Connecting to wallet...', 'info');
 
             await connect();
 
@@ -352,8 +355,7 @@ function App() {
                 connected
             });
 
-            setStatusMessage('Wallet connected successfully! 🎉');
-            setTimeout(() => setStatusMessage(''), 3000);
+            addNotification('Wallet connected successfully! 🎉', 'success');
         } catch (error: any) {
             console.error('❌ Wallet connection failed:', error);
 
@@ -370,11 +372,9 @@ function App() {
             }
 
             setLastError(errorMessage);
-            setStatusMessage(errorMessage);
             addNotification(errorMessage, 'error');
 
             setTimeout(() => {
-                setStatusMessage('');
                 setLastError(null);
             }, 5000);
         }
@@ -384,14 +384,12 @@ function App() {
         try {
             console.log('🔌 Disconnecting wallet...');
             await disconnect();
-            setStatusMessage('Wallet disconnected');
+            addNotification('Wallet disconnected', 'info');
             setAchievements([]);
             console.log('✅ Wallet disconnected successfully');
-            setTimeout(() => setStatusMessage(''), 3000);
         } catch (error) {
             console.error('❌ Error disconnecting wallet:', error);
-            setStatusMessage('Failed to disconnect wallet');
-            setTimeout(() => setStatusMessage(''), 3000);
+            addNotification('Failed to disconnect wallet', 'error');
         }
     };
 
@@ -403,14 +401,14 @@ function App() {
 
         if (!validateCharacterInput(character)) {
             console.log('❌ Character validation failed');
-            setStatusMessage('Invalid character data');
+            addNotification('Invalid character data', 'error');
             return;
         }
 
         console.log(
             '✅ Setting selected character and switching to interaction view'
         );
-        setStatusMessage(`${character.name} selected! Preparing your companion...`);
+        addNotification(`${character.name} selected! Preparing your companion...`, 'success');
 
         const nextOwnedCharacters = normalizeOwnedCharacterIds([
             ...ownedCharacters,
@@ -986,12 +984,6 @@ function App() {
                 onOpenProfile={() => navigateToView('profile')}
             />
 
-            {statusMessage && (
-                <View style={[styles.statusMessage, lastError ? styles.error : styles.success]}>
-                    <Text style={styles.statusText}>{statusMessage}</Text>
-                </View>
-            )}
-
             {notifications.map((notification, i) => (
                 <Notification
                     key={notification.id}
@@ -1035,33 +1027,6 @@ const styles = StyleSheet.create({
         height: 192,
     },
 
-    statusMessage: {
-        position: 'absolute',
-        top: 50,
-        right: 20,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        maxWidth: 250,
-        zIndex: 1000,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
-    },
-    success: {
-        backgroundColor: 'rgba(34, 197, 94, 0.9)',
-    },
-    error: {
-        backgroundColor: 'rgba(239, 68, 68, 0.9)',
-    },
-    statusText: {
-        color: '#fff',
-        textAlign: 'center',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
     noCharacterContainer: {
         flex: 1,
         flexDirection: 'column',

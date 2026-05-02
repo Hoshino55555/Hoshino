@@ -5,10 +5,29 @@ import { functions } from '../config/firebase'
 
 // Server-authoritative balance + spin endpoints. Missions/streaks still live
 // in AsyncStorage for now; only the SF balance and daily spin moved.
+type ServerCaps = { carryCap: number; inventoryCap: number };
+type ServerCapLimits = {
+    carryCapMax: number;
+    inventoryCapMax: number;
+    carryCapIncrement: number;
+    inventoryCapIncrement: number;
+    upgradeCarryPriceSF: number;
+    upgradeInventoryPriceSF: number;
+};
+export type ActiveCamp = {
+    id: string;
+    startedAtMs: number;
+    expiresAtMs: number;
+};
 type ServerBalance = {
     balance: number;
     dailySpin: { lastClaimedAtMs: number; nextEligibleAtMs: number; available: boolean };
+    caps?: ServerCaps;
+    capLimits?: ServerCapLimits;
+    activeCamp?: ActiveCamp | null;
 };
+export type { ServerCaps, ServerCapLimits, ServerBalance };
+export type CampId = 'sleeping-camp';
 const callGetStarFragments = httpsCallable<Record<string, never>, ServerBalance>(
     functions,
     'getStarFragments'
@@ -28,14 +47,46 @@ const callClaimDailySpin = httpsCallable<
 >(functions, 'claimDailySpin');
 
 const callPurchaseIngredients = httpsCallable<
-    { counts: Record<string, number> },
-    { newBalance: number; granted: Record<string, number>; totalCost: number }
+    { counts: Record<string, number>; requestId?: string },
+    { newBalance: number; granted: Record<string, number>; totalCost: number; replayed?: boolean }
 >(functions, 'purchaseIngredients');
+
+export type IngredientBoxId =
+    | 'box-ingredients-common'
+    | 'box-ingredients-uncommon'
+    | 'box-ingredients-rare';
+
+const callPurchaseIngredientBox = httpsCallable<
+    { boxId: IngredientBoxId; requestId?: string },
+    {
+        newBalance: number;
+        granted: Record<string, number>;
+        totalCost: number;
+        rolls: number;
+        tier: string;
+        replayed?: boolean;
+    }
+>(functions, 'purchaseIngredientBox');
 
 const callClaimHackathonSpecial = httpsCallable<
     Record<string, never>,
     { newBalance: number; granted: number }
 >(functions, 'claimHackathonSpecial');
+
+const callUpgradeCarryCapacity = httpsCallable<
+    { requestId?: string },
+    { newBalance: number; carryCap: number; replayed?: boolean }
+>(functions, 'upgradeCarryCapacity');
+
+const callUpgradeInventorySize = httpsCallable<
+    { requestId?: string },
+    { newBalance: number; inventoryCap: number; replayed?: boolean }
+>(functions, 'upgradeInventorySize');
+
+const callPurchaseCamp = httpsCallable<
+    { campId: CampId; requestId?: string },
+    { newBalance: number; activeCamp: ActiveCamp; replayed?: boolean }
+>(functions, 'purchaseCamp');
 
 export interface Mission {
     id: string
@@ -397,13 +448,48 @@ export class StarFragmentService {
 
     // Atomic shop purchase — server deducts SF and grants ingredients in one
     // transaction. Counts not matching IngredientId are silently dropped.
-    async purchaseIngredients(counts: Record<string, number>): Promise<{ newBalance: number; granted: Record<string, number>; totalCost: number }> {
-        const res = await callPurchaseIngredients({ counts })
+    // Pass a per-tap requestId to make the call idempotent under retry.
+    async purchaseIngredients(counts: Record<string, number>, requestId?: string): Promise<{ newBalance: number; granted: Record<string, number>; totalCost: number; replayed?: boolean }> {
+        const res = await callPurchaseIngredients({ counts, requestId })
+        return res.data
+    }
+
+    // Atomic gacha-box purchase. Server is authoritative on price and tier
+    // composition; the client cannot influence the rolls. The same requestId
+    // returns the same rolled grant on replay.
+    async purchaseIngredientBox(boxId: IngredientBoxId, requestId?: string): Promise<{
+        newBalance: number;
+        granted: Record<string, number>;
+        totalCost: number;
+        rolls: number;
+        tier: string;
+        replayed?: boolean;
+    }> {
+        const res = await callPurchaseIngredientBox({ boxId, requestId })
         return res.data
     }
 
     async claimHackathonSpecial(): Promise<{ newBalance: number; granted: number }> {
         const res = await callClaimHackathonSpecial({})
+        return res.data
+    }
+
+    // Atomic carry-cap upgrade. Server enforces price + hard cap; the client
+    // gets back the new balance + new cap.
+    async upgradeCarryCapacity(requestId?: string): Promise<{ newBalance: number; carryCap: number; replayed?: boolean }> {
+        const res = await callUpgradeCarryCapacity({ requestId })
+        return res.data
+    }
+
+    async upgradeInventorySize(requestId?: string): Promise<{ newBalance: number; inventoryCap: number; replayed?: boolean }> {
+        const res = await callUpgradeInventorySize({ requestId })
+        return res.data
+    }
+
+    // Buy a single-slot camp (e.g. sleeping-camp). Server refuses if a camp
+    // is already active; the wallet shows activeCamp until expiresAtMs.
+    async purchaseCamp(campId: CampId, requestId?: string): Promise<{ newBalance: number; activeCamp: ActiveCamp; replayed?: boolean }> {
+        const res = await callPurchaseCamp({ campId, requestId })
         return res.data
     }
 
