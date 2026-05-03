@@ -120,6 +120,51 @@ const TIER_TILE_COLOR = {
     ultra_rare: '#9C27B0',
 } as const;
 
+// Ingredient pool for each box tier — every ingredient renders as part of
+// the "bundle" preview on the shop card. Driven off INGREDIENT_TIER so adding
+// a new ingredient automatically participates without a separate manifest.
+const INGREDIENTS_BY_TIER: Record<string, string[]> = Object.entries(
+    INGREDIENT_TIER
+).reduce<Record<string, string[]>>((acc, [id, tier]) => {
+    (acc[tier] ||= []).push(id);
+    return acc;
+}, {});
+
+// Hand-tuned huddle positions for the bundle preview (n=3..6). Each sprite
+// is 18×18 inside a 44×44 container; layouts form a tight diamond/pentagon
+// cluster centered on (13,13) so the pile reads as huddled together rather
+// than a row. Render order = back-to-front (later entries draw on top, so
+// the front-most sprites sit at the end of each array).
+const BUNDLE_LAYOUT: Record<number, { top: number; left: number }[]> = {
+    3: [
+        { top: 0, left: 13 },
+        { top: 14, left: 2 },
+        { top: 14, left: 24 },
+    ],
+    4: [
+        { top: 0, left: 13 },
+        { top: 13, left: 0 },
+        { top: 13, left: 26 },
+        { top: 26, left: 13 },
+    ],
+    5: [
+        { top: 0, left: 13 },
+        { top: 11, left: 0 },
+        { top: 11, left: 26 },
+        { top: 24, left: 5 },
+        { top: 24, left: 21 },
+    ],
+    6: [
+        { top: 0, left: 13 },
+        { top: 12, left: 5 },
+        { top: 12, left: 21 },
+        { top: 24, left: -2 },
+        { top: 24, left: 13 },
+        { top: 24, left: 28 },
+    ],
+};
+
+
 const REEL_TILES: ReelTile[] = [
     { kind: 'ingredient', id: 'egg',        tier: 'common',     color: TIER_TILE_COLOR.common },
     { kind: 'starFragments', amount: 10,    color: '#2e5a3e' },
@@ -141,7 +186,9 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
     const insets = useSafeAreaInsets();
     const { publicKey, walletSource, signer } = useWallet();
     const screenHeight = Dimensions.get('window').height;
-    const bannerReserve = screenHeight * 0.25;
+    const bannerReserve = screenHeight * 0.27;
+    // Painted strip at the bottom of HOSHI-DEPO.gif — back button lives there.
+    const bottomBarReserve = screenHeight * 0.10;
 
     const walletKey = publicKey ?? FALLBACK_WALLET;
     const starFragmentService = useMemo(() => new StarFragmentService(connection), [connection]);
@@ -736,6 +783,11 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
         const opening = openingBoxId === item.id;
         const insufficient = balance < item.priceStarFragments;
         const disabled = opening || (openingBoxId !== null && !opening) || insufficient;
+        // 'box-ingredients-common' → 'common' etc. Falls back to common so a
+        // future tier name doesn't crash the bundle preview (just shows the
+        // common pool until the catalog catches up).
+        const tier = item.id.replace('box-ingredients-', '');
+        const bundle = INGREDIENTS_BY_TIER[tier] || INGREDIENTS_BY_TIER.common;
         return (
             <View
                 key={item.id}
@@ -746,9 +798,25 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                     onPress={() => handleBoxPurchase(item)}
                     disabled={disabled}
                 >
-                    <Image source={Stars.fragment} style={styles.itemImage} resizeMode="contain" />
+                    <View style={styles.bundle}>
+                        {bundle.map((ing, i) => {
+                            const layout = BUNDLE_LAYOUT[bundle.length] || BUNDLE_LAYOUT[6];
+                            const pos = layout[i] || layout[layout.length - 1];
+                            return (
+                                <Image
+                                    key={ing}
+                                    source={getIngredientArt(ing)}
+                                    style={[styles.bundleSprite, pos]}
+                                    resizeMode="contain"
+                                />
+                            );
+                        })}
+                    </View>
                     <Text style={styles.itemName} numberOfLines={2}>
-                        {item.name}
+                        {/* Force the rarity word onto its own line so Common,
+                            Uncommon, and Rare all wrap identically — keeps
+                            the box cards visually consistent in a row. */}
+                        {item.name.replace(' · ', '\n')}
                     </Text>
                     <Text style={styles.itemSummary} numberOfLines={2}>
                         {item.summary}
@@ -920,7 +988,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                     {locked || isIap ? (
                         <View style={styles.priceContainer}>
                             <Text style={styles.itemPrice}>
-                                {item.priceUsd != null ? `$${item.priceUsd.toFixed(2)}` : 'IAP'}
+                                {item.priceUsd != null ? `$${item.priceUsd.toFixed(2)}` : 'Coming Soon'}
                             </Text>
                         </View>
                     ) : (
@@ -948,17 +1016,15 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
     return (
         <ZoomOutOverlay exiting={isClosing} onExitComplete={onClose} backgroundColor="#1a1033">
             <ImageBackground source={Backgrounds.shop} style={styles.bg} resizeMode="cover">
-                <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={handleClose}
-                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                    >
-                        <Text style={styles.backButtonText}>{'<'} Back</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={[styles.scrollClipper, { marginTop: bannerReserve }]}>
+                <View
+                    style={[
+                        styles.scrollClipper,
+                        {
+                            marginTop: bannerReserve + insets.top,
+                            marginBottom: bottomBarReserve,
+                        },
+                    ]}
+                >
                 <ScrollView
                     contentContainerStyle={[
                         styles.scrollBody,
@@ -1053,6 +1119,22 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                         )}
                     </View>
                 </ScrollView>
+                </View>
+
+                <View
+                    style={[
+                        styles.bottomBar,
+                        { height: bottomBarReserve, paddingBottom: insets.bottom },
+                    ]}
+                    pointerEvents="box-none"
+                >
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={handleClose}
+                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                    >
+                        <Text style={styles.backButtonText}>{'<'} Back</Text>
+                    </TouchableOpacity>
                 </View>
             </ImageBackground>
             <Modal
@@ -1196,7 +1278,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                             <Text style={styles.iapSummary}>{iapItem.summary}</Text>
                         ) : null}
                         <Text style={styles.iapPrice}>
-                            {iapItem?.priceUsd != null ? `$${iapItem.priceUsd.toFixed(2)} USD` : 'IAP'}
+                            {iapItem?.priceUsd != null ? `$${iapItem.priceUsd.toFixed(2)} USD` : 'Coming Soon'}
                         </Text>
 
                         <Text style={styles.iapSectionLabel}>Pay with</Text>
@@ -1278,13 +1360,18 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
 
 const styles = StyleSheet.create({
     bg: { flex: 1, width: '100%', height: '100%' },
-    topBar: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 4,
+    // Sits in the painted bottom strip baked into HOSHI-DEPO.gif. Absolute
+    // positioning so the scroll content above isn't shifted — scrollClipper
+    // already reserves the matching height via marginBottom.
+    bottomBar: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-start',
+        paddingHorizontal: 16,
     },
     spinBackdrop: {
         flex: 1,
@@ -1582,6 +1669,20 @@ const styles = StyleSheet.create({
         height: 44,
         marginBottom: 4,
     },
+    // Bundle preview is a clustered "pile" of every ingredient in the tier.
+    // Container width matches the widest BUNDLE_LAYOUT preset (left=26 +
+    // sprite=20 = 46, rounded to 48) so the cluster reads as centered.
+    bundle: {
+        width: 48,
+        height: 44,
+        marginBottom: 4,
+        position: 'relative',
+    },
+    bundleSprite: {
+        position: 'absolute',
+        width: 20,
+        height: 20,
+    },
     pile: {
         width: 44,
         height: 44,
@@ -1593,6 +1694,11 @@ const styles = StyleSheet.create({
     },
     itemName: {
         fontSize: 10,
+        lineHeight: 13,
+        // Reserve 2 lines so titles that wrap (e.g. "Common Ingredient Box")
+        // line up vertically with shorter titles (e.g. "Rare Ingredient Box")
+        // — keeps the price row at the same Y across every card in a row.
+        minHeight: 26,
         fontWeight: 'bold',
         marginBottom: 2,
         textAlign: 'center',

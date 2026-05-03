@@ -37,10 +37,12 @@ export const Characters = {
     SIRIUS: {
         still: require('../../assets/images/characters/SIRIUS.png'),
         anim: require('../../assets/images/characters/SIRIUS-anim.gif'),
+        sleep: require('../../assets/images/characters/SIRIUS-sleep.png'),
     },
     ZANIAH: {
         still: require('../../assets/images/characters/ZANIAH.png'),
         anim: require('../../assets/images/characters/ZANIAH-anim.gif'),
+        sleep: require('../../assets/images/characters/ZANIAH-sleep.png'),
     },
 } as const;
 
@@ -73,50 +75,91 @@ export const getCharacterSleep = (id: string | null | undefined) => {
 // below instead, which keys off the IngredientId union and falls back when
 // art hasn't landed yet.
 export const Ingredients = {
-    miraBerry: require('../../assets/images/ingredients/mira-berry.png'),
-    novaEgg: require('../../assets/images/ingredients/nova-egg.png'),
-    pinkSugar: require('../../assets/images/ingredients/pink-sugar.png'),
+    bacon: require('../../assets/images/ingredients/bacon.png'),
+    banana: require('../../assets/images/ingredients/banana.png'),
+    bread: require('../../assets/images/ingredients/bread.png'),
+    carrot: require('../../assets/images/ingredients/carrot.png'),
+    egg: require('../../assets/images/ingredients/egg.png'),
     gouda: require('../../assets/images/ingredients/gouda.png'),
     lettuce: require('../../assets/images/ingredients/lettuce.png'),
+    milk: require('../../assets/images/ingredients/milk.png'),
+    oat: require('../../assets/images/ingredients/oat.png'),
     potato: require('../../assets/images/ingredients/potato.png'),
     rice: require('../../assets/images/ingredients/rice.png'),
+    strawberry: require('../../assets/images/ingredients/strawberry.png'),
+    tofu: require('../../assets/images/ingredients/tofu.png'),
     tomato: require('../../assets/images/ingredients/tomato.png'),
+    tuna: require('../../assets/images/ingredients/tuna.png'),
+    // Legacy placeholder retained as the star_dust stand-in until the real
+    // ultra-rare sprite drops. Removing it would break getIngredientArt for
+    // the only IngredientId without dedicated art.
+    pinkSugar: require('../../assets/images/ingredients/pink-sugar.png'),
 } as const;
 
-// Real ingredient art keyed by RecipeCatalog.IngredientId. Filled in as
-// art drops; ids without entries fall back via `getIngredientArt` to a
-// celestial placeholder so the cooking/forage UI never shows a broken slot.
+// Real ingredient art keyed by RecipeCatalog.IngredientId. star_dust currently
+// reuses the pink-sugar placeholder until the dedicated sprite lands.
 //
 // Backed by a Map so untrusted runtime ids (server payloads, IngredientCounts
 // keys) can't accidentally hit prototype-chain properties like `toString`.
 // The entry tuple is typed as `[IngredientId, ...]` so a typo'd key is a
 // compile error without forcing IngredientId casts at call sites.
 const INGREDIENT_ART = new Map<string, ReturnType<typeof require>>([
-    ['egg', Ingredients.novaEgg],
+    ['bacon', Ingredients.bacon],
+    ['banana', Ingredients.banana],
+    ['bread', Ingredients.bread],
+    ['carrot', Ingredients.carrot],
+    ['egg', Ingredients.egg],
     ['gouda', Ingredients.gouda],
     ['lettuce', Ingredients.lettuce],
+    ['milk', Ingredients.milk],
+    ['oat', Ingredients.oat],
     ['potato', Ingredients.potato],
     ['rice', Ingredients.rice],
+    ['strawberry', Ingredients.strawberry],
+    ['tofu', Ingredients.tofu],
     ['tomato', Ingredients.tomato],
+    ['tuna', Ingredients.tuna],
+    ['star_dust', Ingredients.pinkSugar],
 ] satisfies [IngredientId, ReturnType<typeof require>][]);
 
-const INGREDIENT_PLACEHOLDERS = [
-    Ingredients.miraBerry,
-    Ingredients.novaEgg,
-    Ingredients.pinkSugar,
-];
-
-// Stable hash → placeholder index. Same id always maps to the same
-// placeholder so the UI doesn't reshuffle on every render.
-function placeholderForId(id: string) {
-    let h = 0;
-    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-    return INGREDIENT_PLACEHOLDERS[Math.abs(h) % INGREDIENT_PLACEHOLDERS.length];
-}
-
 export function getIngredientArt(id: string) {
-    return INGREDIENT_ART.get(id) ?? placeholderForId(id);
+    // Fallback to pink-sugar for unknown ids — same surface the star_dust
+    // placeholder uses, so a typo or stale server id still renders something
+    // instead of breaking the slot.
+    return INGREDIENT_ART.get(id) ?? Ingredients.pinkSugar;
 }
+
+// Recipe dish art keyed by Recipe.id. All 14 v1 recipes have art; ids
+// outside the catalog fall back to the pink-sugar placeholder so a stale
+// recipe id from server state can't crash the renderer.
+const RECIPE_ART = new Map<string, ReturnType<typeof require>>([
+    ['babana_bred', require('../../assets/images/recipes/babana_bred.png')],
+    ['burdger', require('../../assets/images/recipes/burdger.png')],
+    ['dont_ask', require('../../assets/images/recipes/dont_ask.png')],
+    ['eggtato', require('../../assets/images/recipes/eggtato.png')],
+    ['healthy_era', require('../../assets/images/recipes/healthy_era.png')],
+    ['hoshi_boba', require('../../assets/images/recipes/hoshi_boba.png')],
+    ['hoshi_tato', require('../../assets/images/recipes/hoshi_tato.png')],
+    ['maki_chan', require('../../assets/images/recipes/maki_chan.png')],
+    ['miso_nori', require('../../assets/images/recipes/miso_nori.png')],
+    ['oat_and_cheese', require('../../assets/images/recipes/oat_and_cheese.png')],
+    ['oatmaxxing', require('../../assets/images/recipes/oatmaxxing.png')],
+    ['turboslayer_9000', require('../../assets/images/recipes/turboslayer_9000.png')],
+    ['veggeta', require('../../assets/images/recipes/veggeta.png')],
+    ['wobble', require('../../assets/images/recipes/wobble.png')],
+]);
+
+export function getRecipeArt(id: string) {
+    return RECIPE_ART.get(id) ?? Ingredients.pinkSugar;
+}
+
+// Recipe-card backgrounds. Common = mint, Rare = rainbow gradient. Selected
+// per-recipe by FeedingPage (rule lives there, not here, so the art module
+// stays catalog-agnostic).
+export const RecipeCards = {
+    common: require('../../assets/images/ui/menu-cards/common.png'),
+    rare: require('../../assets/images/ui/menu-cards/rare.png'),
+} as const;
 
 export const Backgrounds = {
     screen: require('../../assets/images/ui/backgrounds/screen-bg.png'),

@@ -39,7 +39,9 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
     const screenHeight = Dimensions.get('window').height;
     // The painted ARCADE banner sits at the top of the bg art; reserve roughly
     // a quarter of the screen so tiles don't crash into it.
-    const bannerReserve = screenHeight * 0.25;
+    const bannerReserve = screenHeight * 0.27;
+    // Painted plank at the bottom of the new ARCADE bg — back button lives there.
+    const bottomBarReserve = screenHeight * 0.10;
 
     const handleClose = () => {
         if (isClosing) return;
@@ -58,7 +60,47 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
                 style={styles.bg}
                 resizeMode="cover"
             >
-                <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+                <View
+                    style={[
+                        styles.scrollClipper,
+                        {
+                            marginTop: bannerReserve + insets.top,
+                            marginBottom: bottomBarReserve,
+                        },
+                    ]}
+                >
+                    <ScrollView
+                        contentContainerStyle={[
+                            styles.scrollBody,
+                            { paddingBottom: insets.bottom + 16 },
+                        ]}
+                    >
+                        <View style={styles.tileGrid}>
+                            {GAMES.map((game) => (
+                                <TouchableOpacity
+                                    key={game.id}
+                                    style={[styles.tile, !game.available && styles.tileDisabled]}
+                                    activeOpacity={game.available ? 0.8 : 1}
+                                    onPress={() => handleTilePress(game)}
+                                >
+                                    <Text style={styles.tileName}>{game.name}</Text>
+                                    <Text style={styles.tileDescription}>{game.description}</Text>
+                                    {!game.available && (
+                                        <Text style={styles.tileLockBadge}>SOON</Text>
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </ScrollView>
+                </View>
+
+                <View
+                    style={[
+                        styles.bottomBar,
+                        { height: bottomBarReserve, paddingBottom: insets.bottom },
+                    ]}
+                    pointerEvents="box-none"
+                >
                     <TouchableOpacity
                         style={styles.backButton}
                         onPress={handleClose}
@@ -67,30 +109,6 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
                         <Text style={styles.backButtonText}>{'<'} Back</Text>
                     </TouchableOpacity>
                 </View>
-
-                <ScrollView
-                    contentContainerStyle={[
-                        styles.scrollBody,
-                        { paddingTop: bannerReserve, paddingBottom: insets.bottom + 16 },
-                    ]}
-                >
-                    <View style={styles.tileGrid}>
-                        {GAMES.map((game) => (
-                            <TouchableOpacity
-                                key={game.id}
-                                style={[styles.tile, !game.available && styles.tileDisabled]}
-                                activeOpacity={game.available ? 0.8 : 1}
-                                onPress={() => handleTilePress(game)}
-                            >
-                                <Text style={styles.tileName}>{game.name}</Text>
-                                <Text style={styles.tileDescription}>{game.description}</Text>
-                                {!game.available && (
-                                    <Text style={styles.tileLockBadge}>SOON</Text>
-                                )}
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </ScrollView>
             </ImageBackground>
         </ZoomOutOverlay>
     );
@@ -98,13 +116,18 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
 
 const styles = StyleSheet.create({
     bg: { flex: 1, width: '100%', height: '100%' },
-    topBar: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 4,
+    // Sits in the painted plank baked into the bottom of the new ARCADE bg.
+    // Absolute so the scroll content above isn't shifted — paddingBottom on
+    // the scroll view already reserves the matching space.
+    bottomBar: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-start',
+        paddingHorizontal: 16,
     },
     backButton: {
         paddingVertical: 6,
@@ -118,6 +141,10 @@ const styles = StyleSheet.create({
         color: '#E8F5E8',
         fontFamily: 'PressStart2P',
         fontSize: 10,
+    },
+    scrollClipper: {
+        flex: 1,
+        overflow: 'hidden',
     },
     scrollBody: {
         paddingHorizontal: 16,

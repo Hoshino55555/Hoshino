@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -22,21 +22,18 @@ import {
     type IngredientTier,
 } from '../services/RecipeCatalog';
 import type { CookResponse, IngredientCounts } from '../services/GameStateService';
-import { Backgrounds, Ingredients, getIngredientArt } from '../assets';
+import { Backgrounds, getIngredientArt, getRecipeArt, RecipeCards } from '../assets';
 
-// Per-recipe dish art hasn't been authored yet. Until it lands, each recipe
-// picks one of the three celestial sprites via a hash of its id so the same
-// recipe always shows the same placeholder. Ingredient slots use real art
-// via `getIngredientArt`, which falls back to the same celestial pool.
-const PLACEHOLDER_DISH_IMAGES = [
-    Ingredients.miraBerry,
-    Ingredients.novaEgg,
-    Ingredients.pinkSugar,
-];
-function placeholderDishFor(id: string) {
-    let h = 0;
-    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-    return PLACEHOLDER_DISH_IMAGES[Math.abs(h) % PLACEHOLDER_DISH_IMAGES.length];
+// Tier rule for the recipe-card background art: any recipe whose multiset
+// touches a rare or ultra_rare ingredient promotes to the rainbow RARE card,
+// otherwise COMMON. Lives here (not in the asset module) so the catalog stays
+// art-agnostic and the rule can shift without re-touching assets/index.
+function recipeCardArt(recipe: Recipe) {
+    const promoted = recipe.ingredients.some((ing) => {
+        const t = INGREDIENT_TIER[ing];
+        return t === 'rare' || t === 'ultra_rare';
+    });
+    return promoted ? RecipeCards.rare : RecipeCards.common;
 }
 
 const TIER_COLOR: Record<IngredientTier, string> = {
@@ -107,10 +104,11 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     } = useGameStateContext();
     const insets = useSafeAreaInsets();
     const { height: screenHeight } = useWindowDimensions();
-    // Reserve the top ~33% of the screen so content lands just below the
-    // painted "MENU" banner. Measured from the cooking-bg.png: scene + MENU
-    // label occupy roughly the top third of a tall phone screen.
-    const bannerReserve = screenHeight * 0.25;
+    // Reserve the top ~27% of the screen so content lands just below the
+    // painted "MENU" banner baked into MENU3.png.
+    const bannerReserve = screenHeight * 0.27;
+    // Bottom beige strip baked into MENU3.png — back button overlays it.
+    const bottomBarReserve = screenHeight * 0.10;
 
     const [isClosing, setIsClosing] = useState(false);
     const [manualOpen, setManualOpen] = useState(false);
@@ -118,10 +116,21 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     const [pendingManual, setPendingManual] = useState(false);
     const [lastResult, setLastResult] = useState<CookResponse['result'] | null>(null);
 
+    // Hidden visual-QA toggle: 8 taps on MANUAL COOK within 800ms intervals
+    // unlocks every recipe card on screen. Purely client-side — does not call
+    // the discovery endpoint, just overrides the rendered list so we can
+    // eyeball card art for recipes the user hasn't actually cooked yet.
+    // Modal opens on a 220ms debounce so rapid tap salvos accrue without
+    // popping the picker on the first hit.
+    const [secretAllUnlocked, setSecretAllUnlocked] = useState(false);
+    const secretTapCount = useRef(0);
+    const secretLastTapAt = useRef(0);
+    const manualOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const discoveredSet = useMemo(() => new Set(discoveredRecipes), [discoveredRecipes]);
     const discoveredRecipeDetails = useMemo(
-        () => RECIPES.filter((r) => discoveredSet.has(r.id)),
-        [discoveredSet]
+        () => (secretAllUnlocked ? RECIPES : RECIPES.filter((r) => discoveredSet.has(r.id))),
+        [discoveredSet, secretAllUnlocked]
     );
 
     const currentWindow = currentMealWindow();
@@ -148,6 +157,41 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
             `${windowLabel} already cooked — wait for the next meal window`,
             'warning'
         );
+    };
+
+    // Tracks rapid taps on the MANUAL COOK card. Counter resets if the user
+    // pauses longer than 800ms between taps, so accidental discovery is
+    // unlikely. At 8 the visual-QA override flips on for the rest of the
+    // session and we cancel any pending modal open so the salvo stays clean.
+    const handleManualPress = () => {
+        if (alreadyClaimed) {
+            notifyAlreadyClaimed();
+            return;
+        }
+        if (manualOpenTimer.current) {
+            clearTimeout(manualOpenTimer.current);
+            manualOpenTimer.current = null;
+        }
+
+        if (!secretAllUnlocked) {
+            const now = Date.now();
+            if (now - secretLastTapAt.current > 800) secretTapCount.current = 0;
+            secretLastTapAt.current = now;
+            secretTapCount.current += 1;
+            if (secretTapCount.current >= 8) {
+                secretTapCount.current = 0;
+                setSecretAllUnlocked(true);
+                onNotification?.('All recipe cards unlocked', 'info');
+                return;
+            }
+        }
+
+        // Defer the picker so a rapid 8-tap salvo can complete without the
+        // modal stealing focus on tap #1.
+        manualOpenTimer.current = setTimeout(() => {
+            manualOpenTimer.current = null;
+            setManualOpen(true);
+        }, 220);
     };
 
     const handleCookRecipe = async (recipe: Recipe) => {
@@ -200,28 +244,25 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                 resizeMode="cover"
                 testID="feeding-screen"
             >
-                <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={handleClose}
-                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                    >
-                        <Text style={styles.backButtonText}>{'<'} Back</Text>
-                    </TouchableOpacity>
-                </View>
-
+                <View
+                    style={[
+                        styles.scrollClipper,
+                        {
+                            marginTop: bannerReserve + insets.top,
+                            marginBottom: bottomBarReserve,
+                        },
+                    ]}
+                >
                 <ScrollView
                     contentContainerStyle={[
                         styles.scrollBody,
-                        { paddingTop: bannerReserve, paddingBottom: insets.bottom + 16 },
+                        { paddingBottom: insets.bottom + 16 },
                     ]}
                 >
                     <TouchableOpacity
                         style={[styles.manualCard, alreadyClaimed && styles.cardDisabled]}
                         activeOpacity={alreadyClaimed ? 1 : 0.8}
-                        onPress={() =>
-                            alreadyClaimed ? notifyAlreadyClaimed() : setManualOpen(true)
-                        }
+                        onPress={handleManualPress}
                     >
                         <Text style={styles.manualTitle}>MANUAL COOK</Text>
                         <Text style={styles.manualSubtitle}>
@@ -297,51 +338,75 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                                         }}
                                         disabled={hardDisabled}
                                     >
-                                        <View style={styles.cardHeader}>
+                                        <ImageBackground
+                                            source={recipeCardArt(recipe)}
+                                            style={styles.cardArt}
+                                            imageStyle={styles.cardArtImage}
+                                            resizeMode="stretch"
+                                        >
+                                            {/* Title sits in the colored slot baked into
+                                                the card art (upper-left). */}
                                             <Text
-                                                style={styles.cardHeaderName}
+                                                style={styles.cardTitle}
                                                 numberOfLines={1}
                                             >
                                                 {recipe.name}
                                             </Text>
-                                            <Text style={styles.cardHeaderLevel}>
+                                            <Image
+                                                source={getRecipeArt(recipe.id)}
+                                                style={styles.dishImage}
+                                                resizeMode="contain"
+                                            />
+                                            {(() => {
+                                                // 2-col mode for >3 unique ingredients: fill the
+                                                // left column with the first 3 entries, rest spill
+                                                // into a right column. So 4→3|1, 5→3|2, 6→3|3.
+                                                const twoCol = ingredientEntries.length > 3;
+                                                const leftEntries = twoCol
+                                                    ? ingredientEntries.slice(0, 3)
+                                                    : ingredientEntries;
+                                                const rightEntries = twoCol
+                                                    ? ingredientEntries.slice(3)
+                                                    : [];
+                                                const renderRow = ([ing, n]: [string, number]) => (
+                                                    <View key={ing} style={styles.ingredientRow}>
+                                                        <Image
+                                                            source={getIngredientArt(ing)}
+                                                            style={styles.ingredientIcon}
+                                                            resizeMode="contain"
+                                                        />
+                                                        <Text style={styles.ingredientCount}>
+                                                            ×{n}
+                                                        </Text>
+                                                    </View>
+                                                );
+                                                return (
+                                                    <View
+                                                        style={[
+                                                            styles.ingredientList,
+                                                            twoCol && styles.ingredientListTwoCol,
+                                                        ]}
+                                                    >
+                                                        <View style={styles.ingredientCol}>
+                                                            {leftEntries.map(renderRow)}
+                                                        </View>
+                                                        {twoCol && (
+                                                            <View style={styles.ingredientCol}>
+                                                                {rightEntries.map(renderRow)}
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                );
+                                            })()}
+                                            <Text style={styles.cardLevel}>
                                                 Lv.{level}
                                             </Text>
-                                        </View>
-                                        <View style={styles.cardBody}>
-                                            <View style={styles.dishImageWrap}>
-                                                <Image
-                                                    source={placeholderDishFor(recipe.id)}
-                                                    style={styles.dishImage}
-                                                    resizeMode="contain"
-                                                />
-                                            </View>
-                                            <View style={styles.ingredientCol}>
-                                                <View style={styles.ingredientList}>
-                                                    {ingredientEntries.map(([ing, n]) => (
-                                                        <View
-                                                            key={ing}
-                                                            style={styles.ingredientRow}
-                                                        >
-                                                            <Image
-                                                                source={getIngredientArt(ing)}
-                                                                style={styles.ingredientIcon}
-                                                                resizeMode="contain"
-                                                            />
-                                                            <Text style={styles.ingredientCount}>
-                                                                ×{n}
-                                                            </Text>
-                                                        </View>
-                                                    ))}
-                                                </View>
-                                                <View style={styles.pointsBadge}>
-                                                    <View style={styles.pointsMarker} />
-                                                    <Text style={styles.pointsBadgeText}>
-                                                        {projectedXp}
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                        </View>
+                                            {/* Points number renders over the fire badge
+                                                that's already painted into the card art. */}
+                                            <Text style={styles.pointsOverFire}>
+                                                {projectedXp}
+                                            </Text>
+                                        </ImageBackground>
                                         {!affordable && (
                                             <Text style={styles.recipeNote}>
                                                 missing ingredients
@@ -377,6 +442,23 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                         </View>
                     )}
                 </ScrollView>
+                </View>
+
+                <View
+                    style={[
+                        styles.bottomBar,
+                        { height: bottomBarReserve, paddingBottom: insets.bottom },
+                    ]}
+                    pointerEvents="box-none"
+                >
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={handleClose}
+                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                    >
+                        <Text style={styles.backButtonText}>{'<'} Back</Text>
+                    </TouchableOpacity>
+                </View>
 
                 <ManualCookModal
                     visible={manualOpen}
@@ -529,13 +611,18 @@ const ManualCookModal: React.FC<ManualCookModalProps> = ({
 
 const styles = StyleSheet.create({
     bg: { flex: 1, width: '100%', height: '100%' },
-    topBar: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 4,
+    // Bottom bar lives in the painted strip at the very bottom of the new
+    // background. Absolute so the scroll content above isn't pushed by it —
+    // scrollClipper already reserves the same height via marginBottom.
+    bottomBar: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-start',
+        paddingHorizontal: 16,
     },
     backButton: {
         paddingVertical: 6,
@@ -549,6 +636,10 @@ const styles = StyleSheet.create({
         color: '#E8F5E8',
         fontFamily: 'PressStart2P',
         fontSize: 10,
+    },
+    scrollClipper: {
+        flex: 1,
+        overflow: 'hidden',
     },
     scrollBody: {
         paddingHorizontal: 16,
@@ -592,70 +683,83 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
         justifyContent: 'space-between',
     },
-    // Cards are intentionally sharp-cornered (borderRadius 0) with a chunky
-    // dark border — gives the pixel-art feel of the recipe-example reference.
-    // Inner lip uses a lighter border to get the two-tone "pressed" look.
+    // Cards are now image-driven — chrome (header bar, points-fire badge) is
+    // baked into the menu-card-COMMON/RARE PNGs. The card art is ~1.55:1
+    // (source 1304×840), so aspectRatio locks the layout to the art's
+    // proportions across screen widths.
     recipeCard: {
-        backgroundColor: '#f5eed6',
-        borderRadius: 0,
-        borderWidth: 2,
-        borderColor: '#3a2a1a',
-        padding: 0,
         marginBottom: 10,
         width: '48%',
-        overflow: 'hidden',
     },
-    cardHeader: {
-        backgroundColor: '#9ed5c5',
-        paddingHorizontal: 6,
-        paddingVertical: 4,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderBottomWidth: 2,
-        borderBottomColor: '#3a2a1a',
+    cardArt: {
+        aspectRatio: 1304 / 840,
+        padding: 0,
     },
-    cardHeaderName: {
+    cardArtImage: {
+        // PNGs already have rounded corners + drop shadow baked in; let them
+        // render edge-to-edge without RN clipping the shadow halo.
+        borderRadius: 0,
+    },
+    // Title sits white in the upper-left painted band; level rides just
+    // below it in the smaller tab beneath the title slot.
+    cardTitle: {
+        position: 'absolute',
+        top: '3%',
+        left: '7%',
+        maxWidth: '88%',
         color: '#ffffff',
         fontFamily: '04b03',
-        fontSize: 12,
-        flexShrink: 1,
-        paddingRight: 4,
-        textShadowColor: '#3a2a1a',
+        fontSize: 13,
+        letterSpacing: 0.5,
+        textShadowColor: '#2d1b69',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
     },
-    cardHeaderLevel: {
+    // Level rides in the small teal tab on the left, just below the title
+    // banner. Sized larger than the title to read as the recipe's "stamp".
+    cardLevel: {
+        position: 'absolute',
+        top: '23%',
+        left: '5%',
         color: '#ffffff',
         fontFamily: '04b03',
-        fontSize: 12,
-        textShadowColor: '#3a2a1a',
+        fontSize: 14,
+        textShadowColor: '#2d1b69',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
     },
-    cardBody: {
-        flexDirection: 'row',
-        padding: 8,
-        minHeight: 90,
-    },
-    dishImageWrap: {
-        flex: 1,
-        aspectRatio: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+    // Dish art sits below the level tab so the two never collide. Slightly
+    // smaller than full-width to leave room for ingredients on the right.
     dishImage: {
-        width: '95%',
-        height: '95%',
+        position: 'absolute',
+        top: '40%',
+        left: '8%',
+        width: '42%',
+        height: '52%',
+    },
+    // Ingredient column hugs the right edge starting near the top so it has
+    // breathing room above the bottom-right fire badge.
+    ingredientList: {
+        position: 'absolute',
+        top: '20%',
+        right: '4%',
+        bottom: '32%',
+        width: '35%',
+        alignItems: 'flex-end',
+        justifyContent: 'flex-start',
+    },
+    // 2-col mode kicks in for >3 unique ingredients. Left col holds the first
+    // 3 entries, right col holds the rest (so 4→3|1, 5→3|2, 6→3|3). Widen the
+    // container so two columns of icon+×N actually fit side by side.
+    ingredientListTwoCol: {
+        width: '52%',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-end',
     },
     ingredientCol: {
-        flex: 1,
-        paddingLeft: 6,
-        paddingRight: 8,
-        justifyContent: 'space-between',
-    },
-    ingredientList: {
         alignItems: 'flex-end',
+        marginLeft: 6,
     },
     ingredientRow: {
         flexDirection: 'row',
@@ -663,41 +767,28 @@ const styles = StyleSheet.create({
         marginVertical: 2,
     },
     ingredientIcon: {
-        width: 24,
-        height: 24,
-        marginRight: 4,
+        width: 19,
+        height: 19,
+        marginRight: 5,
     },
     ingredientCount: {
-        color: '#3a2a1a',
+        color: '#2d1b69',
         fontFamily: '04b03',
-        fontSize: 14,
+        fontSize: 13,
     },
-    pointsBadge: {
-        alignSelf: 'flex-end',
-        backgroundColor: '#9ed5c5',
-        borderWidth: 2,
-        borderColor: '#3a2a1a',
-        borderRadius: 0,
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 4,
-    },
-    pointsMarker: {
-        width: 8,
-        height: 10,
-        backgroundColor: '#ef6d3a',
-        borderWidth: 1,
-        borderColor: '#3a2a1a',
-        borderRadius: 0,
-        marginRight: 4,
-    },
-    pointsBadgeText: {
+    // Sits over the fire icon already baked into the bottom-right of the
+    // card art. The fire reads as the "points" symbol; this is just the
+    // number painted on top of it.
+    pointsOverFire: {
+        position: 'absolute',
+        bottom: '11%',
+        right: '12%',
+        minWidth: '14%',
+        textAlign: 'center',
         color: '#ffffff',
         fontFamily: '04b03',
-        fontSize: 14,
-        textShadowColor: '#3a2a1a',
+        fontSize: 17,
+        textShadowColor: '#2d1b69',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
     },

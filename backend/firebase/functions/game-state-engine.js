@@ -657,6 +657,7 @@ function applyEndSleep(state, nowMs, opts = {}) {
     sleepStartedAt: null,
     energy: full ? 5 : clamp(1, 5, state.energy + Math.floor(elapsed / (60 * 60 * 1000) / 2)),
     mood: full ? clamp(1, 5, state.mood + 1) : state.mood,
+    experience: (state.experience || 0) + (full ? 25 : 0),
     totalSleeps: (state.totalSleeps || 0) + (full ? 1 : 0),
     // Reset the accumulator on wake — energy was just topped up, the next
     // 4h tick should start counting from now, not from whatever fraction

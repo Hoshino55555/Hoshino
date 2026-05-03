@@ -11,7 +11,8 @@ import SleepScreen from './SleepScreen';
 import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import ForagePopOut from './ForagePopOut';
-import type { ForagedItem } from '../services/GameStateService';
+import MorningRecapModal, { MorningRecapDeltas } from './MorningRecapModal';
+import type { ForagedItem, GameState } from '../services/GameStateService';
 import { pushMoonokoSnapshot } from '../widgets/widgetService';
 import type { PendingWidgetAction } from '../../App';
 import { Backgrounds, Menu, Stars, getCharacterAnim } from '../assets';
@@ -82,11 +83,20 @@ const MoonokoInteraction: React.FC<Props> = ({
         hunger: gameState?.hunger ?? 5,
         energy: gameState?.energy ?? 3,
     };
-    const pendingFinds = gameState?.foragedItems ?? [];
+    const allPendingFinds = gameState?.foragedItems ?? [];
+    // Sleep-tagged finds are surfaced through the Morning Recap modal, not the
+    // standard forage pop-out — splitting here keeps the daytime tap path
+    // unchanged while preventing a duplicate animation right after wake.
+    const pendingFinds = allPendingFinds.filter((f) => f.source !== 'sleep');
     const hasPendingFinds = pendingFinds.length > 0;
 
     const [popOutItems, setPopOutItems] = useState<ForagedItem[] | null>(null);
     const drainInFlightRef = useRef(false);
+
+    const [recapState, setRecapState] = useState<{
+        deltas: MorningRecapDeltas;
+        items: ForagedItem[];
+    } | null>(null);
 
     const handleCharacterPress = () => {
         if (drainInFlightRef.current || popOutItems) return;
@@ -645,12 +655,50 @@ const MoonokoInteraction: React.FC<Props> = ({
                             // taps until endSleep returned (1–3s on slow
                             // networks) — felt like the UI was frozen.
                             setPendingEndSleep(true);
+                            const preWake: GameState | null = gameState ?? null;
                             try {
-                                await endSleep(true);
+                                const next = await endSleep(true);
                                 // Server cleared sleepStartedAt; the
                                 // serverSleeping/pendingEndSleep sync effect
                                 // clears the flag.
                                 setWakeRequested(false);
+                                if (preWake) {
+                                    const energyGained = Math.max(
+                                        0,
+                                        (next.energy ?? 0) - (preWake.energy ?? 0),
+                                    );
+                                    const moodGained = Math.max(
+                                        0,
+                                        (next.mood ?? 0) - (preWake.mood ?? 0),
+                                    );
+                                    const xpGained = Math.max(
+                                        0,
+                                        (next.experience ?? 0) - (preWake.experience ?? 0),
+                                    );
+                                    const sleepItems = (next.foragedItems ?? []).filter(
+                                        (f) => f.source === 'sleep',
+                                    );
+                                    // Only show the recap on a real full-rest
+                                    // wake — force-wake without 8h returns no
+                                    // mood/xp grant, no sleep items, and would
+                                    // render an empty ceremony.
+                                    if (
+                                        energyGained > 0 ||
+                                        moodGained > 0 ||
+                                        xpGained > 0 ||
+                                        sleepItems.length > 0
+                                    ) {
+                                        setRecapState({
+                                            deltas: {
+                                                energyGained,
+                                                moodGained,
+                                                xpGained,
+                                                totalSleeps: next.totalSleeps ?? 0,
+                                            },
+                                            items: sleepItems,
+                                        });
+                                    }
+                                }
                             } catch (e: any) {
                                 // Roll back: server is still in sleep state,
                                 // so put the user back on SleepScreen with a
@@ -664,6 +712,29 @@ const MoonokoInteraction: React.FC<Props> = ({
                         }}
                     />
                 </View>
+            )}
+
+            {recapState && (
+                <MorningRecapModal
+                    visible={true}
+                    characterId={selectedCharacter?.id}
+                    deltas={recapState.deltas}
+                    overnightItems={recapState.items}
+                    onDismiss={() => {
+                        setRecapState(null);
+                        // Drain silently — items already shown in the recap.
+                        // Failure path falls back to a toast; the next character
+                        // tap can still drain via the standard pop-out flow.
+                        if ((gameState?.foragedItems ?? []).length > 0) {
+                            drainForaged().catch((e: any) => {
+                                onNotification?.(
+                                    e?.message || 'Failed to collect overnight finds',
+                                    'error',
+                                );
+                            });
+                        }
+                    }}
+                />
             )}
 
         </>
