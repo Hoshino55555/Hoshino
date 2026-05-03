@@ -11,8 +11,11 @@ Whenever a build is ready to hand off to testers / hackathon judges:
   release the APK *after* the server is live, otherwise installs will hit
   errors against missing endpoints.
 
-Releases are marked **prerelease** while the version stays `-preview`.
-Drop the suffix and tag without `--prerelease` for the first non-preview cut.
+Releases keep the `-preview` suffix in the title and tag, but **do not**
+pass `--prerelease` to `gh release create`. GitHub's "Latest" badge
+auto-skips prereleases, so flagging preview builds as prerelease leaves
+sideloaders downloading a stale APK from the old non-preview cut. Drop
+the suffix entirely once we ship the first non-preview build.
 
 ## Versioning
 
@@ -77,11 +80,12 @@ $ANDROID_HOME/build-tools/36.0.0/aapt dump badging \
   android/app/build/outputs/apk/release/app-release.apk | head -1
 # expect: package: name='com.socks.hoshino' versionCode='<N>' versionName='0.1.x-preview' ...
 
-# Publish the GitHub release with the APK attached
+# Publish the GitHub release with the APK attached. Do NOT pass
+# --prerelease — see "Versioning" above for why preview builds still
+# need the Latest badge.
 gh release create v0.1.x-preview \
   --title "0.1.x-preview · <one-line summary>" \
   --notes-file /tmp/release-notes-0.1.x.md \
-  --prerelease \
   android/app/build/outputs/apk/release/app-release.apk
 ```
 
