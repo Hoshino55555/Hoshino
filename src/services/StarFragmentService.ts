@@ -237,7 +237,7 @@ export class StarFragmentService {
                 description: 'Feed your character 3 times today',
                 type: 'daily',
                 requirements: [{ type: 'feed_character', target: 3, description: 'Feed character 3 times' }],
-                rewards: [{ type: 'star_fragments', amount: 35, description: '+35 Star Fragments' }],
+                rewards: [{ type: 'star_fragments', amount: 35, description: '+35 Shards' }],
                 progress: this.getMissionProgress(progress, 'daily_feed'),
                 maxProgress: 3,
                 completed: progress.completedMissions.includes(`daily_feed_${this.getDateString(new Date())}`),
@@ -250,7 +250,7 @@ export class StarFragmentService {
                 description: 'Have 2 chat sessions with your character',
                 type: 'daily',
                 requirements: [{ type: 'chat_sessions', target: 2, description: 'Chat 2 times' }],
-                rewards: [{ type: 'star_fragments', amount: 30, description: '+30 Star Fragments' }],
+                rewards: [{ type: 'star_fragments', amount: 30, description: '+30 Shards' }],
                 progress: this.getMissionProgress(progress, 'daily_chat'),
                 maxProgress: 2,
                 completed: progress.completedMissions.includes(`daily_chat_${this.getDateString(new Date())}`),
@@ -264,7 +264,7 @@ export class StarFragmentService {
                 type: 'daily',
                 requirements: [{ type: 'mood_maintain', target: 4, description: 'Keep mood >3 for 4 hours' }],
                 rewards: [
-                    { type: 'star_fragments', amount: 50, description: '+50 Star Fragments' },
+                    { type: 'star_fragments', amount: 50, description: '+50 Shards' },
                     { type: 'experience', amount: 100, description: '+100 XP' }
                 ],
                 progress: this.getMissionProgress(progress, 'daily_mood'),
@@ -289,7 +289,7 @@ export class StarFragmentService {
                 type: 'weekly',
                 requirements: [{ type: 'login_streak', target: 5, description: 'Login 5 different days' }],
                 rewards: [
-                    { type: 'star_fragments', amount: 200, description: '+200 Star Fragments' },
+                    { type: 'star_fragments', amount: 200, description: '+200 Shards' },
                     { type: 'special_food', amount: 1, description: 'Premium Starberry' }
                 ],
                 progress: Math.min(progress.currentStreak, 5),
@@ -305,7 +305,7 @@ export class StarFragmentService {
                 type: 'weekly',
                 requirements: [{ type: 'marketplace_purchase', target: 3, description: 'Buy 3 items from shop' }],
                 rewards: [
-                    { type: 'star_fragments', amount: 250, description: '+250 Star Fragments' },
+                    { type: 'star_fragments', amount: 250, description: '+250 Shards' },
                     { type: 'cosmetic_unlock', amount: 1, description: 'Unlock special hat' }
                 ],
                 progress: this.getMissionProgress(progress, 'weekly_marketplace'),
@@ -321,7 +321,7 @@ export class StarFragmentService {
                 type: 'weekly',
                 requirements: [{ type: 'nft_mint', target: 1, description: 'Mint any NFT' }],
                 rewards: [
-                    { type: 'star_fragments', amount: 400, description: '+400 Star Fragments!' },
+                    { type: 'star_fragments', amount: 400, description: '+400 Shards!' },
                     { type: 'experience', amount: 300, description: '+300 XP' }
                 ],
                 progress: this.getMissionProgress(progress, 'weekly_nft'),
@@ -345,7 +345,7 @@ export class StarFragmentService {
                 type: 'season',
                 requirements: [{ type: 'login_streak', target: 10000, description: 'Earn 10,000 season points' }],
                 rewards: [
-                    { type: 'star_fragments', amount: 1500, description: '+1500 Star Fragments!' },
+                    { type: 'star_fragments', amount: 1500, description: '+1500 Shards!' },
                     { type: 'cosmetic_unlock', amount: 1, description: 'Celestial Wings' }
                 ],
                 progress: progress.seasonProgress.seasonPoints,
@@ -427,7 +427,7 @@ export class StarFragmentService {
             return { success: true, newBalance: res.data.newBalance }
         } catch (error: any) {
             // Firebase HttpsError surfaces as { code, message }
-            const message = error?.message || 'Failed to spend star fragments'
+            const message = error?.message || 'Failed to spend shards'
             return { success: false, error: message }
         }
     }

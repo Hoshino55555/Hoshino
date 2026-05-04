@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Image, Animated, Easing, Pressable, StyleSheet } from 'react-native';
+import { View, Image, Animated, Easing, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import type { ForagedItem } from '../services/GameStateService';
 import { getIngredientArt } from '../assets';
 
@@ -15,12 +15,52 @@ function jitterForId(id: string, salt: number) {
 // holds one fewer. Returns which row the i-th item belongs to, its slot
 // within that row, and the row's total size — enough to compute lift +
 // horizontal placement so items pile up like a pyramid instead of a column.
-// Base width tuned for typical forage drops (1–5 items): a 4-wide base reads
-// as a clear pyramid for small piles. Larger batches taper down and any
-// overflow stacks vertically at the apex (Math.max(1, …) below).
+// Base width grows with item count so a triangle of N(N+1)/2 always fits
+// without falling back to a vertical column at the apex. The "natural" base
+// for small piles is 4 — anything larger widens the pyramid instead.
 const BASE_ROW_SIZE = 4;
-function placeOnPile(i: number, total: number) {
-    const baseRowSize = Math.min(BASE_ROW_SIZE, Math.max(1, total));
+// Last few items roll off the pile edge instead of stacking. Triggers once
+// the pile is large enough that one or two stragglers read as overflow
+// rather than a stunted base.
+function stragglerCount(total: number): number {
+    if (total < 6) return 0;
+    if (total < 12) return 1;
+    if (total < 18) return 2;
+    return 3;
+}
+
+interface Placement {
+    row: number;
+    slot: number;
+    rowSize: number;
+    baseRowSize: number;
+    isStraggler: boolean;
+    stragglerIndex: number;
+    stragglerSide: -1 | 1;
+}
+
+function placeOnPile(i: number, total: number): Placement {
+    const stragglers = stragglerCount(total);
+    const pileCount = total - stragglers;
+    if (i >= pileCount) {
+        const stragglerIndex = i - pileCount;
+        return {
+            row: 0,
+            slot: 0,
+            rowSize: 1,
+            baseRowSize: 1,
+            isStraggler: true,
+            stragglerIndex,
+            stragglerSide: stragglerIndex % 2 === 0 ? -1 : 1,
+        };
+    }
+    // Smallest N where N(N+1)/2 ≥ pileCount, but never narrower than the
+    // small-pile default so 1–10 items still read with a 4-wide base.
+    const fitBase = Math.ceil((-1 + Math.sqrt(1 + 8 * Math.max(1, pileCount))) / 2);
+    const baseRowSize = Math.max(
+        1,
+        Math.min(pileCount, Math.max(BASE_ROW_SIZE, fitBase)),
+    );
     let row = 0;
     let placed = 0;
     let rowSize = baseRowSize;
@@ -31,9 +71,66 @@ function placeOnPile(i: number, total: number) {
     }
     // Last row may be partial — clamp rowSize to remaining items so slot
     // math stays in range.
-    const remaining = total - placed;
+    const remaining = pileCount - placed;
     const actualRowSize = Math.min(rowSize, remaining);
-    return { row, slot: i - placed, rowSize: actualRowSize, baseRowSize };
+    return {
+        row,
+        slot: i - placed,
+        rowSize: actualRowSize,
+        baseRowSize,
+        isStraggler: false,
+        stragglerIndex: 0,
+        stragglerSide: 1,
+    };
+}
+
+interface PileDims {
+    spread: number; // pile half-width at base, in dp
+    liftPerItem: number; // dp each row sits higher than the one below it
+    liftCap: number; // hard ceiling on stack height in dp
+    // Hard horizontal bound: |landingX| is clamped to this. Keeps stragglers
+    // and wide pyramid bases from drifting past the viewport edge on narrow
+    // devices or in large drops where the dynamic base widens significantly.
+    maxX: number;
+}
+
+// Computes final resting offset (relative to the pile center, in dp) plus
+// rotation. Shared by both the launch animation (needs landingY for the
+// down-arc target) and the render pass (needs landingX for the X interpolate).
+// Pile dimensions come in via `dims` so the component can scale them off
+// useWindowDimensions — module-level constants would freeze the pile to one
+// device size and break under Android Display-Size scaling.
+function computeLanding(i: number, total: number, itemId: string, dims: PileDims) {
+    const placement = placeOnPile(i, total);
+    const xJ = jitterForId(itemId, 11);
+    const yJ = jitterForId(itemId, 19);
+    const rJ = jitterForId(itemId, 23);
+
+    const clampX = (x: number) => Math.max(-dims.maxX, Math.min(dims.maxX, x));
+
+    if (placement.isStraggler) {
+        // Roll past the pile's outer edge. Each subsequent straggler lands a
+        // little further out, alternating sides so they don't bunch on one side.
+        // Spacing offsets scale with the pile spread so they stay proportional.
+        const extra = dims.spread + dims.spread * 0.42 + placement.stragglerIndex * dims.spread * 0.35;
+        const landingX = clampX(placement.stragglerSide * extra + xJ * dims.spread * 0.12);
+        const landingY = yJ * dims.liftPerItem * 0.25; // sit on the ground, tiny bump
+        const rotateDeg = rJ * 28; // slightly tipped — they tumbled
+        return { landingX, landingY, rotateDeg };
+    }
+
+    const { row, slot, rowSize, baseRowSize } = placement;
+    // Widen the pile footprint when the base grows so items don't pancake on
+    // top of each other. Base 4 → 1× (existing look); base 6 → 1.5×; etc.
+    const spreadScale = Math.max(1, baseRowSize / BASE_ROW_SIZE);
+    const effectiveSpread = dims.spread * spreadScale;
+    const spreadFactor = baseRowSize > 0 ? (baseRowSize - row) / baseRowSize : 0;
+    const slotBase = rowSize > 1 ? (slot / (rowSize - 1)) * 2 - 1 : 0;
+    const xJitter = xJ * 0.4;
+    const landingX = clampX((slotBase + xJitter) * effectiveSpread * spreadFactor);
+    const landingY = -Math.min(row * dims.liftPerItem, dims.liftCap) + yJ * dims.liftPerItem * 0.5;
+    const rotateDeg = rJ * 18;
+    return { landingX, landingY, rotateDeg };
 }
 
 interface Props {
@@ -58,17 +155,32 @@ const ARC_HALF_MS = 220;
 const STAGGER_MS = 55;
 const GROUND_HOLD_MS = 10000;
 const FADE_DURATION_MS = 400;
-// Pile footprint at the moonoko's feet. SPREAD is the half-width of the
-// base row; higher items get a narrower spread (see spreadFactor below)
-// so the silhouette reads as a triangle rather than a vertical column.
-const PILE_BASE_SPREAD_X = 52; // ±px at the base of the pile
-const PILE_LIFT_PER_ITEM = 12; // px each subsequent item sits higher
-const PILE_LIFT_CAP = 72;     // hard cap on stack height (~6 items high)
-// Gap between the menu bar's top edge (or screen bottom if no chrome) and
-// the visual base of the pile. Tunable by eye.
-const PILE_BASE_GAP = 30;
+
+// Reference design width these layout values were tuned against. Real values
+// scale linearly with viewport width via `winW / REFERENCE_WIDTH` so the pile
+// adapts to Android Display-Size scaling and to wider/narrower devices.
+const REFERENCE_WIDTH = 400;
+// All values below are in "reference dp" (i.e. dp at REFERENCE_WIDTH);
+// multiply by `scale` inside the component to get the live dp.
+const ITEM_SIZE_REF = 40;
+const PILE_BASE_SPREAD_REF = 52; // ±dp at the base of the pile
+const PILE_LIFT_PER_ITEM_REF = 12;
+const PILE_LIFT_CAP_REF = 72;
+const PILE_BASE_GAP_REF = 12; // dp above bottom chrome where the pile sits
+const ARC_PEAK_BASE_REF = 110; // dp the arc rises above the launch point
+const ARC_PEAK_JITTER_REF = 18;
 
 const flightMs = () => ARC_HALF_MS * 2;
+
+// Combined arc easing applied to a single 0→1 progress value: ease-out for
+// the first half (rising), ease-in for the second half (falling). Driving
+// the whole arc from one timing means no JS-side sequence handoff at apex.
+const easeOutQuad = Easing.out(Easing.quad);
+const easeInQuad = Easing.in(Easing.quad);
+const arcEasing = (t: number): number =>
+    t < 0.5
+        ? easeOutQuad(t * 2) * 0.5
+        : 0.5 + easeInQuad((t - 0.5) * 2) * 0.5;
 
 export const FORAGE_FLIGHT_MS = ARC_HALF_MS * 2;
 
@@ -77,9 +189,35 @@ export const FORAGE_FLIGHT_MS = ARC_HALF_MS * 2;
 // global timer. Inventory was already credited by the parent's drain call —
 // this overlay is the reward flourish, not the source of truth.
 const ForagePopOut: React.FC<Props> = ({ items, onComplete, bottomInset = 0 }) => {
+    // All pile/arc dimensions are derived from the live screen width relative
+    // to REFERENCE_WIDTH (400dp). The item sprite, pile spread, lift per row,
+    // arc peak, and base gap all scale together so the silhouette stays the
+    // same shape across Display-Size scales and form factors.
+    const { width: winW } = useWindowDimensions();
+    const scale = winW / REFERENCE_WIDTH;
+    const itemSize = ITEM_SIZE_REF * scale;
+    const pileDims: PileDims = {
+        spread: PILE_BASE_SPREAD_REF * scale,
+        liftPerItem: PILE_LIFT_PER_ITEM_REF * scale,
+        liftCap: PILE_LIFT_CAP_REF * scale,
+        // Items render with `left: '50%'` and a centered marginLeft, then
+        // get rotated up to ±28° (stragglers) or ±18° (pile). Rotation
+        // pushes the bounding box past itemSize/2 — worst case is the
+        // half-diagonal (itemSize × √2/2). Use that plus a safety pad so
+        // the rotated sprite never crosses the viewport edge.
+        maxX: winW / 2 - (itemSize * Math.SQRT2) / 2 - 12,
+    };
+    const pileBaseGap = PILE_BASE_GAP_REF * scale;
+    const arcPeakBase = ARC_PEAK_BASE_REF * scale;
+    const arcPeakJitter = ARC_PEAK_JITTER_REF * scale;
+
     const xRefs = useRef(items.map(() => new Animated.Value(0))).current;
     const yRefs = useRef(items.map(() => new Animated.Value(0))).current;
-    const fadeRefs = useRef(items.map(() => new Animated.Value(1))).current;
+    // Start hidden and pop in the instant each item launches. Without this,
+    // every queued item sits visible at the spawn point (translate 0,0) until
+    // its delay fires — with large batches that reads as a stationary blob
+    // clearing one sprite at a time before any arc movement is visible.
+    const fadeRefs = useRef(items.map(() => new Animated.Value(0))).current;
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
     const completedRef = useRef(false);
 
@@ -110,7 +248,17 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete, bottomInset = 0 }) =
             const delayMs = i * STAGGER_MS;
             // Slightly varying arc heights so identical sprites don't fly in
             // perfect lockstep — pure visual texture, no gameplay meaning.
-            const peak = 110 + jitterForId(item.id, 7) * 18;
+            // Base + jitter scale with the screen so the arc reads the same
+            // proportion regardless of Display Size.
+            const peak = arcPeakBase + jitterForId(item.id, 7) * arcPeakJitter;
+            // Snap-in at launch — fadeRef starts at 0 to keep queued items
+            // hidden at the spawn point until their delay elapses.
+            Animated.timing(fadeRefs[i], {
+                toValue: 1,
+                duration: 60,
+                delay: delayMs,
+                useNativeDriver: true,
+            }).start();
             // Horizontal drift over the full flight so items don't fall
             // straight down. Native driver throughout.
             Animated.timing(xRefs[i], {
@@ -120,28 +268,22 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete, bottomInset = 0 }) =
                 easing: Easing.out(Easing.quad),
                 useNativeDriver: true,
             }).start();
-            // Single arc: up (decel) then down (accel) — no rebound.
-            // Per-item Y jitter on the landing height so items in the same
-            // row don't sit on a perfectly flat line — looks more like a
-            // real pile.
-            const { row } = placeOnPile(i, items.length);
-            const yJitter = jitterForId(item.id, 19) * 6;
-            const stackOffset = -Math.min(row * PILE_LIFT_PER_ITEM, PILE_LIFT_CAP) + yJitter;
-            Animated.sequence([
-                Animated.delay(delayMs),
-                Animated.timing(yRefs[i], {
-                    toValue: -peak,
-                    duration: ARC_HALF_MS,
-                    easing: Easing.out(Easing.quad),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(yRefs[i], {
-                    toValue: stackOffset,
-                    duration: ARC_HALF_MS,
-                    easing: Easing.in(Easing.quad),
-                    useNativeDriver: true,
-                }),
-            ]).start();
+            // Single native timing for the entire arc (0→1 over `flight`).
+            // The arc shape (up to -peak, then down to landingY) is applied
+            // in render via interpolate, so there's no JS-side handoff
+            // between up- and down-arcs. Earlier we used Animated.sequence
+            // here, but its completion callback is JS-side: with 50 items
+            // staggered 55ms apart, those handoffs collide on the JS thread
+            // and items visibly park at apex while waiting for the down-arc
+            // to be scheduled — that was the "flash at top of arc" the user
+            // was seeing.
+            Animated.timing(yRefs[i], {
+                toValue: 1,
+                duration: flight,
+                delay: delayMs,
+                easing: arcEasing,
+                useNativeDriver: true,
+            }).start();
         });
 
         // Global ground-hold timer: starts when the LAST item has finished
@@ -195,32 +337,32 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete, bottomInset = 0 }) =
     // (menu bar). This is what `bottomInset` is for — without it, items land
     // inside the menu overlay because `popItem` uses `bottom: 0` of the
     // overlay, and the overlay extends to the bottom of mainDisplayArea.
-    const pileBaseBottom = bottomInset + PILE_BASE_GAP;
+    const pileBaseBottom = bottomInset + pileBaseGap;
     return (
         <View
             pointerEvents="box-none"
             style={StyleSheet.absoluteFill}
         >
             {items.map((item, i) => {
-                // Triangular pile: each row holds one fewer item than the
-                // one below it. Slot positions evenly spread across the
-                // row's available width, with a small id-derived jitter
-                // so identical sprites don't sit on perfectly straight
-                // lines.
-                const { row, slot, rowSize, baseRowSize } = placeOnPile(i, items.length);
-                const spreadFactor = (baseRowSize - row) / baseRowSize;
-                const slotBase = rowSize > 1 ? (slot / (rowSize - 1)) * 2 - 1 : 0;
-                const xJitter = jitterForId(item.id, 11) * 0.4;
-                const landingX = (slotBase + xJitter) * PILE_BASE_SPREAD_X * spreadFactor;
-                // Per-item rotation so sprites don't all lie flat. ±18° read
-                // as a tossed-in pile rather than placed.
-                const rotateDeg = jitterForId(item.id, 23) * 18;
+                // Pile geometry (row/slot, dynamic base width, plus straggler
+                // overflow for large drops) is computed in computeLanding so
+                // the launch animation and the render share one source of truth.
+                const { landingX, landingY, rotateDeg } = computeLanding(i, items.length, item.id, pileDims);
+                // Same per-item peak jitter the launch animation uses — kept
+                // local because peak isn't part of computeLanding.
+                const peak = arcPeakBase + jitterForId(item.id, 7) * arcPeakJitter;
 
                 const translateX = xRefs[i].interpolate({
                     inputRange: [0, 1],
                     outputRange: [0, landingX],
                 });
-                const translateY = yRefs[i]; // pixels, driven by the sequence
+                // yRefs[i] is a 0→1 progress driven natively over the full
+                // flight; interpolation here turns it into the up-then-down
+                // pixel arc. Single timing = no JS sequence handoff at apex.
+                const translateY = yRefs[i].interpolate({
+                    inputRange: [0, 0.5, 1],
+                    outputRange: [0, -peak, landingY],
+                });
                 const opacity = fadeRefs[i];
 
                 // Look up by `ingredient` (e.g. "tomato"), not by `id`. The
@@ -237,6 +379,10 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete, bottomInset = 0 }) =
                             styles.popItem,
                             {
                                 bottom: pileBaseBottom,
+                                width: itemSize,
+                                height: itemSize,
+                                marginLeft: -itemSize / 2,
+                                marginBottom: -itemSize / 2,
                                 opacity,
                                 transform: [
                                     { translateX },
@@ -249,9 +395,13 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete, bottomInset = 0 }) =
                         <Pressable
                             hitSlop={8}
                             onPress={() => dismissItem(item.id, i)}
-                            style={styles.pressable}
+                            style={[styles.pressable, { width: itemSize, height: itemSize }]}
                         >
-                            <Image source={img} style={styles.ingredientImage} resizeMode="contain" />
+                            <Image
+                                source={img}
+                                style={{ width: itemSize, height: itemSize }}
+                                resizeMode="contain"
+                            />
                         </Pressable>
                     </Animated.View>
                 );

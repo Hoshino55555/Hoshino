@@ -177,23 +177,45 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     const drainForaged = useCallback(async () => {
         if (!characterId) throw new Error('No character selected');
         const requestedFor = characterId;
-        const { state: next, drained } = await GameStateService.drainForaged(characterId);
-        if (requestedFor !== currentCharacterIdRef.current) return drained;
+        // Optimistically clear foragedItems so the exclamation badge hides
+        // immediately and a rapid second tap returns at the !hasPendingFinds
+        // guard in the press handler instead of racing the server (which used
+        // to throw "internal" on the duplicate transaction). Snapshot for
+        // restore-on-failure so a real server error puts the badge back.
+        let restoreItems: ForagedItem[] | null = null;
+        setState((prev) => {
+            if (!prev) return prev;
+            restoreItems = prev.foragedItems;
+            return { ...prev, foragedItems: [] };
+        });
+        // Bump immediately so an in-flight background poll started before
+        // this tap can't clobber the optimistic clear when it lands.
         lastMutationAtRef.current = Date.now();
-        setState(next);
-        // Patch inventory locally from the drained items instead of issuing a
-        // second getInventory round trip. The server already committed these
-        // counts in the same transaction that returned `drained`.
-        if (drained.length > 0) {
-            setInventory((prev) => {
-                const copy = { ...prev };
-                for (const f of drained) {
-                    copy[f.ingredient] = (copy[f.ingredient] || 0) + 1;
-                }
-                return copy;
-            });
+        try {
+            const { state: next, drained } = await GameStateService.drainForaged(characterId);
+            if (requestedFor !== currentCharacterIdRef.current) return drained;
+            lastMutationAtRef.current = Date.now();
+            setState(next);
+            // Patch inventory locally from the drained items instead of issuing a
+            // second getInventory round trip. The server already committed these
+            // counts in the same transaction that returned `drained`.
+            if (drained.length > 0) {
+                setInventory((prev) => {
+                    const copy = { ...prev };
+                    for (const f of drained) {
+                        copy[f.ingredient] = (copy[f.ingredient] || 0) + 1;
+                    }
+                    return copy;
+                });
+            }
+            return drained;
+        } catch (err) {
+            if (requestedFor === currentCharacterIdRef.current && restoreItems) {
+                const items = restoreItems;
+                setState((prev) => (prev ? { ...prev, foragedItems: items } : prev));
+            }
+            throw err;
         }
-        return drained;
     }, [characterId]);
 
     const refreshPantry = useCallback(async () => {

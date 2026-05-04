@@ -82,6 +82,7 @@ async function getForagingOptsForUser(uid, nowMs) {
   return {
     randomBytes: rng.randomBytes,
     carryCap: Math.floor(wallet.caps.carryCap * carryMult),
+    inventoryCap: wallet.caps.inventoryCap,
     forageIntervalMultiplier: intervalMultFn,
   };
 }
@@ -397,7 +398,6 @@ exports.drainForaged = onCall(COMMON_OPTS, async (request) => {
   const nowMs = Date.now();
   const state = await loadOrDefault(uid, characterId, nowMs);
   const opts = await getForagingOptsForUser(uid, nowMs);
-  const caps = await getUserCaps(uid);
   const resolved = engine.resolve(state, nowMs, opts);
   const finds = resolved.foragedItems || [];
   let accepted = finds;
@@ -415,7 +415,7 @@ exports.drainForaged = onCall(COMMON_OPTS, async (request) => {
       for (const v of Object.values(counts)) {
         if (typeof v === 'number') total += v;
       }
-      const room = Math.max(0, caps.inventoryCap - total);
+      const room = Math.max(0, opts.inventoryCap - total);
       if (finds.length > room) {
         accepted = finds.slice(0, room);
         dropped = finds.length - room;
@@ -432,6 +432,6 @@ exports.drainForaged = onCall(COMMON_OPTS, async (request) => {
     state: drained,
     drained: accepted, // for the recap banner — source + tier + ingredient
     droppedAtCap: dropped, // count of finds dropped because pantry was full
-    inventoryCap: caps.inventoryCap,
+    inventoryCap: opts.inventoryCap,
   };
 });

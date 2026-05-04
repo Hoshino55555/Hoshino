@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, Modal, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
+import { View, Text, Image, TouchableOpacity, Modal, StyleSheet, Dimensions, Animated, Easing, useWindowDimensions } from 'react-native';
 import Shop from './Shop';
 import Gallery from './Gallery';
 import InnerScreen from './InnerScreen';
 import Settings from './Settings';
-import Frame from './Frame';
 import Starburst from './Starburst';
 import GamesList from './GamesList';
 import SleepScreen from './SleepScreen';
+import SleepConfirmationModal from './SleepConfirmationModal';
 import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import ForagePopOut from './ForagePopOut';
 import MorningRecapModal, { MorningRecapDeltas } from './MorningRecapModal';
 import type { ForagedItem, GameState } from '../services/GameStateService';
+import { SLEEP_REQUIRED_MS } from '../services/GameStateService';
+import { scheduleSleepAlarm, cancelSleepAlarm } from '../services/AlarmService';
 import { pushMoonokoSnapshot } from '../widgets/widgetService';
 import type { PendingWidgetAction } from '../../App';
 import { Backgrounds, Menu, Stars, getCharacterAnim } from '../assets';
@@ -78,6 +80,20 @@ const MoonokoInteraction: React.FC<Props> = ({
     onWidgetActionConsumed,
 }) => {
     const { state: gameState, drainForaged, startSleep, endSleep } = useGameStateContext();
+    // Sizes that used to be hardcoded dp (character sprite, badge offsets,
+    // menu icons, row paddings) are derived from the live window dimensions
+    // here so the screen survives Android Display-Size scaling. Values are
+    // ratios tuned against Seeker's default scale (400dp wide × 890dp tall):
+    //   - character ≈ 62% of screen width or 42% of height, whichever fits
+    //   - exclamation badge floats ~40% of character height above the head
+    //   - menu icons ~13% of screen width, capped so big tablets don't get
+    //     cartoonishly large icons
+    const { width: winW, height: winH } = useWindowDimensions();
+    const characterSize = Math.min(winW * 0.62, winH * 0.42);
+    const characterMarginTop = -characterSize * 0.32;
+    const badgeOffset = -characterSize * 0.4;
+    const badgeFontSize = Math.max(28, Math.min(44, winW * 0.09));
+    const menuIconSize = Math.min(winW * 0.10, 44);
     const currentStats = {
         mood: gameState?.mood ?? 3,
         hunger: gameState?.hunger ?? 5,
@@ -98,6 +114,62 @@ const MoonokoInteraction: React.FC<Props> = ({
         items: ForagedItem[];
     } | null>(null);
 
+    const handleCharacterLongPress = () => {
+        if (!__DEV__) return;
+        if (popOutItems) return;
+        const tiers: Array<{
+            ingredients: string[];
+            tier: ForagedItem['tier'];
+            weight: number;
+        }> = [
+            {
+                tier: 'common',
+                weight: 4,
+                ingredients: ['egg', 'lettuce', 'potato', 'rice', 'carrot'],
+            },
+            {
+                tier: 'uncommon',
+                weight: 3,
+                ingredients: ['banana', 'strawberry', 'tomato', 'tofu', 'oat', 'bread'],
+            },
+            {
+                tier: 'rare',
+                weight: 2,
+                ingredients: ['bacon', 'milk', 'tuna', 'gouda'],
+            },
+            {
+                tier: 'ultra_rare',
+                weight: 1,
+                ingredients: ['star_dust'],
+            },
+        ];
+        const totalWeight = tiers.reduce((s, t) => s + t.weight, 0);
+        const pickTier = () => {
+            let r = Math.random() * totalWeight;
+            for (const t of tiers) {
+                r -= t.weight;
+                if (r <= 0) return t;
+            }
+            return tiers[0];
+        };
+        const count = 50;
+        const now = Date.now();
+        const fake: ForagedItem[] = Array.from({ length: count }, (_, i) => {
+            const t = pickTier();
+            const ingredient =
+                t.ingredients[Math.floor(Math.random() * t.ingredients.length)];
+            return {
+                id: `dev-${now}-${i}`,
+                ingredient,
+                tier: t.tier,
+                tickMs: now,
+                slot: i,
+                source: 'awake',
+            };
+        });
+        setPopOutItems(fake);
+    };
+
     const handleCharacterPress = () => {
         if (drainInFlightRef.current || popOutItems) return;
         if (!hasPendingFinds) return;
@@ -108,7 +180,15 @@ const MoonokoInteraction: React.FC<Props> = ({
         drainInFlightRef.current = true;
         drainForaged()
             .catch((e: any) => {
-                onNotification?.(e?.message || 'Failed to collect finds', 'error');
+                const raw = e?.message || '';
+                // Firebase Functions coerces uncaught server throws to the
+                // bare code "internal" — surface a friendly fallback rather
+                // than that opaque string.
+                const friendly =
+                    !raw || raw.toLowerCase() === 'internal'
+                        ? "Couldn't collect finds — try again in a moment"
+                        : raw;
+                onNotification?.(friendly, 'error');
                 // Clear the optimistic items on failure. Otherwise, if
                 // ForagePopOut unmounts before its onComplete fires (e.g. the
                 // user navigates into Inventory mid-animation), its cleanup
@@ -222,6 +302,8 @@ const MoonokoInteraction: React.FC<Props> = ({
     // (invisible, scaled-small) state and would otherwise block touches with
     // no visible UI. Bumping the key gives the user a clean retry surface.
     const [sleepInstanceKey, setSleepInstanceKey] = useState(0);
+    const [sleepModalVisible, setSleepModalVisible] = useState(false);
+    const [pickedWakeAtMs, setPickedWakeAtMs] = useState<number | null>(null);
 
     // Clear sleep UI flags when the active character changes. Without this,
     // a startSleep promise inflight on character A could leave pendingStartSleep
@@ -288,7 +370,6 @@ const MoonokoInteraction: React.FC<Props> = ({
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuBarLayout, setMenuBarLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
-    const frameOpacity = useRef(new Animated.Value(0)).current;
     const bobAnim = useRef(new Animated.Value(0)).current;
 
     // Gentle up/down loop to match the Moonoko's baked-in float. Native driver
@@ -313,17 +394,6 @@ const MoonokoInteraction: React.FC<Props> = ({
         loop.start();
         return () => loop.stop();
     }, [bobAnim]);
-
-    useEffect(() => {
-        if (menuBarLayout.width > 0) {
-            Animated.timing(frameOpacity, {
-                toValue: 1,
-                duration: 150,
-                easing: Easing.out(Easing.quad),
-                useNativeDriver: true,
-            }).start();
-        }
-    }, [menuBarLayout.width]);
 
     // Navigation functions for physical device buttons
     const goToPreviousMenu = () => {
@@ -389,13 +459,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                     // the server response sets sleepStartedAt and serverSleeping
                     // takes over, so we clear the pending flag. On failure we
                     // clear the flag and toast — caller stays on home menu.
-                    setPendingStartSleep(true);
-                    startSleep()
-                        .then(() => setPendingStartSleep(false))
-                        .catch((e: any) => {
-                            setPendingStartSleep(false);
-                            onNotification?.(e?.message || 'Failed to start sleep', 'error');
-                        });
+                    setSleepModalVisible(true);
                 }
                 break;
 
@@ -466,7 +530,10 @@ const MoonokoInteraction: React.FC<Props> = ({
                 activeOpacity={0.7}
                 testID={`menu-${button.action}`}
             >
-                <Image source={getImageSource(button.icon)} style={styles.menuImage} />
+                <Image
+                    source={getImageSource(button.icon)}
+                    style={[styles.menuImage, { width: menuIconSize, height: menuIconSize }]}
+                />
             </TouchableOpacity>
         );
     };
@@ -531,17 +598,23 @@ const MoonokoInteraction: React.FC<Props> = ({
                     <TouchableOpacity
                         activeOpacity={hasPendingFinds ? 0.7 : 1}
                         onPress={handleCharacterPress}
-                        disabled={!hasPendingFinds && !popOutItems}
+                        onLongPress={handleCharacterLongPress}
+                        delayLongPress={500}
+                        disabled={!__DEV__ && !hasPendingFinds && !popOutItems}
                         style={styles.characterTouch}
                     >
                         <Image
                             source={getImageSource(selectedCharacter.image)}
-                            style={styles.characterImage}
+                            style={[
+                                styles.characterImage,
+                                { width: characterSize, height: characterSize, marginTop: characterMarginTop },
+                            ]}
                         />
                         {hasPendingFinds && !popOutItems && (
                             <Animated.View
                                 style={[
                                     styles.exclamationBadge,
+                                    { top: badgeOffset },
                                     {
                                         transform: [
                                             {
@@ -555,7 +628,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                                 ]}
                                 pointerEvents="none"
                             >
-                                <Text style={styles.exclamationText}>!</Text>
+                                <Text style={[styles.exclamationText, { fontSize: badgeFontSize }]}>!</Text>
                             </Animated.View>
                         )}
                     </TouchableOpacity>
@@ -596,33 +669,6 @@ const MoonokoInteraction: React.FC<Props> = ({
                 </View>
             )}
 
-            {/* Decorative Frame Overlay - dims sync to menu bar via onLayout */}
-            {menuBarLayout.width > 0 && (
-                <Animated.View
-                    pointerEvents="box-none"
-                    style={{
-                        position: 'absolute',
-                        top: menuBarLayout.y + 15,
-                        left: menuBarLayout.x + 15,
-                        width: menuBarLayout.width - 30,
-                        height: menuBarLayout.height - 30,
-                        opacity: frameOpacity,
-                    }}
-                >
-                    <Frame
-                        width={menuBarLayout.width - 30}
-                        height={menuBarLayout.height - 30}
-                        top={0}
-                        left={0}
-                        position="absolute"
-                        showBackgroundImage={false}
-                        pixelSize={3}
-                    >
-                        <View style={{ width: '100%', height: '100%' }} />
-                    </Frame>
-                </Animated.View>
-            )}
-
             </InnerScreen>
             {/* TEMP: SleepOverlay disabled while sleep UX is being reworked. */}
 
@@ -648,6 +694,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                         wakeRequested={wakeRequested}
                         characterId={selectedCharacter?.id}
                         sleepStartedAt={gameState?.sleepStartedAt ?? null}
+                        wakeAtMs={pickedWakeAtMs}
                         onWake={async () => {
                             // Optimistically dismiss the overlay the instant
                             // the exit animation reports complete. Without
@@ -655,6 +702,8 @@ const MoonokoInteraction: React.FC<Props> = ({
                             // taps until endSleep returned (1–3s on slow
                             // networks) — felt like the UI was frozen.
                             setPendingEndSleep(true);
+                            setPickedWakeAtMs(null);
+                            cancelSleepAlarm();
                             const preWake: GameState | null = gameState ?? null;
                             try {
                                 const next = await endSleep(true);
@@ -713,6 +762,64 @@ const MoonokoInteraction: React.FC<Props> = ({
                     />
                 </View>
             )}
+
+            <SleepConfirmationModal
+                visible={sleepModalVisible}
+                character={selectedCharacter}
+                playerName={undefined}
+                defaultWakeAtMs={Date.now() + SLEEP_REQUIRED_MS}
+                onCancel={() => setSleepModalVisible(false)}
+                onSmokeTest={() => {
+                    setSleepModalVisible(false);
+                    scheduleSleepAlarm(
+                        Date.now() + 60_000,
+                        selectedCharacter?.name,
+                    ).then((res) => {
+                        if (!res.ok && res.reason === 'notifications-denied') {
+                            onNotification?.('Enable notifications to test the alarm.', 'info');
+                        } else if (res.ok) {
+                            onNotification?.(
+                                `Test alarm scheduled (${res.reason} · 60s)`,
+                                'success',
+                            );
+                        } else {
+                            onNotification?.(`Smoke test failed: ${res.reason}`, 'error');
+                        }
+                    });
+                }}
+                onConfirm={(wakeAtMs) => {
+                    setSleepModalVisible(false);
+                    setPickedWakeAtMs(wakeAtMs);
+                    setPendingStartSleep(true);
+                    startSleep()
+                        .then((next) => {
+                            setPendingStartSleep(false);
+                            const startedAt = next?.sleepStartedAt;
+                            if (startedAt) {
+                                scheduleSleepAlarm(
+                                    wakeAtMs,
+                                    selectedCharacter?.name,
+                                ).then((res) => {
+                                    if (!res.ok && res.reason === 'notifications-denied') {
+                                        onNotification?.(
+                                            'Enable notifications for a wake-up alarm.',
+                                            'info',
+                                        );
+                                    } else if (res.ok && res.reason === 'inexact') {
+                                        onNotification?.(
+                                            'Wake reminder set (may be a few min late).',
+                                            'info',
+                                        );
+                                    }
+                                });
+                            }
+                        })
+                        .catch((e: any) => {
+                            setPendingStartSleep(false);
+                            onNotification?.(e?.message || 'Failed to start sleep', 'error');
+                        });
+                }}
+            />
 
             {recapState && (
                 <MorningRecapModal
@@ -835,7 +942,7 @@ const styles = StyleSheet.create({
     integratedMenuBarInner: {
         flexDirection: 'column',
         justifyContent: 'flex-end',
-        backgroundColor: '#E8F5E8',
+        backgroundColor: 'transparent',
         marginHorizontal: 3,
         marginTop: 4,
         marginBottom: 3,
@@ -846,16 +953,16 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginVertical: 1,
-        paddingHorizontal: 20,
+        paddingHorizontal: '5%',
     },
     menuIcon: {
-        padding: 5,
+        padding: 6,
         alignItems: 'center',
         justifyContent: 'center',
     },
     menuImage: {
-        width: 30,
-        height: 30,
+        width: 48,
+        height: 48,
         resizeMode: 'contain',
     },
     achievementStatusSection: {

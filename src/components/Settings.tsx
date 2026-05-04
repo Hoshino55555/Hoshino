@@ -1,8 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Switch, StyleSheet, ScrollView, Alert, Image, PanResponder, Animated } from 'react-native';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    Switch,
+    StyleSheet,
+    ScrollView,
+    Alert,
+    Image,
+    PanResponder,
+    Animated,
+    ImageBackground,
+    Dimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SettingsService, { MenuButton } from '../services/SettingsService';
-import InnerScreen from './InnerScreen';
-import { Menu } from '../assets';
+import ZoomOutOverlay from './ZoomOutOverlay';
+import { Menu, Backgrounds } from '../assets';
 
 interface Props {
     onBack: () => void;
@@ -12,6 +26,10 @@ interface Props {
 }
 
 const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSettingsChanged }) => {
+    const insets = useSafeAreaInsets();
+    const screenHeight = Dimensions.get('window').height;
+    const bannerReserve = screenHeight * 0.27;
+    const bottomBarReserve = screenHeight * 0.10;
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
     const [soundEnabled, setSoundEnabled] = useState(true);
@@ -89,20 +107,25 @@ const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSet
     };
 
     return (
-        <InnerScreen
-            expanded
-            animateIn
-            exiting={isClosing}
-            onExitComplete={onBack}
-            showBackgroundImage={false}
-            leftButtonText=""
-            centerButtonText=""
-            rightButtonText=""
-            onLeftButtonPress={handleClose}
-        >
-            <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-                <Text style={styles.title}>Settings</Text>
-
+        <ZoomOutOverlay exiting={isClosing} onExitComplete={onBack} backgroundColor="#1a1033">
+            <ImageBackground source={Backgrounds.settings} style={styles.bg} resizeMode="cover">
+                <View
+                    style={[
+                        styles.scrollClipper,
+                        {
+                            marginTop: bannerReserve + insets.top,
+                            marginBottom: bottomBarReserve,
+                        },
+                    ]}
+                >
+                <ScrollView
+                    style={styles.content}
+                    contentContainerStyle={[
+                        styles.scrollContent,
+                        { paddingBottom: insets.bottom + 16 },
+                    ]}
+                    showsVerticalScrollIndicator={false}
+                >
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Menu Buttons</Text>
                     <Text style={styles.sectionDescription}>
@@ -250,12 +273,55 @@ const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSet
                         ))}
                     </View>
                 </View>
-            </ScrollView>
-        </InnerScreen>
+                </ScrollView>
+                </View>
+
+                <View
+                    style={[
+                        styles.bottomBar,
+                        { height: bottomBarReserve, paddingBottom: insets.bottom },
+                    ]}
+                    pointerEvents="box-none"
+                >
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={handleClose}
+                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                    >
+                        <Text style={styles.backButtonText}>{'<'} Back</Text>
+                    </TouchableOpacity>
+                </View>
+            </ImageBackground>
+        </ZoomOutOverlay>
     );
 };
 
 const styles = StyleSheet.create({
+    bg: {
+        flex: 1,
+    },
+    scrollClipper: {
+        flex: 1,
+        overflow: 'hidden',
+    },
+    bottomBar: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        paddingHorizontal: 16,
+    },
+    backButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+    },
+    backButtonText: {
+        fontSize: 12,
+        color: '#E8F5E8',
+        fontFamily: 'PressStart2P',
+    },
     content: {
         flex: 1,
         paddingHorizontal: 12,

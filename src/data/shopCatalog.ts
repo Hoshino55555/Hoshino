@@ -9,13 +9,7 @@
 
 import type { ImageSourcePropType } from 'react-native';
 import { ItemCategory, ItemRarity, type MarketplaceItem } from '../services/MarketplaceService';
-import {
-    INGREDIENT_LABELS,
-    INGREDIENT_TIER,
-    type IngredientId,
-    type IngredientTier,
-} from '../services/RecipeCatalog';
-import { Ingredients, getIngredientArt } from '../assets';
+import { Ingredients, ShopItems } from '../assets';
 
 export type ShopTab = 'deals' | 'consumables' | 'accessories';
 
@@ -38,47 +32,6 @@ export interface ShopItem extends MarketplaceItem {
     summary?: string;       // short bullet shown on the card
 }
 
-const STAR_FRAGMENT_PRICE_BY_TIER: Record<IngredientTier, number> = {
-    common: 8,
-    uncommon: 15,
-    rare: 25,
-    ultra_rare: 60,
-};
-
-const RARITY_BY_TIER: Record<IngredientTier, ItemRarity> = {
-    common: ItemRarity.COMMON,
-    uncommon: ItemRarity.UNCOMMON,
-    rare: ItemRarity.RARE,
-    ultra_rare: ItemRarity.LEGENDARY,
-};
-
-function ingredientItem(id: IngredientId): ShopItem {
-    const tier = INGREDIENT_TIER[id];
-    return {
-        id,
-        name: INGREDIENT_LABELS[id],
-        description: `${INGREDIENT_LABELS[id]} — ${tier.replace('_', ' ')} ingredient`,
-        imageUrl: '',
-        category: ItemCategory.INGREDIENT,
-        rarity: RARITY_BY_TIER[tier],
-        priceSOL: 0,
-        priceStarFragments: STAR_FRAGMENT_PRICE_BY_TIER[tier],
-        inStock: true,
-        tab: 'consumables',
-        subcategory: 'Ingredients',
-        currency: 'starFragments',
-        status: 'available',
-        image: getIngredientArt(id),
-    };
-}
-
-const INGREDIENT_IDS: IngredientId[] = [
-    'egg', 'lettuce', 'potato', 'rice', 'carrot',
-    'banana', 'strawberry', 'tomato', 'tofu', 'oat', 'bread',
-    'bacon', 'milk', 'tuna', 'gouda',
-    'star_dust',
-];
-
 // Generic stub image for items that don't yet have dedicated art. Reuses an
 // existing sprite so we don't ship a broken-image placeholder; the card's
 // "Coming Soon" overlay carries the real signal that the item isn't live.
@@ -100,7 +53,7 @@ const dealsItems: ShopItem[] = [
         currency: 'usd',
         priceUsd: 9.99,
         status: 'iap-pending',
-        image: STUB_IMAGE,
+        image: ShopItems.seasonPass,
         summary: 'AI credits · diary · exclusive Moonoko',
     },
     {
@@ -153,8 +106,8 @@ const dealsItems: ShopItem[] = [
     },
     {
         id: 'star-fragments-small',
-        name: 'Star Fragment Pack · S',
-        description: '500 Star Fragments',
+        name: 'Shard Pack · S',
+        description: '500 Shards',
         imageUrl: '',
         category: ItemCategory.UTILITY,
         rarity: ItemRarity.COMMON,
@@ -162,17 +115,17 @@ const dealsItems: ShopItem[] = [
         priceStarFragments: 0,
         inStock: true,
         tab: 'deals',
-        subcategory: 'Star Fragments',
+        subcategory: 'Shards',
         currency: 'usd',
         priceUsd: 0.99,
         status: 'iap-pending',
-        image: STUB_IMAGE,
+        image: ShopItems.sfPackSmall,
         summary: '500 fragments',
     },
     {
         id: 'star-fragments-medium',
-        name: 'Star Fragment Pack · M',
-        description: '3000 Star Fragments',
+        name: 'Shard Pack · M',
+        description: '3000 Shards',
         imageUrl: '',
         category: ItemCategory.UTILITY,
         rarity: ItemRarity.UNCOMMON,
@@ -180,17 +133,17 @@ const dealsItems: ShopItem[] = [
         priceStarFragments: 0,
         inStock: true,
         tab: 'deals',
-        subcategory: 'Star Fragments',
+        subcategory: 'Shards',
         currency: 'usd',
         priceUsd: 4.99,
         status: 'iap-pending',
-        image: STUB_IMAGE,
+        image: ShopItems.sfPackMedium,
         summary: '3,000 fragments',
     },
     {
         id: 'star-fragments-large',
-        name: 'Star Fragment Pack · L',
-        description: '7000 Star Fragments',
+        name: 'Shard Pack · L',
+        description: '7000 Shards',
         imageUrl: '',
         category: ItemCategory.UTILITY,
         rarity: ItemRarity.RARE,
@@ -198,17 +151,17 @@ const dealsItems: ShopItem[] = [
         priceStarFragments: 0,
         inStock: true,
         tab: 'deals',
-        subcategory: 'Star Fragments',
+        subcategory: 'Shards',
         currency: 'usd',
         priceUsd: 9.99,
         status: 'iap-pending',
-        image: STUB_IMAGE,
+        image: ShopItems.sfPackLarge,
         summary: '7,000 fragments',
     },
     {
         id: 'hackathon-special',
         name: 'Hackathon Special',
-        description: 'Free 10,000 Star Fragments — hackathon demo grant.',
+        description: 'Free 10,000 Shards — hackathon demo grant.',
         imageUrl: '',
         category: ItemCategory.UTILITY,
         rarity: ItemRarity.LEGENDARY,
@@ -216,7 +169,7 @@ const dealsItems: ShopItem[] = [
         priceStarFragments: 0,
         inStock: true,
         tab: 'deals',
-        subcategory: 'Star Fragments',
+        subcategory: 'Shards',
         currency: 'starFragments',
         status: 'asset-pending',
         image: STUB_IMAGE,
@@ -277,7 +230,6 @@ const dealsItems: ShopItem[] = [
 ];
 
 const consumablesItems: ShopItem[] = [
-    ...INGREDIENT_IDS.map(ingredientItem),
     {
         id: 'box-ingredients-common',
         name: 'Ingredient Box · Common',
@@ -291,8 +243,8 @@ const consumablesItems: ShopItem[] = [
         tab: 'consumables',
         subcategory: 'Ingredient Boxes',
         currency: 'starFragments',
-        status: 'asset-pending',
-        image: STUB_IMAGE,
+        status: 'available',
+        image: ShopItems.boxIngredientsCommon,
         summary: '5 random common',
     },
     {
@@ -308,8 +260,8 @@ const consumablesItems: ShopItem[] = [
         tab: 'consumables',
         subcategory: 'Ingredient Boxes',
         currency: 'starFragments',
-        status: 'asset-pending',
-        image: STUB_IMAGE,
+        status: 'available',
+        image: ShopItems.boxIngredientsUncommon,
         summary: '5 random uncommon',
     },
     {
@@ -325,8 +277,8 @@ const consumablesItems: ShopItem[] = [
         tab: 'consumables',
         subcategory: 'Ingredient Boxes',
         currency: 'starFragments',
-        status: 'asset-pending',
-        image: STUB_IMAGE,
+        status: 'available',
+        image: ShopItems.boxIngredientsRare,
         summary: '3 random rare',
     },
     {

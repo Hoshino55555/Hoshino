@@ -38,7 +38,7 @@ const StarFragmentMissions: React.FC<StarFragmentMissionsProps> = ({
             const loginResult = await starFragmentService.checkDailyLogin(walletAddress)
             if (loginResult.isNewDay) {
                 onNotification(
-                    `Daily login bonus: ${loginResult.loginReward + loginResult.streakBonus} star fragments! 🌟`,
+                    `Daily login bonus: ${loginResult.loginReward + loginResult.streakBonus} shards! 🌟`,
                     'success'
                 )
             }
@@ -76,7 +76,7 @@ const StarFragmentMissions: React.FC<StarFragmentMissionsProps> = ({
                     .reduce((sum, r) => sum + r.amount, 0)
 
                 onNotification(
-                    `Mission completed! Earned ${fragmentsEarned} star fragments! ⭐`,
+                    `Mission completed! Earned ${fragmentsEarned} shards! ⭐`,
                     'success'
                 )
 
@@ -197,7 +197,7 @@ const StarFragmentMissions: React.FC<StarFragmentMissionsProps> = ({
                 <Text style={styles.balanceAmount}>
                     {playerProgress?.starFragments.toLocaleString() || 0}
                 </Text>
-                <Text style={styles.balanceLabel}>Star Fragments</Text>
+                <Text style={styles.balanceLabel}>Shards</Text>
                 <Text style={styles.totalEarned}>
                     Total Earned: {playerProgress?.totalEarned.toLocaleString() || 0}
                 </Text>
@@ -256,7 +256,7 @@ const StarFragmentMissions: React.FC<StarFragmentMissionsProps> = ({
         return (
             <View style={styles.overlay}>
                 <View style={styles.noWalletContainer}>
-                    <Text style={styles.title}>Star Fragment Missions</Text>
+                    <Text style={styles.title}>Shard Missions</Text>
                     <Text style={styles.message}>Connect your wallet to access missions and track your progress!</Text>
                     <TouchableOpacity
                         onPress={onClose}
@@ -273,7 +273,7 @@ const StarFragmentMissions: React.FC<StarFragmentMissionsProps> = ({
         <View style={styles.overlay}>
             <View style={styles.modalContainer}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>⭐ Star Fragment Missions</Text>
+                    <Text style={styles.title}>⭐ Shard Missions</Text>
                     <TouchableOpacity onPress={onClose}>
                         <Text style={styles.closeText}>✕</Text>
                     </TouchableOpacity>

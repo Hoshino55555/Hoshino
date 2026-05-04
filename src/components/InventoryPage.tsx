@@ -36,9 +36,8 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
     const { inventory } = useGameStateContext();
     const insets = useSafeAreaInsets();
     const { height: screenHeight } = useWindowDimensions();
-    // Mirrors FeedingPage's banner reserve so the inventory content lands
-    // below the painted top scene.
-    const bannerReserve = screenHeight * 0.32;
+    const bannerReserve = screenHeight * 0.27;
+    const bottomBarReserve = screenHeight * 0.10;
 
     const [isClosing, setIsClosing] = useState(false);
 
@@ -75,17 +74,15 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                 resizeMode="cover"
                 testID="inventory-screen"
             >
-                <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={handleClose}
-                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                    >
-                        <Text style={styles.backButtonText}>{'<'} Back</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={[styles.scrollClipper, { marginTop: bannerReserve }]}>
+                <View
+                    style={[
+                        styles.scrollClipper,
+                        {
+                            marginTop: bannerReserve + insets.top,
+                            marginBottom: bottomBarReserve,
+                        },
+                    ]}
+                >
                     <ScrollView
                         contentContainerStyle={[
                             styles.scrollBody,
@@ -133,6 +130,22 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                         )}
                     </ScrollView>
                 </View>
+
+                <View
+                    style={[
+                        styles.bottomBar,
+                        { height: bottomBarReserve, paddingBottom: insets.bottom },
+                    ]}
+                    pointerEvents="box-none"
+                >
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={handleClose}
+                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                    >
+                        <Text style={styles.backButtonText}>{'<'} Back</Text>
+                    </TouchableOpacity>
+                </View>
             </ImageBackground>
         </ZoomOutOverlay>
     );
@@ -140,30 +153,23 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
 
 const styles = StyleSheet.create({
     bg: { flex: 1, width: '100%', height: '100%' },
-    topBar: {
+    bottomBar: {
         position: 'absolute',
-        top: 0,
         left: 0,
         right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'flex-start',
         paddingHorizontal: 16,
-        paddingBottom: 4,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        zIndex: 10,
     },
     backButton: {
         paddingVertical: 6,
         paddingHorizontal: 10,
-        backgroundColor: 'rgba(46, 90, 62, 0.85)',
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#E8F5E8',
     },
     backButtonText: {
         color: '#E8F5E8',
         fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontSize: 12,
     },
     scrollClipper: {
         flex: 1,

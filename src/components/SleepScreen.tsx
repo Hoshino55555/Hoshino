@@ -37,8 +37,10 @@ interface Props {
     wakeRequested?: boolean;
     /** Selected moonoko id — drives the sleep pose + the "[NAME] IS SLEEPING…" header. */
     characterId?: string | null;
-    /** Server's sleepStartedAt — used to compute the displayed alarm time. */
+    /** Server's sleepStartedAt — used as fallback to compute alarm time. */
     sleepStartedAt?: number | null;
+    /** Wake time picked by the user; overrides the default 8h calculation. */
+    wakeAtMs?: number | null;
 }
 
 function formatTime(ms: number): string {
@@ -57,6 +59,7 @@ const SleepScreen: React.FC<Props> = ({
     wakeRequested = false,
     characterId,
     sleepStartedAt,
+    wakeAtMs,
 }) => {
     const insets = useSafeAreaInsets();
     const [isClosing, setIsClosing] = useState(false);
@@ -83,11 +86,11 @@ const SleepScreen: React.FC<Props> = ({
 
     const displayName = (characterId || 'MOONOKO').toUpperCase();
     const clockText = formatTime(now);
-    // Engine wakes at sleepStartedAt + 8h. Show that as the read-only alarm
-    // until the picker (and variable wake-time enforcement) lands.
-    const alarmText = sleepStartedAt
-        ? formatTime(sleepStartedAt + SLEEP_REQUIRED_MS)
-        : '7:00 AM';
+    const alarmText = wakeAtMs
+        ? formatTime(wakeAtMs)
+        : sleepStartedAt
+            ? formatTime(sleepStartedAt + SLEEP_REQUIRED_MS)
+            : '7:00 AM';
 
     return (
         <ZoomOutOverlay

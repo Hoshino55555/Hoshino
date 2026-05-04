@@ -271,7 +271,7 @@ class GlobalPointSystem {
         }
 
         if (data.starFragments < amount) {
-            return { success: false, error: 'Insufficient Star Fragments' };
+            return { success: false, error: 'Insufficient Shards' };
         }
 
         data.starFragments -= amount;

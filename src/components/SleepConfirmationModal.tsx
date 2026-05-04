@@ -9,7 +9,88 @@ import {
     Dimensions,
 } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
+
+const DIGIT_ROW_HEIGHT = 56;
+const DIGIT_FONT_SIZE = 38;
+const DIGIT_BOX_MIN_WIDTH = 92;
+const ROLL_DURATION_MS = 180;
+
+interface RollingDigitProps {
+    value: string;
+    direction: 1 | -1;
+    textStyle: any;
+}
+
+const RollingDigit: React.FC<RollingDigitProps> = ({ value, direction, textStyle }) => {
+    const [snapshot, setSnapshot] = useState<{
+        shown: string;
+        incoming: string | null;
+        dir: 1 | -1;
+    }>({ shown: value, incoming: null, dir: 1 });
+    const anim = useRef(new Animated.Value(0)).current;
+    const lastValue = useRef(value);
+    const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+    const tokenRef = useRef(0);
+
+    useEffect(() => {
+        if (value === lastValue.current) return;
+        const old = lastValue.current;
+        lastValue.current = value;
+        if (animationRef.current) {
+            animationRef.current.stop();
+        }
+        const myToken = ++tokenRef.current;
+        setSnapshot({ shown: old, incoming: value, dir: direction });
+        anim.setValue(0);
+        const a = Animated.timing(anim, {
+            toValue: 1,
+            duration: ROLL_DURATION_MS,
+            useNativeDriver: true,
+        });
+        animationRef.current = a;
+        a.start(({ finished }) => {
+            if (!finished || myToken !== tokenRef.current) return;
+            setSnapshot({ shown: value, incoming: null, dir: direction });
+        });
+    }, [value, direction, anim]);
+
+    if (snapshot.incoming === null) {
+        return (
+            <View style={styles.digitWindow}>
+                <Text style={textStyle} numberOfLines={1}>
+                    {snapshot.shown}
+                </Text>
+            </View>
+        );
+    }
+
+    const shownY = anim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -snapshot.dir * DIGIT_ROW_HEIGHT],
+    });
+    const incomingY = anim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [snapshot.dir * DIGIT_ROW_HEIGHT, 0],
+    });
+
+    return (
+        <View style={styles.digitWindow}>
+            <Animated.Text
+                numberOfLines={1}
+                style={[textStyle, styles.rollingLayer, { transform: [{ translateY: shownY }] }]}
+            >
+                {snapshot.shown}
+            </Animated.Text>
+            <Animated.Text
+                numberOfLines={1}
+                style={[textStyle, styles.rollingLayer, { transform: [{ translateY: incomingY }] }]}
+            >
+                {snapshot.incoming}
+            </Animated.Text>
+        </View>
+    );
+};
 
 interface Character {
     id: string;
@@ -22,64 +103,82 @@ interface Character {
 interface Props {
     visible: boolean;
     character: Character | null;
-    playerName?: string; // Add playerName prop
-    onConfirm: () => void;
+    playerName?: string;
+    defaultWakeAtMs: number;
+    onConfirm: (wakeAtMs: number) => void;
     onCancel: () => void;
+    onSmokeTest?: () => void;
 }
 
-type DialogPhase = 'confirmation' | 'alright' | 'goodnight' | 'completed';
+const MIN_OFFSET_MS = 5 * 60 * 1000;
+const MAX_OFFSET_MS = 14 * 60 * 60 * 1000;
+const MINUTE_STEP = 5;
+
+interface WakeParts {
+    hour12: number;
+    minute: number;
+    isPM: boolean;
+}
+
+const partsFromMs = (ms: number): WakeParts => {
+    const d = new Date(ms);
+    const h24 = d.getHours();
+    const isPM = h24 >= 12;
+    let hour12 = h24 % 12;
+    if (hour12 === 0) hour12 = 12;
+    const minute = Math.floor(d.getMinutes() / MINUTE_STEP) * MINUTE_STEP;
+    return { hour12, minute, isPM };
+};
+
+const msFromParts = (parts: WakeParts, refMs: number): number => {
+    const ref = new Date(refMs);
+    let h24 = parts.hour12 % 12;
+    if (parts.isPM) h24 += 12;
+    const candidate = new Date(
+        ref.getFullYear(),
+        ref.getMonth(),
+        ref.getDate(),
+        h24,
+        parts.minute,
+        0,
+        0,
+    ).getTime();
+    if (candidate < refMs + MIN_OFFSET_MS) return candidate + 24 * 60 * 60 * 1000;
+    return candidate;
+};
+
+const formatOffset = (ms: number): string => {
+    const totalMin = Math.round(ms / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h === 0) return `${m}m`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}m`;
+};
 
 const SleepConfirmationModal: React.FC<Props> = ({
     visible,
-    character,
     playerName,
+    defaultWakeAtMs,
     onConfirm,
-    onCancel
+    onCancel,
+    onSmokeTest,
 }) => {
-    const [dialogPhase, setDialogPhase] = useState<DialogPhase>('confirmation');
-    const [displayedText, setDisplayedText] = useState<string>('');
-    const [isTyping, setIsTyping] = useState<boolean>(false);
+    const [parts, setParts] = useState<WakeParts>(() => partsFromMs(defaultWakeAtMs));
+    const [hourDir, setHourDir] = useState<1 | -1>(1);
+    const [minuteDir, setMinuteDir] = useState<1 | -1>(1);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.8)).current;
-    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const wasVisibleRef = useRef(false);
+    const defaultRef = useRef(defaultWakeAtMs);
+    defaultRef.current = defaultWakeAtMs;
 
-    const typewriterEffect = (text: string, duration: number = 2000) => {
-        setIsTyping(true);
-        setDisplayedText('');
-
-        const characters = text.split('');
-        const delay = duration / characters.length;
-
-        characters.forEach((char, index) => {
-            typingTimeoutRef.current = setTimeout(() => {
-                setDisplayedText(prev => prev + char);
-
-                if (index === characters.length - 1) {
-                    setIsTyping(false);
-                }
-            }, delay * index);
-        });
-    };
-
-    const clearTypingTimeouts = () => {
-        if (typingTimeoutRef.current) {
-            clearTimeout(typingTimeoutRef.current);
+    useEffect(() => {
+        if (visible && !wasVisibleRef.current) {
+            setParts(partsFromMs(defaultRef.current));
         }
-    };
-
-    useEffect(() => {
-        return () => {
-            clearTypingTimeouts();
-        };
-    }, []);
-
-    useEffect(() => {
+        wasVisibleRef.current = visible;
         if (visible) {
-            setDialogPhase('confirmation');
-            setDisplayedText('');
-            setIsTyping(false);
-
-            // Retro-style animation: quick pop-in
             Animated.parallel([
                 Animated.timing(fadeAnim, {
                     toValue: 1,
@@ -92,60 +191,14 @@ const SleepConfirmationModal: React.FC<Props> = ({
                     friction: 6,
                     useNativeDriver: true,
                 }),
-            ]).start(() => {
-                // Start typing the initial message
-                const initialMessage = getDialogContent().message;
-                typewriterEffect(initialMessage, 1500);
-            });
+            ]).start();
         } else {
-            // Reset for next time
             fadeAnim.setValue(0);
             scaleAnim.setValue(0.8);
-            setDialogPhase('confirmation');
-            setDisplayedText('');
-            setIsTyping(false);
-            clearTypingTimeouts();
         }
     }, [visible]);
 
-    const handleYes = () => {
-        // Start the message progression
-        setDialogPhase('alright');
-        const alrightMessage = 'Alright. Time to go touch some pillows!!!';
-        typewriterEffect(alrightMessage, 1800);
-
-        // After typing + brief pause, show goodnight message
-        setTimeout(() => {
-            setDialogPhase('goodnight');
-            const playerDisplayName = playerName || 'Player';
-            const goodnightMessage = `GN ${playerDisplayName}. See you tomorrow!`;
-            typewriterEffect(goodnightMessage, 1500);
-
-            // After goodnight typing + brief pause, complete and trigger sleep overlay
-            setTimeout(() => {
-                setDialogPhase('completed');
-
-                // Quick retro fade out
-                Animated.parallel([
-                    Animated.timing(fadeAnim, {
-                        toValue: 0,
-                        duration: 150,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(scaleAnim, {
-                        toValue: 0.8,
-                        duration: 150,
-                        useNativeDriver: true,
-                    }),
-                ]).start(() => {
-                    onConfirm();
-                });
-            }, 2200); // Wait for typing (1500ms) + pause (700ms)
-        }, 2300); // Wait for typing (1800ms) + pause (500ms)
-    };
-
-    const handleNo = () => {
-        // Quick retro fade out
+    const close = (cb: () => void) => {
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 0,
@@ -157,116 +210,191 @@ const SleepConfirmationModal: React.FC<Props> = ({
                 duration: 150,
                 useNativeDriver: true,
             }),
-        ]).start(() => {
-            onCancel();
+        ]).start(cb);
+    };
+
+    const stepHour = (delta: number) => {
+        setHourDir(delta > 0 ? 1 : -1);
+        setParts((p) => {
+            let h = p.hour12 + delta;
+            if (h > 12) h = 1;
+            if (h < 1) h = 12;
+            return { ...p, hour12: h };
         });
     };
 
-    const getDialogContent = () => {
-        // Debug logging
-        console.log('PlayerName in modal:', playerName);
-
-        switch (dialogPhase) {
-            case 'confirmation':
-                return {
-                    message: 'Is it shut-eye time???',
-                    showButtons: true,
-                };
-            case 'alright':
-                return {
-                    message: 'Alright. Time to go touch some pillows!!!',
-                    showButtons: false,
-                };
-            case 'goodnight':
-                const displayName = playerName || 'Player';
-                console.log('Using display name:', displayName);
-                return {
-                    message: `GN ${displayName}. See you tomorrow!`,
-                    showButtons: false,
-                };
-            default:
-                return {
-                    message: '',
-                    showButtons: false,
-                };
-        }
+    const stepMinute = (delta: number) => {
+        setMinuteDir(delta > 0 ? 1 : -1);
+        setParts((p) => {
+            let m = p.minute + delta * MINUTE_STEP;
+            if (m >= 60) m = 0;
+            if (m < 0) m = 60 - MINUTE_STEP;
+            return { ...p, minute: m };
+        });
     };
 
-    const dialogContent = getDialogContent();
-    const textToShow = dialogPhase === 'confirmation' ? dialogContent.message : displayedText;
+    const toggleAmPm = () => setParts((p) => ({ ...p, isPM: !p.isPM }));
 
-    if (!visible) {
-        return null;
-    }
+    if (!visible) return null;
+
+    const now = Date.now();
+    let wakeAtMs = msFromParts(parts, now);
+    const maxAt = now + MAX_OFFSET_MS;
+    if (wakeAtMs > maxAt) wakeAtMs = maxAt;
+    const offsetMs = Math.max(0, wakeAtMs - now);
+    const greeting = playerName
+        ? `GN ${playerName}. See you tomorrow!`
+        : 'GN. See you tomorrow!';
+
+    const hourTens = Math.floor(parts.hour12 / 10).toString();
+    const hourOnes = (parts.hour12 % 10).toString();
+    const minuteTens = Math.floor(parts.minute / 10).toString();
+    const minuteOnes = (parts.minute % 10).toString();
 
     return (
-        <Modal
-            transparent
-            visible={visible}
-            animationType="none"
-            onRequestClose={onCancel}
-        >
-            <Animated.View
-                style={[
-                    styles.modalOverlay,
-                    {
-                        opacity: fadeAnim,
-                    },
-                ]}
-            >
-                <Animated.View
-                    style={[
-                        styles.modalContainer,
-                        {
-                            transform: [{ scale: scaleAnim }],
-                        },
-                    ]}
-                >
-                    {/* Cosmic Window Header */}
+        <Modal transparent visible={visible} animationType="none" onRequestClose={onCancel}>
+            <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+                <Animated.View style={[styles.modalContainer, { transform: [{ scale: scaleAnim }] }]}>
                     <View style={styles.windowHeader}>
-                        <View style={styles.windowTitle}>
-                            <Text style={styles.titleText}>💤 Sleep Mode</Text>
-                        </View>
+                        <Text style={styles.titleText}>SLEEP MODE</Text>
                     </View>
 
-                    {/* Content Area */}
                     <View style={styles.contentArea}>
-                        <Text style={styles.messageText}>{textToShow}</Text>
+                        <Text style={styles.messageText}>{greeting}</Text>
 
-                        {/* Typing cursor effect */}
-                        {isTyping && (
-                            <Text style={styles.typingCursor}>|</Text>
-                        )}
+                        <Text style={styles.pickerLabel}>WAKE AT</Text>
 
-                        {/* Pixel dots for loading phases */}
-                        {!dialogContent.showButtons && !isTyping && (
-                            <View style={styles.dotsContainer}>
-                                <View style={styles.cosmicDot} />
-                                <View style={styles.cosmicDot} />
-                                <View style={styles.cosmicDot} />
-                            </View>
-                        )}
-
-                        {/* Buttons */}
-                        {dialogContent.showButtons && (
-                            <View style={styles.buttonContainer}>
+                        <View style={styles.clockRow}>
+                            <View style={styles.column}>
                                 <TouchableOpacity
-                                    style={[styles.button, styles.noButton]}
-                                    onPress={handleNo}
-                                    activeOpacity={0.8}
+                                    style={styles.arrowBtn}
+                                    onPress={() => stepHour(1)}
+                                    activeOpacity={0.6}
+                                    hitSlop={10}
                                 >
-                                    <Text style={styles.buttonText}>No</Text>
+                                    <Text style={styles.arrowText}>▲</Text>
                                 </TouchableOpacity>
-
+                                <View style={[styles.digitBox, styles.digitBoxMinute]}>
+                                    <RollingDigit
+                                        value={hourTens}
+                                        direction={hourDir}
+                                        textStyle={styles.digitText}
+                                    />
+                                    <RollingDigit
+                                        value={hourOnes}
+                                        direction={hourDir}
+                                        textStyle={styles.digitText}
+                                    />
+                                </View>
                                 <TouchableOpacity
-                                    style={[styles.button, styles.yesButton]}
-                                    onPress={handleYes}
-                                    activeOpacity={0.8}
+                                    style={styles.arrowBtn}
+                                    onPress={() => stepHour(-1)}
+                                    activeOpacity={0.6}
+                                    hitSlop={10}
                                 >
-                                    <Text style={styles.buttonText}>Yes</Text>
+                                    <Text style={styles.arrowText}>▼</Text>
                                 </TouchableOpacity>
                             </View>
-                        )}
+
+                            <Text style={styles.colon}>:</Text>
+
+                            <View style={styles.column}>
+                                <TouchableOpacity
+                                    style={styles.arrowBtn}
+                                    onPress={() => stepMinute(1)}
+                                    activeOpacity={0.6}
+                                    hitSlop={10}
+                                >
+                                    <Text style={styles.arrowText}>▲</Text>
+                                </TouchableOpacity>
+                                <View style={[styles.digitBox, styles.digitBoxMinute]}>
+                                    <RollingDigit
+                                        value={minuteTens}
+                                        direction={minuteDir}
+                                        textStyle={styles.digitText}
+                                    />
+                                    <RollingDigit
+                                        value={minuteOnes}
+                                        direction={minuteDir}
+                                        textStyle={styles.digitText}
+                                    />
+                                </View>
+                                <TouchableOpacity
+                                    style={styles.arrowBtn}
+                                    onPress={() => stepMinute(-1)}
+                                    activeOpacity={0.6}
+                                    hitSlop={10}
+                                >
+                                    <Text style={styles.arrowText}>▼</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.ampmColumn}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.ampmBtn,
+                                        !parts.isPM && styles.ampmBtnActive,
+                                    ]}
+                                    onPress={toggleAmPm}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.ampmText,
+                                            !parts.isPM && styles.ampmTextActive,
+                                        ]}
+                                    >
+                                        AM
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.ampmBtn,
+                                        parts.isPM && styles.ampmBtnActive,
+                                    ]}
+                                    onPress={toggleAmPm}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.ampmText,
+                                            parts.isPM && styles.ampmTextActive,
+                                        ]}
+                                    >
+                                        PM
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        <Text style={styles.pickerOffset}>in {formatOffset(offsetMs)}</Text>
+
+                        <View style={styles.buttonContainer}>
+                            <TouchableOpacity
+                                style={[styles.button, styles.noButton]}
+                                onPress={() => close(onCancel)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.buttonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.button, styles.yesButton]}
+                                onPress={() => close(() => onConfirm(wakeAtMs))}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.buttonText}>Sleep</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {__DEV__ && onSmokeTest ? (
+                            <TouchableOpacity
+                                style={styles.smokeBtn}
+                                onPress={() => close(onSmokeTest)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.smokeText}>DEV · test alarm 60s</Text>
+                            </TouchableOpacity>
+                        ) : null}
                     </View>
                 </Animated.View>
             </Animated.View>
@@ -283,14 +411,12 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     modalContainer: {
-        backgroundColor: '#e5dcf5', // Soft pastel purple cosmic background
+        backgroundColor: '#e5dcf5',
         borderRadius: 4,
         width: width * 0.85,
         maxWidth: 380,
-        minHeight: 160,
         borderWidth: 3,
-        borderColor: '#000000', // Keep dark pixel border
-        // Hard pixel-style shadow
+        borderColor: '#000000',
         shadowColor: '#000000',
         shadowOffset: { width: 3, height: 3 },
         shadowOpacity: 0.3,
@@ -298,100 +424,178 @@ const styles = StyleSheet.create({
         elevation: 15,
     },
     windowHeader: {
-        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center', // Center the title since no controls
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: '#c6d6f2', // Soft cosmic blue for header
+        backgroundColor: '#c6d6f2',
         borderBottomWidth: 2,
         borderBottomColor: '#000000',
     },
-    windowTitle: {
-        alignItems: 'center',
-    },
     titleText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#2d1b69', // Deep purple text
-        fontFamily: '04b03',
+        fontSize: 12,
+        color: '#2d1b69',
+        fontFamily: 'PressStart2P',
         letterSpacing: 1,
     },
     contentArea: {
-        padding: 24,
+        padding: 20,
         alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 120,
     },
     messageText: {
-        fontSize: 16,
-        color: '#2d1b69', // Deep purple text for contrast
-        textAlign: 'center',
-        fontFamily: '04b03',
-        fontWeight: 'bold',
-        lineHeight: 22,
-        letterSpacing: 0.5,
-        marginBottom: 20,
-        minHeight: 44, // Reserve space to prevent layout shift during typing
-    },
-    typingCursor: {
-        fontSize: 16,
+        fontSize: 11,
         color: '#2d1b69',
-        fontFamily: '04b03',
-        fontWeight: 'bold',
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        opacity: 0.8,
+        textAlign: 'center',
+        fontFamily: 'PressStart2P',
+        marginBottom: 16,
     },
-    dotsContainer: {
+    pickerLabel: {
+        fontSize: 8,
+        color: '#5a4a8a',
+        fontFamily: 'PressStart2P',
+        letterSpacing: 1,
+        marginBottom: 10,
+    },
+    clockRow: {
         flexDirection: 'row',
-        justifyContent: 'center',
         alignItems: 'center',
-        gap: 10,
-        marginTop: 10,
+        marginBottom: 12,
     },
-    cosmicDot: {
-        width: 8,
-        height: 8,
-        backgroundColor: '#8b5cf6', // Cosmic purple dots
-        borderRadius: 4, // Slightly rounded for dreamy effect
-        shadowColor: '#8b5cf6',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.6,
-        shadowRadius: 4,
+    column: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    arrowBtn: {
+        paddingVertical: 10,
+        paddingHorizontal: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#000000',
+        backgroundColor: '#c6d6f2',
+        borderRadius: 3,
+        minWidth: 92,
+        marginVertical: 2,
+    },
+    arrowText: {
+        fontSize: 18,
+        color: '#2d1b69',
+        lineHeight: 18,
+    },
+    digitBox: {
+        borderWidth: 2,
+        borderColor: '#000000',
+        backgroundColor: '#fffaf2',
+        borderRadius: 3,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        minWidth: DIGIT_BOX_MIN_WIDTH,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: 4,
+    },
+    digitBoxMinute: {
+        flexDirection: 'row',
+    },
+    digitWindow: {
+        height: DIGIT_ROW_HEIGHT,
+        overflow: 'hidden',
+        minWidth: 38,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    rollingLayer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        textAlign: 'center',
+    },
+    digitText: {
+        fontSize: DIGIT_FONT_SIZE,
+        lineHeight: DIGIT_ROW_HEIGHT,
+        color: '#2d1b69',
+        fontFamily: 'PressStart2P',
+        textAlign: 'center',
+        textAlignVertical: 'center',
+        includeFontPadding: false,
+    },
+    colon: {
+        fontSize: DIGIT_FONT_SIZE,
+        color: '#2d1b69',
+        fontFamily: 'PressStart2P',
+        marginHorizontal: 8,
+        includeFontPadding: false,
+    },
+    ampmColumn: {
+        marginLeft: 14,
+        gap: 6,
+    },
+    ampmBtn: {
+        paddingVertical: 7,
+        paddingHorizontal: 10,
+        borderWidth: 2,
+        borderColor: '#000000',
+        backgroundColor: '#fffaf2',
+        borderRadius: 3,
+        minWidth: 48,
+        alignItems: 'center',
+    },
+    ampmBtnActive: {
+        backgroundColor: '#8ee2d9',
+    },
+    ampmText: {
+        fontSize: 10,
+        color: '#5a4a8a',
+        fontFamily: 'PressStart2P',
+        letterSpacing: 1,
+    },
+    ampmTextActive: {
+        color: '#2d1b69',
+    },
+    pickerOffset: {
+        fontSize: 9,
+        color: '#5a4a8a',
+        fontFamily: 'PressStart2P',
+        marginBottom: 14,
     },
     buttonContainer: {
         flexDirection: 'row',
-        gap: 16,
-        marginTop: 24,
+        gap: 12,
     },
     button: {
-        paddingVertical: 12,
-        paddingHorizontal: 24,
+        paddingVertical: 10,
+        paddingHorizontal: 22,
         borderRadius: 3,
         borderWidth: 2,
         borderColor: '#000000',
-        minWidth: 85,
+        minWidth: 90,
         alignItems: 'center',
-        // Soft pixel shadow
         shadowColor: '#000000',
         shadowOffset: { width: 2, height: 2 },
         shadowOpacity: 0.8,
         shadowRadius: 0,
         elevation: 6,
     },
-    noButton: {
-        backgroundColor: '#a8a8e0', // Soft violet
-    },
-    yesButton: {
-        backgroundColor: '#8ee2d9', // Pastel teal/aqua
-    },
+    noButton: { backgroundColor: '#a8a8e0' },
+    yesButton: { backgroundColor: '#8ee2d9' },
     buttonText: {
-        fontSize: 13,
-        fontWeight: 'bold',
-        color: '#2d1b69', // Dark purple text for both buttons
-        fontFamily: '04b03',
+        fontSize: 11,
+        color: '#2d1b69',
+        fontFamily: 'PressStart2P',
+        letterSpacing: 1,
+    },
+    smokeBtn: {
+        marginTop: 14,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderWidth: 1,
+        borderColor: '#5a4a8a',
+        borderRadius: 3,
+        backgroundColor: 'transparent',
+    },
+    smokeText: {
+        fontSize: 7,
+        color: '#5a4a8a',
+        fontFamily: 'PressStart2P',
         letterSpacing: 1,
     },
 });

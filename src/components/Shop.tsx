@@ -120,51 +120,6 @@ const TIER_TILE_COLOR = {
     ultra_rare: '#9C27B0',
 } as const;
 
-// Ingredient pool for each box tier — every ingredient renders as part of
-// the "bundle" preview on the shop card. Driven off INGREDIENT_TIER so adding
-// a new ingredient automatically participates without a separate manifest.
-const INGREDIENTS_BY_TIER: Record<string, string[]> = Object.entries(
-    INGREDIENT_TIER
-).reduce<Record<string, string[]>>((acc, [id, tier]) => {
-    (acc[tier] ||= []).push(id);
-    return acc;
-}, {});
-
-// Hand-tuned huddle positions for the bundle preview (n=3..6). Each sprite
-// is 18×18 inside a 44×44 container; layouts form a tight diamond/pentagon
-// cluster centered on (13,13) so the pile reads as huddled together rather
-// than a row. Render order = back-to-front (later entries draw on top, so
-// the front-most sprites sit at the end of each array).
-const BUNDLE_LAYOUT: Record<number, { top: number; left: number }[]> = {
-    3: [
-        { top: 0, left: 13 },
-        { top: 14, left: 2 },
-        { top: 14, left: 24 },
-    ],
-    4: [
-        { top: 0, left: 13 },
-        { top: 13, left: 0 },
-        { top: 13, left: 26 },
-        { top: 26, left: 13 },
-    ],
-    5: [
-        { top: 0, left: 13 },
-        { top: 11, left: 0 },
-        { top: 11, left: 26 },
-        { top: 24, left: 5 },
-        { top: 24, left: 21 },
-    ],
-    6: [
-        { top: 0, left: 13 },
-        { top: 12, left: 5 },
-        { top: 12, left: 21 },
-        { top: 24, left: -2 },
-        { top: 24, left: 13 },
-        { top: 24, left: 28 },
-    ],
-};
-
-
 const REEL_TILES: ReelTile[] = [
     { kind: 'ingredient', id: 'egg',        tier: 'common',     color: TIER_TILE_COLOR.common },
     { kind: 'starFragments', amount: 10,    color: '#2e5a3e' },
@@ -357,7 +312,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
             const res = await starFragmentService.claimHackathonSpecial();
             setBalance(res.newBalance);
             onNotification?.(
-                `Hackathon Special claimed — +${res.granted.toLocaleString()} Star Fragments!`,
+                `Hackathon Special claimed — +${res.granted.toLocaleString()} Shards!`,
                 'success'
             );
         } catch (err: any) {
@@ -373,7 +328,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
         if (openingBoxId) return;
         if (balance < item.priceStarFragments) {
             onNotification?.(
-                `Not enough Star Fragments — need ${item.priceStarFragments}, have ${balance}.`,
+                `Not enough Shards — need ${item.priceStarFragments}, have ${balance}.`,
                 'error'
             );
             return;
@@ -404,7 +359,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
         if (upgradingField) return;
         if (balance < item.priceStarFragments) {
             onNotification?.(
-                `Not enough Star Fragments — need ${item.priceStarFragments}, have ${balance}.`,
+                `Not enough Shards — need ${item.priceStarFragments}, have ${balance}.`,
                 'error'
             );
             return;
@@ -450,7 +405,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
         }
         if (balance < item.priceStarFragments) {
             onNotification?.(
-                `Not enough Star Fragments — need ${item.priceStarFragments}, have ${balance}.`,
+                `Not enough Shards — need ${item.priceStarFragments}, have ${balance}.`,
                 'error'
             );
             return;
@@ -519,7 +474,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
             if (res.granted?.kind === 'starFragments') {
                 setBalance(res.granted.newBalance);
                 onNotification?.(
-                    `+${res.granted.amount.toLocaleString()} Star Fragments — purchase complete!`,
+                    `+${res.granted.amount.toLocaleString()} Shards — purchase complete!`,
                     'success'
                 );
             } else if (res.granted?.kind === 'seasonPass') {
@@ -586,7 +541,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
             if (!BOOSTER_SKU_IDS.has(item.id as BoosterSkuId)) return;
             if (balance < item.priceStarFragments) {
                 onNotification?.(
-                    `Not enough Star Fragments — need ${item.priceStarFragments}, have ${balance}.`,
+                    `Not enough Shards — need ${item.priceStarFragments}, have ${balance}.`,
                     'error'
                 );
                 return;
@@ -635,7 +590,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
         const projected = cartTotal + item.priceStarFragments;
         if (projected > balance) {
             onNotification?.(
-                `Not enough Star Fragments — need ${projected}, have ${balance}.`,
+                `Not enough Shards — need ${projected}, have ${balance}.`,
                 'error'
             );
             return;
@@ -686,7 +641,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
             return;
         }
         if (cartTotal > balance) {
-            onNotification?.('Insufficient Star Fragments.', 'error');
+            onNotification?.('Insufficient Shards.', 'error');
             return;
         }
 
@@ -783,11 +738,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
         const opening = openingBoxId === item.id;
         const insufficient = balance < item.priceStarFragments;
         const disabled = opening || (openingBoxId !== null && !opening) || insufficient;
-        // 'box-ingredients-common' → 'common' etc. Falls back to common so a
-        // future tier name doesn't crash the bundle preview (just shows the
-        // common pool until the catalog catches up).
-        const tier = item.id.replace('box-ingredients-', '');
-        const bundle = INGREDIENTS_BY_TIER[tier] || INGREDIENTS_BY_TIER.common;
         return (
             <View
                 key={item.id}
@@ -798,20 +748,12 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                     onPress={() => handleBoxPurchase(item)}
                     disabled={disabled}
                 >
-                    <View style={styles.bundle}>
-                        {bundle.map((ing, i) => {
-                            const layout = BUNDLE_LAYOUT[bundle.length] || BUNDLE_LAYOUT[6];
-                            const pos = layout[i] || layout[layout.length - 1];
-                            return (
-                                <Image
-                                    key={ing}
-                                    source={getIngredientArt(ing)}
-                                    style={[styles.bundleSprite, pos]}
-                                    resizeMode="contain"
-                                />
-                            );
-                        })}
-                    </View>
+                    <Image
+                        source={item.image}
+                        style={styles.boxImage}
+                        resizeMode="contain"
+                    />
+
                     <Text style={styles.itemName} numberOfLines={2}>
                         {/* Force the rarity word onto its own line so Common,
                             Uncommon, and Rare all wrap identically — keeps
@@ -1036,7 +978,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                         <Image source={Stars.fragment} style={styles.balanceIcon} resizeMode="contain" />
                         <View style={styles.dustTextContainer}>
                             <Text style={styles.walletLabel}>WALLET</Text>
-                            <Text style={styles.dustAmount}>{remainingBalance} Star Fragments</Text>
+                            <Text style={styles.dustAmount}>{remainingBalance} Shards</Text>
                             {cartTotal > 0 ? (
                                 <Text style={styles.walletSubLabel}>(−{cartTotal} in cart)</Text>
                             ) : null}
@@ -1238,7 +1180,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                                                 resizeMode="contain"
                                             />
                                             <Text style={styles.revealText}>
-                                                +{spinReward.amount} Star Fragments
+                                                +{spinReward.amount} Shards
                                             </Text>
                                         </>
                                     ) : (
@@ -1547,6 +1489,14 @@ const styles = StyleSheet.create({
         flex: 1,
         overflow: 'hidden',
     },
+    // Sized to match the bundle cluster's footprint so the box-card layout
+    // (title + summary + price below) lines up identically whether we're
+    // showing real box art or the rare-tier bundle fallback.
+    boxImage: {
+        width: 56,
+        height: 56,
+        marginBottom: 4,
+    },
     scrollBody: {
         paddingHorizontal: 16,
     },
@@ -1668,20 +1618,6 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         marginBottom: 4,
-    },
-    // Bundle preview is a clustered "pile" of every ingredient in the tier.
-    // Container width matches the widest BUNDLE_LAYOUT preset (left=26 +
-    // sprite=20 = 46, rounded to 48) so the cluster reads as centered.
-    bundle: {
-        width: 48,
-        height: 44,
-        marginBottom: 4,
-        position: 'relative',
-    },
-    bundleSprite: {
-        position: 'absolute',
-        width: 20,
-        height: 20,
     },
     pile: {
         width: 44,

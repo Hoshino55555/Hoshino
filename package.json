@@ -13,6 +13,7 @@
   "dependencies": {
     "@expo-google-fonts/press-start-2p": "^0.4.0",
     "@expo-google-fonts/space-mono": "^0.4.2",
+    "@notifee/react-native": "^9.1.8",
     "@privy-io/expo": "^0.65.0",
     "@privy-io/expo-native-extensions": "^0.0.9",
     "@react-native-async-storage/async-storage": "2.2.0",

@@ -50,6 +50,18 @@ interface Props {
 
 const getImageSource = (imageName: string) => getCharacterAnim(imageName);
 
+// Local placeholder for the AI capacity meter. Swap this for a server-side
+// quota surface (daily message budget / token bucket) once exposed.
+const SESSION_AI_BUDGET = 30;
+const CAPACITY_SEGMENTS = 30;
+
+// PictoChat-style name handle. Lowercases, strips non-alphanum, caps the
+// length so the pill stays a fixed width regardless of the source name.
+const namePlateHandle = (name: string): string => {
+    const cleaned = (name || 'user').replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+    return cleaned.slice(0, 8) || 'user';
+};
+
 const CharacterChat = ({ character, onExit, playerName, onNotification }: Props) => {
     const insets = useSafeAreaInsets();
     const [messages, setMessages] = useState<Message[]>([]);
@@ -62,7 +74,46 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     // no-op. Lifting the input bar by this height lands it just above the
     // keyboard on every recent Android version.
     const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const [capacityVisible, setCapacityVisible] = useState(false);
+    const [capacityTrackHeight, setCapacityTrackHeight] = useState(0);
+    const [typingDots, setTypingDots] = useState(0);
     const messagesEndRef = useRef<ScrollView>(null);
+    const capacityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const toggleCapacityBar = () => {
+        if (capacityTimerRef.current) {
+            clearTimeout(capacityTimerRef.current);
+            capacityTimerRef.current = null;
+        }
+        setCapacityVisible((prev) => {
+            if (prev) return false;
+            capacityTimerRef.current = setTimeout(
+                () => setCapacityVisible(false),
+                3500,
+            );
+            return true;
+        });
+    };
+
+    useEffect(() => {
+        return () => {
+            if (capacityTimerRef.current) clearTimeout(capacityTimerRef.current);
+        };
+    }, []);
+
+    // Cycle the typing-indicator dots (0 → 1 → 2 → 3 → 0) while a response
+    // is in flight, so the row reads as actively-being-typed instead of a
+    // static placeholder.
+    useEffect(() => {
+        if (!isThinking) {
+            setTypingDots(0);
+            return;
+        }
+        const id = setInterval(() => {
+            setTypingDots((d) => (d + 1) % 4);
+        }, 350);
+        return () => clearInterval(id);
+    }, [isThinking]);
 
     const handleClose = () => {
         if (isClosing) return;
@@ -171,125 +222,211 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     };
 
     return (
-        <ZoomOutOverlay exiting={isClosing} onExitComplete={onExit} backgroundColor="#0d0f2e">
+        <ZoomOutOverlay exiting={isClosing} onExitComplete={onExit} backgroundColor="#1a1a1a">
             <KeyboardAvoidingView
                 style={styles.flex}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 keyboardVerticalOffset={0}
             >
-                {/* Cosmic background sparkles — purely decorative, behind everything. */}
-                <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-                    <View style={[styles.star, { top: '8%', left: '12%' }]} />
-                    <View style={[styles.star, { top: '14%', right: '18%' }]} />
-                    <View style={[styles.star, { top: '40%', left: '6%' }]} />
-                    <View style={[styles.star, { top: '55%', right: '10%' }]} />
-                    <View style={[styles.star, { bottom: '30%', left: '20%' }]} />
-                    <View style={[styles.star, { bottom: '15%', right: '25%' }]} />
-                </View>
-
-                <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-                    <TouchableOpacity
-                        style={styles.headerButton}
-                        onPress={handleClose}
-                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                    >
-                        <Text style={styles.headerButtonText}>{'< Back'}</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.headerTitleWrap} />
-
-                    {/* Spacer to balance the Back button on the left. */}
-                    <View style={styles.headerSpacer} />
-                </View>
-
-                <ScrollView
-                    style={styles.messagesContainer}
-                    ref={messagesEndRef}
-                    contentContainerStyle={styles.messagesContent}
-                    keyboardShouldPersistTaps="handled"
-                >
-                    {messages.length === 0 && !isThinking && (
-                        <Text style={styles.emptyHint}>
-                            Say hi to {character.name}. Long-press any message to copy it.
-                        </Text>
-                    )}
-
-                    {messages.map((message) => (
-                        <View
-                            key={message.id}
-                            style={[
-                                styles.message,
-                                message.sender === 'user' ? styles.userMessage : styles.characterMessage,
-                            ]}
+                <View style={styles.paperBg}>
+                    <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+                        <TouchableOpacity
+                            style={styles.headerSideButton}
+                            onPress={handleClose}
+                            hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                         >
-                            <Pressable
-                                onLongPress={() => copyMessage(message.text)}
-                                delayLongPress={350}
-                                style={({ pressed }) => [
-                                    styles.messageBorder,
-                                    message.sender === 'user'
-                                        ? styles.userMessageBorder
-                                        : styles.characterMessageBorder,
-                                    pressed && styles.messagePressed,
+                            <Text style={styles.headerSideText}>{'<'}</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle} numberOfLines={1}>
+                            {character.name}
+                        </Text>
+                        <View style={styles.headerSideButton} />
+                    </View>
+
+                    <View style={styles.body}>
+                        {capacityVisible && (() => {
+                            const userMessageCount = messages.filter(
+                                (m) => m.sender === 'user'
+                            ).length;
+                            const usedRatio = Math.min(
+                                1,
+                                userMessageCount / SESSION_AI_BUDGET
+                            );
+                            const filledSegments = Math.round(
+                                usedRatio * CAPACITY_SEGMENTS
+                            );
+                            // Compute an integer pixel height per segment from
+                            // the measured track. flex:1 distributes fractional
+                            // pixels and Android rounds them inconsistently,
+                            // which makes the stack look ragged. We allocate a
+                            // fixed slot height (segment + gap) so every chip
+                            // is identical.
+                            const SEG_GAP = 2;
+                            const slot = capacityTrackHeight > 0
+                                ? Math.max(
+                                      3,
+                                      Math.floor(capacityTrackHeight / CAPACITY_SEGMENTS)
+                                  )
+                                : 0;
+                            const chipHeight = Math.max(1, slot - SEG_GAP);
+                            const usedPct = Math.round(usedRatio * 100);
+                            return (
+                                <View style={styles.capacityBar} pointerEvents="none">
+                                    <Text style={styles.capacityPct}>{usedPct}%</Text>
+                                    <Text style={styles.capacityLabel}>USED</Text>
+                                    <View
+                                        style={styles.capacityTrack}
+                                        onLayout={(e) =>
+                                            setCapacityTrackHeight(e.nativeEvent.layout.height)
+                                        }
+                                    >
+                                        {slot > 0 &&
+                                            Array.from({ length: CAPACITY_SEGMENTS }).map(
+                                                (_, i) => {
+                                                    // Each slot has a fixed integer height. The
+                                                    // colored chip lives inside it, leaving the
+                                                    // bottom SEG_GAP px transparent so every
+                                                    // gap is identical (no margin rounding).
+                                                    const edgeIndex =
+                                                        CAPACITY_SEGMENTS - filledSegments;
+                                                    const isFilled = i >= edgeIndex;
+                                                    const isEdge =
+                                                        isFilled && i === edgeIndex;
+                                                    return (
+                                                        <View
+                                                            key={i}
+                                                            style={[
+                                                                styles.capacitySlot,
+                                                                { height: slot },
+                                                            ]}
+                                                        >
+                                                            <View
+                                                                style={[
+                                                                    styles.capacitySegment,
+                                                                    { height: chipHeight },
+                                                                    isEdge
+                                                                        ? styles.capacitySegmentEdge
+                                                                        : isFilled
+                                                                        ? styles.capacitySegmentOn
+                                                                        : styles.capacitySegmentOff,
+                                                                ]}
+                                                            />
+                                                        </View>
+                                                    );
+                                                }
+                                            )}
+                                    </View>
+                                </View>
+                            );
+                        })()}
+
+                        <ScrollView
+                            style={styles.messagesContainer}
+                            ref={messagesEndRef}
+                            contentContainerStyle={styles.messagesContent}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            {messages.length === 0 && !isThinking && (
+                                <Text style={styles.emptyHint}>
+                                    Say hi to {character.name}. Long-press any message to copy it.
+                                </Text>
+                            )}
+
+                            {messages.map((message) => {
+                                const isUser = message.sender === 'user';
+                                const handle = namePlateHandle(
+                                    isUser ? playerName || 'user' : character.name
+                                );
+                                return (
+                                    <Pressable
+                                        key={message.id}
+                                        onLongPress={() => copyMessage(message.text)}
+                                        delayLongPress={350}
+                                        style={({ pressed }) => [
+                                            styles.row,
+                                            pressed && styles.rowPressed,
+                                        ]}
+                                    >
+                                        <View
+                                            style={[
+                                                styles.namePill,
+                                                isUser ? styles.userPill : styles.characterPill,
+                                            ]}
+                                        >
+                                            <Text style={styles.namePillText}>{handle}</Text>
+                                        </View>
+                                        <View style={styles.messageBox}>
+                                            <Text style={styles.rowText} selectable>
+                                                {message.text}
+                                            </Text>
+                                        </View>
+                                    </Pressable>
+                                );
+                            })}
+
+                            {isThinking && (
+                                <View style={styles.row}>
+                                    <View style={[styles.namePill, styles.characterPill]}>
+                                        <Text style={styles.namePillText}>
+                                            {namePlateHandle(character.name)}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.messageBox}>
+                                        <Text style={styles.rowText}>
+                                            {character.name} is typing
+                                            {'.'.repeat(typingDots)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+                        </ScrollView>
+                    </View>
+
+                    <View
+                        style={[
+                            styles.inputContainer,
+                            {
+                                paddingBottom:
+                                    keyboardHeight > 0
+                                        ? keyboardHeight + insets.bottom + 8
+                                        : insets.bottom + 6,
+                            },
+                        ]}
+                    >
+                        <View style={styles.inputBorder}>
+                            <TouchableOpacity
+                                onPress={toggleCapacityBar}
+                                hitSlop={{ top: 8, right: 4, bottom: 8, left: 4 }}
+                                style={[
+                                    styles.namePill,
+                                    styles.userPill,
+                                    styles.inputNamePill,
                                 ]}
                             >
-                                <Text
-                                    style={[
-                                        styles.messageText,
-                                        message.sender === 'user'
-                                            ? styles.userMessageText
-                                            : styles.characterMessageText,
-                                    ]}
-                                    selectable
-                                >
-                                    {message.text}
+                                <Text style={styles.namePillText}>
+                                    {namePlateHandle(playerName || 'user')}
                                 </Text>
-                            </Pressable>
+                            </TouchableOpacity>
+                            <TextInput
+                                style={styles.textInput}
+                                value={inputText}
+                                onChangeText={setInputText}
+                                placeholder={`Message ${character.name}...`}
+                                placeholderTextColor="#9a8b6a"
+                                multiline
+                                maxLength={500}
+                            />
+                            <TouchableOpacity
+                                onPress={sendMessage}
+                                disabled={!inputText.trim() || isThinking}
+                                style={[
+                                    styles.sendButton,
+                                    (!inputText.trim() || isThinking) && styles.sendButtonDisabled,
+                                ]}
+                            >
+                                <Text style={styles.sendButtonText}>SEND</Text>
+                            </TouchableOpacity>
                         </View>
-                    ))}
-
-                    {isThinking && (
-                        <View style={styles.thinkingMessage}>
-                            <View style={styles.thinkingBorder}>
-                                <Text style={styles.thinkingText}>
-                                    {character.name} is thinking...
-                                </Text>
-                                <Text style={styles.thinkingDots}>✦ ✦ ✦</Text>
-                            </View>
-                        </View>
-                    )}
-                </ScrollView>
-
-                <View
-                    style={[
-                        styles.inputContainer,
-                        {
-                            paddingBottom:
-                                keyboardHeight > 0
-                                    ? keyboardHeight + insets.bottom + 8
-                                    : insets.bottom + 6,
-                        },
-                    ]}
-                >
-                    <View style={styles.inputBorder}>
-                        <TextInput
-                            style={styles.textInput}
-                            value={inputText}
-                            onChangeText={setInputText}
-                            placeholder={`Message ${character.name}...`}
-                            placeholderTextColor="#9aa3d0"
-                            multiline
-                            maxLength={500}
-                        />
-                        <TouchableOpacity
-                            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-                            onPress={sendMessage}
-                            disabled={!inputText.trim() || isThinking}
-                        >
-                            <View style={styles.sendButtonBorder}>
-                                <Text style={styles.sendButtonText}>Send</Text>
-                            </View>
-                        </TouchableOpacity>
                     </View>
                 </View>
             </KeyboardAvoidingView>
@@ -299,196 +436,207 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
 
 const styles = StyleSheet.create({
     flex: { flex: 1 },
-    star: {
-        position: 'absolute',
-        width: 3,
-        height: 3,
-        backgroundColor: '#FFD700',
-        borderRadius: 1.5,
-        opacity: 0.6,
+    paperBg: {
+        flex: 1,
+        backgroundColor: '#d4d4d4',
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 12,
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(105, 110, 180, 0.4)',
+        backgroundColor: '#1a1a1a',
+        paddingHorizontal: 8,
+        paddingBottom: 6,
     },
-    headerButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        backgroundColor: 'rgba(72, 61, 139, 0.85)',
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#FFD700',
-        minWidth: 56,
+    headerSideButton: {
+        minWidth: 36,
+        paddingVertical: 4,
         alignItems: 'center',
     },
-    headerButtonText: {
-        color: '#FFD700',
+    headerSideText: {
+        color: '#f5d65f',
         fontFamily: 'PressStart2P',
-        fontSize: 10,
-    },
-    headerSpacer: {
-        minWidth: 56,
-    },
-    headerTitleWrap: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginHorizontal: 8,
-        overflow: 'hidden',
-    },
-    headerAvatar: {
-        width: 28,
-        height: 28,
-        marginRight: 8,
-        resizeMode: 'contain',
+        fontSize: 14,
     },
     headerTitle: {
-        color: '#FFD700',
+        flex: 1,
+        textAlign: 'center',
+        color: '#f5d65f',
         fontFamily: 'PressStart2P',
-        fontSize: 12,
+        fontSize: 10,
         letterSpacing: 0.5,
-        flexShrink: 1,
+    },
+    body: {
+        flex: 1,
+        flexDirection: 'row',
+    },
+    capacityBar: {
+        position: 'absolute',
+        left: 6,
+        bottom: 6,
+        width: 36,
+        height: '38%',
+        backgroundColor: '#2a2a2a',
+        alignItems: 'stretch',
+        paddingTop: 14,
+        paddingBottom: 4,
+        paddingHorizontal: 2,
+        borderWidth: 2,
+        borderColor: '#1a1a1a',
+        borderRadius: 10,
+        zIndex: 10,
+    },
+    capacityPct: {
+        color: '#ffffff',
+        fontFamily: 'PressStart2P',
+        fontSize: 9,
+        marginBottom: 2,
+        textAlign: 'center',
+    },
+    capacityLabel: {
+        color: '#f5d65f',
+        fontFamily: 'PressStart2P',
+        fontSize: 5,
+        marginBottom: 1,
+        textAlign: 'center',
+    },
+    capacityTrack: {
+        flex: 1,
+        alignSelf: 'stretch',
+        flexDirection: 'column',
+        justifyContent: 'flex-end',
+        paddingTop: 0,
+        paddingBottom: 2,
+        paddingHorizontal: 1,
+    },
+    capacitySlot: {
+        width: '100%',
+        justifyContent: 'flex-start',
+    },
+    capacitySegment: {
+        width: '100%',
+        borderRadius: 2,
+    },
+    capacitySegmentOn: {
+        backgroundColor: '#e093c0',
+    },
+    capacitySegmentEdge: {
+        backgroundColor: '#8a3a6a',
+    },
+    capacitySegmentOff: {
+        backgroundColor: '#9a9a9a',
     },
     messagesContainer: {
         flex: 1,
-        paddingHorizontal: 8,
     },
     messagesContent: {
-        paddingTop: 12,
-        paddingBottom: 16,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
     },
     emptyHint: {
         textAlign: 'center',
-        color: '#b8c6ff',
-        fontFamily: 'SpaceMono',
-        fontSize: 12,
+        color: '#5a4a2a',
+        fontFamily: 'PressStart2P',
+        fontSize: 9,
         marginTop: 32,
         paddingHorizontal: 24,
-        lineHeight: 18,
+        lineHeight: 16,
     },
-    message: {
-        marginVertical: 4,
-        maxWidth: '85%',
-    },
-    userMessage: {
-        alignSelf: 'flex-end',
-    },
-    characterMessage: {
-        alignSelf: 'flex-start',
-    },
-    messageBorder: {
+    row: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 6,
+        backgroundColor: '#ffffff',
         borderWidth: 2,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        borderColor: '#1a1a1a',
         borderRadius: 6,
+        padding: 3,
+        minHeight: 40,
     },
-    messagePressed: {
+    rowPressed: {
         opacity: 0.7,
     },
-    userMessageBorder: {
-        backgroundColor: 'rgba(138, 43, 226, 0.85)',
-        borderColor: '#DA70D6',
-    },
-    characterMessageBorder: {
-        backgroundColor: 'rgba(70, 130, 180, 0.85)',
-        borderColor: '#87CEEB',
-    },
-    messageText: {
-        fontSize: 14,
-        lineHeight: 19,
-        fontFamily: 'SpaceMono',
-    },
-    userMessageText: {
-        color: '#F5F0FF',
-    },
-    characterMessageText: {
-        color: '#F0F8FF',
-    },
-    thinkingMessage: {
-        alignSelf: 'flex-start',
-        marginVertical: 4,
-    },
-    thinkingBorder: {
+    namePill: {
+        width: 92,
+        height: 30,
+        marginRight: 4,
         borderWidth: 2,
-        borderColor: '#FF69B4',
-        backgroundColor: 'rgba(199, 21, 133, 0.6)',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        flexDirection: 'row',
+        borderColor: '#1a1a1a',
+        borderRadius: 5,
         alignItems: 'center',
-        borderRadius: 6,
+        justifyContent: 'center',
+        paddingHorizontal: 4,
     },
-    thinkingText: {
-        fontSize: 12,
-        color: '#FFB6C1',
-        fontFamily: 'SpaceMono',
+    inputNamePill: {
+        width: 72,
+        marginRight: 6,
+        alignSelf: 'center',
+    },
+    userPill: {
+        backgroundColor: '#fff48f',
+    },
+    characterPill: {
+        backgroundColor: '#b0d8ff',
+    },
+    namePillText: {
+        color: '#1a1a1a',
+        fontFamily: 'PressStart2P',
+        fontSize: 10,
         letterSpacing: 0.5,
-        flex: 1,
     },
-    thinkingDots: {
-        fontSize: 12,
-        color: '#FFB6C1',
+    messageBox: {
+        flex: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        justifyContent: 'center',
+    },
+    rowText: {
+        color: '#1a1a1a',
         fontFamily: 'SpaceMono',
-        marginLeft: 8,
+        fontSize: 13,
+        lineHeight: 18,
     },
     inputContainer: {
         paddingHorizontal: 8,
         paddingTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(105, 110, 180, 0.4)',
+        borderTopWidth: 2,
+        borderTopColor: '#2a2a2a',
+        backgroundColor: '#f7ebcb',
     },
     inputBorder: {
-        borderWidth: 2,
-        borderColor: '#4169E1',
-        backgroundColor: 'rgba(72, 61, 139, 0.85)',
-        borderRadius: 8,
-        padding: 6,
         flexDirection: 'row',
         alignItems: 'flex-end',
+        backgroundColor: '#fff8df',
+        borderWidth: 2,
+        borderColor: '#2a2a2a',
+        padding: 4,
     },
     textInput: {
         flex: 1,
-        backgroundColor: 'rgba(20, 22, 60, 0.95)',
-        borderWidth: 1,
-        borderColor: '#6495ED',
-        borderRadius: 6,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        marginRight: 8,
-        color: '#E6E6FA',
-        fontSize: 14,
-        fontFamily: 'PressStart2P',
+        color: '#2a2a2a',
+        fontFamily: 'SpaceMono',
+        fontSize: 13,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
         maxHeight: 120,
-        minHeight: 40,
+        minHeight: 36,
     },
     sendButton: {
-        minWidth: 64,
-    },
-    sendButtonBorder: {
-        backgroundColor: 'rgba(138, 43, 226, 0.85)',
-        borderWidth: 2,
-        borderColor: '#DA70D6',
-        borderRadius: 6,
+        marginLeft: 6,
         paddingHorizontal: 12,
         paddingVertical: 10,
+        backgroundColor: '#1a1a1a',
+        borderWidth: 2,
+        borderColor: '#2a2a2a',
         alignItems: 'center',
         justifyContent: 'center',
     },
-    sendButtonText: {
-        color: '#F5F0FF',
-        fontWeight: 'bold',
-        fontSize: 12,
-        fontFamily: 'PressStart2P',
-        letterSpacing: 0.5,
-    },
     sendButtonDisabled: {
-        opacity: 0.5,
+        opacity: 0.4,
+    },
+    sendButtonText: {
+        color: '#f5d65f',
+        fontFamily: 'PressStart2P',
+        fontSize: 11,
     },
 });
 

@@ -161,12 +161,26 @@ export const RecipeCards = {
     rare: require('../../assets/images/ui/menu-cards/rare.png'),
 } as const;
 
+// Per-SKU shop card art. Keyed off the shopCatalog.ts item ids so a
+// missing entry maps cleanly to the catalog's STUB_IMAGE fallback.
+export const ShopItems = {
+    boxIngredientsCommon: require('../../assets/images/ui/shop-items/ingredient-box-common.png'),
+    boxIngredientsUncommon: require('../../assets/images/ui/shop-items/ingredient-box-uncommon.png'),
+    boxIngredientsRare: require('../../assets/images/ui/shop-items/ingredient-box-rare.png'),
+    seasonPass: require('../../assets/images/ui/shop-items/lunar-pass.png'),
+    satelliteDish: require('../../assets/images/ui/shop-items/satellite-dish.png'),
+    sfPackSmall: require('../../assets/images/ui/shop-items/shards-pack-small.png'),
+    sfPackMedium: require('../../assets/images/ui/shop-items/shards-pack-medium.png'),
+    sfPackLarge: require('../../assets/images/ui/shop-items/shards-pack-large.png'),
+} as const;
+
 export const Backgrounds = {
     screen: require('../../assets/images/ui/backgrounds/screen-bg.png'),
     cooking: require('../../assets/images/ui/backgrounds/cooking-bg.png'),
     arcade: require('../../assets/images/ui/backgrounds/arcade-bg.png'),
     sleep: require('../../assets/images/ui/backgrounds/sleep-bg.png'),
     shop: require('../../assets/images/ui/backgrounds/shop-bg.gif'),
+    settings: require('../../assets/images/ui/backgrounds/settings-bg.jpg'),
 } as const;
 
 // Sleep-screen chrome — pillow the moonoko sleeps on, the alarm row's

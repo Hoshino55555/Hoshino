@@ -164,15 +164,14 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     // unlikely. At 8 the visual-QA override flips on for the rest of the
     // session and we cancel any pending modal open so the salvo stays clean.
     const handleManualPress = () => {
-        if (alreadyClaimed) {
-            notifyAlreadyClaimed();
-            return;
-        }
         if (manualOpenTimer.current) {
             clearTimeout(manualOpenTimer.current);
             manualOpenTimer.current = null;
         }
 
+        // Run the secret-tap counter before the alreadyClaimed gate so a QA
+        // tap salvo still works after the user has cooked the current meal
+        // window. Counter resets on a >800ms pause between taps.
         if (!secretAllUnlocked) {
             const now = Date.now();
             if (now - secretLastTapAt.current > 800) secretTapCount.current = 0;
@@ -184,6 +183,11 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                 onNotification?.('All recipe cards unlocked', 'info');
                 return;
             }
+        }
+
+        if (alreadyClaimed) {
+            notifyAlreadyClaimed();
+            return;
         }
 
         // Defer the picker so a rapid 8-tap salvo can complete without the
@@ -285,8 +289,14 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                             {discoveredRecipeDetails.map((recipe) => {
                                 const affordable = canAfford(recipe, inventory);
                                 const isPending = pendingRecipeId === recipe.id;
+                                // Dev-reveal mode shows every card at full
+                                // opacity for art QA — the affordability /
+                                // claimed dim signals are noise when you're
+                                // eyeballing card visuals. Tap behavior is
+                                // unaffected (still uses hardDisabled below).
                                 const visuallyDisabled =
-                                    !affordable || isPending || alreadyClaimed;
+                                    !secretAllUnlocked &&
+                                    (!affordable || isPending || alreadyClaimed);
                                 // Keep the card tappable when the only reason it's
                                 // disabled is the claimed window, so we can pop the
                                 // explanatory toast instead of silently eating the tap.
@@ -800,7 +810,7 @@ const styles = StyleSheet.create({
         paddingBottom: 4,
         textAlign: 'center',
     },
-    cardDisabled: { opacity: 0.5 },
+    cardDisabled: { filter: [{ grayscale: 1 }] },
     cardPending: { borderColor: '#E8B84A' },
     lastResultCard: {
         backgroundColor: 'rgba(24, 46, 32, 0.85)',
