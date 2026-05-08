@@ -312,7 +312,7 @@ const consumablesItems: ShopItem[] = [
         subcategory: 'Boosters',
         currency: 'starFragments',
         status: 'available',
-        image: ShopItems.starberry,
+        image: ShopItems.moonokoBall,
     },
     {
         id: 'booster-sleep',
@@ -344,7 +344,7 @@ const consumablesItems: ShopItem[] = [
         subcategory: 'Boosters',
         currency: 'starFragments',
         status: 'available',
-        image: STUB_IMAGE,
+        image: ShopItems.starberry,
     },
     {
         id: 'sleeping-camp',

@@ -1,0 +1,36 @@
+appId: com.socks.hoshino
+name: feeding-open
+tags:
+  - feeding
+  - smoke
+# Open feeding, verify the manual-cook card and recipe book mount.
+# Doesn't actually cook — that requires deterministic ingredient state
+# (test fixtures TODO). This flow is the "didn't crash on open" check
+# plus a back-button regression guard.
+#
+# A follow-up `feeding-happy-path` flow will cook a recipe end-to-end
+# once we have fixture seeding (custom-token Firebase auth + Firestore
+# inventory seed), per #23 roadmap.
+---
+- launchApp:
+    clearState: true
+    stopApp: true
+- runFlow: ../setup/sign-in-google.yaml
+- extendedWaitUntil:
+    visible:
+      id: "menu-feed"
+    timeout: 30000
+- tapOn:
+    id: "menu-feed"
+- extendedWaitUntil:
+    visible:
+      id: "feeding-screen"
+    timeout: 10000
+- assertVisible: "MANUAL COOK"
+- assertVisible:
+    text: "RECIPE BOOK.*"
+- tapOn: "< Back"
+- extendedWaitUntil:
+    visible:
+      id: "menu-feed"
+    timeout: 10000

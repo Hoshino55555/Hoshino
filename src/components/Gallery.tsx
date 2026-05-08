@@ -121,6 +121,7 @@ const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
                 styles.fullscreen,
                 { opacity, transform: [{ scale }] },
             ]}
+            testID="gallery-screen"
         >
             <View style={StyleSheet.absoluteFill}>
                 <Room layout={layout} />

@@ -1,0 +1,85 @@
+appId: com.socks.hoshino
+name: menu-navigation
+tags:
+  - smoke
+  - navigation
+# Tap each menu button on MoonokoInteraction and verify the right screen
+# mounts. Back-button regressions show up here too — every screen except
+# Chat uses the painted bottom-strip pattern, so a zIndex glitch on the
+# back button would prevent us from returning to the interaction screen.
+#
+# Sleep is exercised by sleep-rapid-toggle.yaml so we skip it here.
+---
+- launchApp:
+    clearState: true
+    stopApp: true
+- runFlow: ../setup/sign-in-google.yaml
+- extendedWaitUntil:
+    visible:
+      id: "menu-feed"
+    timeout: 30000
+
+# Feed
+- tapOn:
+    id: "menu-feed"
+- extendedWaitUntil:
+    visible:
+      id: "feeding-screen"
+    timeout: 10000
+- tapOn: "< Back"
+- extendedWaitUntil:
+    visible:
+      id: "menu-feed"
+    timeout: 10000
+
+# Shop
+- tapOn:
+    id: "menu-shop"
+- extendedWaitUntil:
+    visible:
+      id: "shop-screen"
+    timeout: 10000
+- tapOn: "< Back"
+- extendedWaitUntil:
+    visible:
+      id: "menu-shop"
+    timeout: 10000
+
+# Inventory
+- tapOn:
+    id: "menu-inventory"
+- extendedWaitUntil:
+    visible:
+      id: "inventory-screen"
+    timeout: 10000
+- tapOn: "< Back"
+- extendedWaitUntil:
+    visible:
+      id: "menu-inventory"
+    timeout: 10000
+
+# Games
+- tapOn:
+    id: "menu-games"
+- extendedWaitUntil:
+    visible:
+      id: "games-screen"
+    timeout: 10000
+- tapOn: "< Back"
+- extendedWaitUntil:
+    visible:
+      id: "menu-games"
+    timeout: 10000
+
+# Settings
+- tapOn:
+    id: "menu-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+- tapOn: "< Back"
+- extendedWaitUntil:
+    visible:
+      id: "menu-settings"
+    timeout: 10000

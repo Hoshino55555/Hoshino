@@ -1,0 +1,39 @@
+appId: com.socks.hoshino
+name: shop-browse
+tags:
+  - shop
+  - smoke
+# Open shop, scroll the catalog, change tabs, return home. Catches:
+#   - Shop catalog rendering crash (regression for any data shape change)
+#   - Tab switcher hookup (boxes / forage / boosters / iap)
+#   - Back button still tappable after a scroll (zIndex regression)
+#
+# Doesn't actually purchase — we don't want to spend the test account's
+# fragments or trigger an IAP intent. A future shop-checkout flow can
+# cover that path against a fixture user.
+---
+- launchApp:
+    clearState: true
+    stopApp: true
+- runFlow: ../setup/sign-in-google.yaml
+- extendedWaitUntil:
+    visible:
+      id: "menu-shop"
+    timeout: 30000
+- tapOn:
+    id: "menu-shop"
+- extendedWaitUntil:
+    visible:
+      id: "shop-screen"
+    timeout: 10000
+- scroll
+- scroll
+- scrollUntilVisible:
+    element:
+      id: "shop-screen"
+    direction: UP
+- tapOn: "< Back"
+- extendedWaitUntil:
+    visible:
+      id: "menu-shop"
+    timeout: 10000

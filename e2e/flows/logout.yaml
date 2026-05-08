@@ -1,0 +1,40 @@
+appId: com.socks.hoshino
+name: logout
+tags:
+  - auth
+# Sign in, open the wallet pill (top-right) → Profile, hit Log out, accept
+# the confirm alert, verify we're back at LoginScreen.
+#
+# After this flow runs the device is signed out. Subsequent flows that
+# need an authenticated user will trigger sign-in via setup/sign-in-google.yaml
+# the same way they would for a clean run.
+---
+- launchApp:
+    clearState: true
+    stopApp: true
+- runFlow: ../setup/sign-in-google.yaml
+- extendedWaitUntil:
+    visible:
+      id: "menu-feed"
+    timeout: 30000
+- tapOn:
+    id: "wallet-pill"
+- extendedWaitUntil:
+    visible:
+      id: "profile-screen"
+    timeout: 10000
+- tapOn:
+    id: "profile-logout"
+- extendedWaitUntil:
+    visible: "Log out"
+    timeout: 5000
+# The Alert.alert dialog has two "Log out" buttons in the tree (the one
+# we already tapped + the destructive button in the modal). Index 1 is
+# the alert button.
+- tapOn:
+    text: "Log out"
+    index: 1
+- extendedWaitUntil:
+    visible:
+      id: "login-screen"
+    timeout: 30000

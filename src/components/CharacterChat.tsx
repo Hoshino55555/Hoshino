@@ -227,7 +227,7 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#1a1a1a' }}>
+        <View style={{ flex: 1, backgroundColor: '#1a1a1a' }} testID="chat-screen">
             <KeyboardAvoidingView
                 style={styles.flex}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -541,10 +541,10 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: '#5a4a2a',
         fontFamily: 'Monaco',
-        fontSize: 13,
+        fontSize: 15,
         marginTop: 32,
         paddingHorizontal: 24,
-        lineHeight: 16,
+        lineHeight: 19,
     },
     row: {
         flexDirection: 'row',
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
     namePillText: {
         color: '#1a1a1a',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 17,
         letterSpacing: 0.5,
     },
     messageBox: {
@@ -597,8 +597,8 @@ const styles = StyleSheet.create({
     rowText: {
         color: '#1a1a1a',
         fontFamily: 'Monaco',
-        fontSize: 13,
-        lineHeight: 18,
+        fontSize: 16,
+        lineHeight: 21,
     },
     inputContainer: {
         paddingHorizontal: 8,
@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
         flex: 1,
         color: '#2a2a2a',
         fontFamily: 'Monaco',
-        fontSize: 13,
+        fontSize: 16,
         paddingHorizontal: 8,
         paddingVertical: 6,
         maxHeight: 120,

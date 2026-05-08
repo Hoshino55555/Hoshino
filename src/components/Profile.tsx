@@ -64,7 +64,7 @@ const Profile: React.FC<Props> = ({
     };
 
     return (
-        <View style={[styles.safeArea, { backgroundColor: '#E8F5E8' }]}>
+        <View style={[styles.safeArea, { backgroundColor: '#E8F5E8' }]} testID="profile-screen">
                 <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
                     <TouchableOpacity style={styles.backButton} onPress={onBack} hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}>
                         <Text style={styles.backButtonText}>{'<'} Back</Text>
@@ -115,7 +115,7 @@ const Profile: React.FC<Props> = ({
                     )}
 
                     {onLogout && (
-                        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} testID="profile-logout">
                             <Text style={styles.logoutButtonText}>Log out</Text>
                         </TouchableOpacity>
                     )}

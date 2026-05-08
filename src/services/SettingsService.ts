@@ -9,10 +9,13 @@ export interface MenuButton {
     action: string;
 }
 
+export type SoundLevel = 0 | 1 | 2 | 3 | 4;
+
 export interface UserSettings {
     menuButtons: MenuButton[];
     theme: 'default' | 'dark' | 'mint';
     soundEnabled: boolean;
+    soundLevel: SoundLevel;
     notificationsEnabled: boolean;
 }
 
@@ -36,6 +39,7 @@ class SettingsService {
             menuButtons: [...DEFAULT_MENU_BUTTONS],
             theme: 'default',
             soundEnabled: true,
+            soundLevel: 3,
             notificationsEnabled: true,
         };
     }
@@ -107,11 +111,24 @@ class SettingsService {
     }
 
     isSoundEnabled(): boolean {
-        return this.settings.soundEnabled;
+        return this.settings.soundEnabled && this.settings.soundLevel > 0;
     }
 
     async setSoundEnabled(enabled: boolean): Promise<void> {
         this.settings.soundEnabled = enabled;
+        await this.saveSettings();
+    }
+
+    getSoundLevel(): SoundLevel {
+        return this.settings.soundLevel;
+    }
+
+    async setSoundLevel(level: SoundLevel): Promise<void> {
+        this.settings.soundLevel = level;
+        // Keep the legacy soundEnabled flag in sync so callers that only
+        // read isSoundEnabled() still get a sensible answer when the
+        // user drops the slider to zero.
+        this.settings.soundEnabled = level > 0;
         await this.saveSettings();
     }
 

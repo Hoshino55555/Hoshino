@@ -43,6 +43,7 @@ const WalletButton: React.FC<WalletButtonProps> = ({
                 style={styles.connectedPill}
                 onPress={onOpenProfile}
                 disabled={!onOpenProfile}
+                testID="wallet-pill"
             >
                 <Text style={styles.connectedText} numberOfLines={1}>{label}</Text>
             </TouchableOpacity>
@@ -72,15 +73,15 @@ const styles = StyleSheet.create({
     },
     connectText: {
         color: '#E8F5E8',
-        fontSize: 10,
+        fontSize: 13,
         fontFamily: 'Monaco',
         transform: [{ translateY: 3 }],
     },
     connectedPill: {
         backgroundColor: 'rgba(232, 245, 232, 0.65)',
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 18,
+        borderRadius: 22,
         borderWidth: 1,
         borderColor: 'rgba(46, 90, 62, 0.4)',
         shadowColor: '#000',
@@ -88,13 +89,17 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.15,
         shadowRadius: 3,
         elevation: 3,
-        maxWidth: 160,
+        maxWidth: 200,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     connectedText: {
         color: '#2E5A3E',
-        fontSize: 10,
+        fontSize: 17,
         fontFamily: 'Monaco',
-        transform: [{ translateY: 3 }],
+        textAlign: 'center',
+        includeFontPadding: false,
+        transform: [{ translateY: 2 }],
     },
 });
 

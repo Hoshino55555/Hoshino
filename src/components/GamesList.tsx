@@ -53,6 +53,7 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
                 source={Backgrounds.arcade}
                 style={styles.bg}
                 resizeMode="cover"
+                testID="games-screen"
             >
                 <View
                     style={[

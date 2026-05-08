@@ -22,7 +22,35 @@ import {
 } from '../services/RecipeCatalog';
 import type { BoosterSkuId } from '../services/GameStateService';
 import { SHOP_CATALOG } from '../data/shopCatalog';
-import { Backgrounds, getIngredientArt } from '../assets';
+import type { ActiveCamp } from '../services/StarFragmentService';
+import { Backgrounds, getIngredientArt, ShopItems } from '../assets';
+
+type InventoryTab = 'ingredients' | 'consumables' | 'accessories';
+
+const INVENTORY_TABS: { id: InventoryTab; label: string }[] = [
+    { id: 'ingredients', label: 'Ingredients' },
+    { id: 'consumables', label: 'Consumables' },
+    { id: 'accessories', label: 'Accessories' },
+];
+
+const CAMP_META: Record<string, { name: string; image: any; description: string }> = {
+    'sleeping-camp': {
+        name: 'Sleeping Camp',
+        image: ShopItems.snoozeSeed,
+        description: 'Forage 20% faster · carry 50% more',
+    },
+};
+
+const formatRemaining = (ms: number): string => {
+    if (ms <= 0) return 'expired';
+    const totalMin = Math.floor(ms / 60000);
+    const days = Math.floor(totalMin / (60 * 24));
+    const hours = Math.floor((totalMin % (60 * 24)) / 60);
+    const mins = totalMin % 60;
+    if (days > 0) return `${days}d ${hours}h left`;
+    if (hours > 0) return `${hours}h ${mins}m left`;
+    return `${mins}m left`;
+};
 
 const BOOSTER_SKU_IDS: BoosterSkuId[] = [
     'booster-mood',
@@ -48,7 +76,7 @@ const BOOSTER_META: Record<BoosterSkuId, { name: string; image: any; description
 
 const callGetStarFragments = httpsCallable<
     Record<string, never>,
-    { boosters?: Record<string, number> }
+    { boosters?: Record<string, number>; activeCamp?: ActiveCamp | null }
 >(functions, 'getStarFragments');
 
 const newRequestId = (prefix: string) =>
@@ -81,11 +109,14 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
     const bottomBarReserve = screenWidth * (284 / 1200);
 
     const [boosters, setBoosters] = useState<Record<string, number>>({});
+    const [activeCamp, setActiveCamp] = useState<ActiveCamp | null>(null);
     const [consumingId, setConsumingId] = useState<BoosterSkuId | null>(null);
+    const [activeTab, setActiveTab] = useState<InventoryTab>('ingredients');
 
-    // Pull booster charges from the wallet on mount. Boosters live in
-    // wallet.boosters (server-authoritative); the consumeBooster response
-    // returns the updated map, so we only fetch once.
+    // Pull booster charges + active camp from the wallet on mount.
+    // Both live server-authoritative on getStarFragments; the
+    // consumeBooster response returns the updated boosters map so we
+    // only fetch once on entry.
     useEffect(() => {
         if (!ready || !firebaseUid) return;
         let cancelled = false;
@@ -94,8 +125,9 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                 const res = await callGetStarFragments({});
                 if (cancelled) return;
                 setBoosters(res.data.boosters || {});
+                setActiveCamp(res.data.activeCamp || null);
             } catch {
-                // Silent — empty boosters map renders an empty section.
+                // Silent — empty maps render the empty-state copy.
             }
         })();
         return () => {
@@ -170,93 +202,163 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                         ]}
                         showsVerticalScrollIndicator={false}
                     >
-                        {ownedBoosters.length > 0 && (
+                        <View style={styles.tabNavigation}>
+                            {INVENTORY_TABS.map((tab) => (
+                                <TouchableOpacity
+                                    key={tab.id}
+                                    style={[
+                                        styles.tabButton,
+                                        activeTab === tab.id && styles.activeTab,
+                                    ]}
+                                    onPress={() => setActiveTab(tab.id)}
+                                >
+                                    <Text style={styles.tabButtonText}>{tab.label}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        {activeTab === 'ingredients' && (
                             <>
-                                <Text style={styles.sectionHeading}>BOOSTERS</Text>
-                                <View style={styles.grid}>
-                                    {ownedBoosters.map(({ id, count, meta }) => {
-                                        const busy = consumingId === id;
-                                        return (
-                                            <TouchableOpacity
+                                <Text style={styles.sectionHeading}>
+                                    INGREDIENTS · {totalCount}
+                                </Text>
+                                {owned.length === 0 ? (
+                                    <Text style={styles.emptyText}>
+                                        Pantry's empty. Forage or visit the shop to stock up.
+                                    </Text>
+                                ) : (
+                                    <View style={styles.grid}>
+                                        {owned.map(({ id, count, tier, label }) => (
+                                            <View
                                                 key={id}
                                                 style={[
                                                     styles.card,
-                                                    styles.boosterCard,
-                                                    busy && { opacity: 0.6 },
+                                                    { borderColor: TIER_COLOR[tier] },
                                                 ]}
-                                                disabled={!!consumingId}
-                                                onPress={() => handleConsumeBooster(id)}
-                                                activeOpacity={0.7}
                                             >
-                                                {meta.image ? (
-                                                    <Image
-                                                        source={meta.image}
-                                                        style={styles.itemImage}
-                                                        resizeMode="contain"
-                                                    />
-                                                ) : (
-                                                    <View style={styles.itemImage} />
-                                                )}
+                                                <Image
+                                                    source={getIngredientArt(id)}
+                                                    style={styles.itemImage}
+                                                    resizeMode="contain"
+                                                />
                                                 <Text style={styles.itemName} numberOfLines={2}>
-                                                    {meta.name}
+                                                    {label}
                                                 </Text>
-                                                <View style={styles.boosterUseRow}>
-                                                    <Text style={styles.boosterUseLabel}>
-                                                        {busy ? '…' : 'TAP TO USE'}
-                                                    </Text>
-                                                    <View
-                                                        style={[
-                                                            styles.countPill,
-                                                            { backgroundColor: '#7ecf7a' },
-                                                        ]}
-                                                    >
-                                                        <Text style={styles.countText}>×{count}</Text>
-                                                    </View>
+                                                <View
+                                                    style={[
+                                                        styles.countPill,
+                                                        { backgroundColor: TIER_COLOR[tier] },
+                                                    ]}
+                                                >
+                                                    <Text style={styles.countText}>×{count}</Text>
                                                 </View>
-                                            </TouchableOpacity>
-                                        );
-                                    })}
-                                </View>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
                             </>
                         )}
 
-                        <Text style={styles.sectionHeading}>
-                            INGREDIENTS · {totalCount}
-                        </Text>
-
-                        {owned.length === 0 ? (
-                            <Text style={styles.emptyText}>
-                                Pantry's empty. Forage or visit the shop to stock up.
-                            </Text>
-                        ) : (
-                            <View style={styles.grid}>
-                                {owned.map(({ id, count, tier, label }) => (
-                                    <View
-                                        key={id}
-                                        style={[
-                                            styles.card,
-                                            { borderColor: TIER_COLOR[tier] },
-                                        ]}
-                                    >
-                                        <Image
-                                            source={getIngredientArt(id)}
-                                            style={styles.itemImage}
-                                            resizeMode="contain"
-                                        />
-                                        <Text style={styles.itemName} numberOfLines={2}>
-                                            {label}
-                                        </Text>
-                                        <View
-                                            style={[
-                                                styles.countPill,
-                                                { backgroundColor: TIER_COLOR[tier] },
-                                            ]}
-                                        >
-                                            <Text style={styles.countText}>×{count}</Text>
-                                        </View>
+                        {activeTab === 'consumables' && (
+                            <>
+                                <Text style={styles.sectionHeading}>BOOSTERS</Text>
+                                {ownedBoosters.length === 0 ? (
+                                    <Text style={styles.emptyText}>
+                                        No boosters yet. Buy one in the shop.
+                                    </Text>
+                                ) : (
+                                    <View style={styles.grid}>
+                                        {ownedBoosters.map(({ id, count, meta }) => {
+                                            const busy = consumingId === id;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={id}
+                                                    style={[
+                                                        styles.card,
+                                                        styles.boosterCard,
+                                                        busy && { opacity: 0.6 },
+                                                    ]}
+                                                    disabled={!!consumingId}
+                                                    onPress={() => handleConsumeBooster(id)}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    {meta.image ? (
+                                                        <Image
+                                                            source={meta.image}
+                                                            style={styles.itemImage}
+                                                            resizeMode="contain"
+                                                        />
+                                                    ) : (
+                                                        <View style={styles.itemImage} />
+                                                    )}
+                                                    <Text style={styles.itemName} numberOfLines={2}>
+                                                        {meta.name}
+                                                    </Text>
+                                                    <View style={styles.boosterUseRow}>
+                                                        <Text style={styles.boosterUseLabel}>
+                                                            {busy ? '…' : 'TAP TO USE'}
+                                                        </Text>
+                                                        <View
+                                                            style={[
+                                                                styles.countPill,
+                                                                { backgroundColor: '#7ecf7a' },
+                                                            ]}
+                                                        >
+                                                            <Text style={styles.countText}>×{count}</Text>
+                                                        </View>
+                                                    </View>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
                                     </View>
-                                ))}
-                            </View>
+                                )}
+                            </>
+                        )}
+
+                        {activeTab === 'accessories' && (
+                            <>
+                                <Text style={styles.sectionHeading}>ACTIVE</Text>
+                                {!activeCamp ? (
+                                    <Text style={styles.emptyText}>
+                                        No accessories active. Camps and upgrades unlock here.
+                                    </Text>
+                                ) : (
+                                    <View style={styles.grid}>
+                                        {(() => {
+                                            const meta =
+                                                CAMP_META[activeCamp.id] ?? {
+                                                    name: activeCamp.id,
+                                                    image: null,
+                                                    description: '',
+                                                };
+                                            const remaining =
+                                                activeCamp.expiresAtMs - Date.now();
+                                            return (
+                                                <View
+                                                    key={activeCamp.id}
+                                                    style={[styles.card, styles.boosterCard]}
+                                                >
+                                                    {meta.image ? (
+                                                        <Image
+                                                            source={meta.image}
+                                                            style={styles.itemImage}
+                                                            resizeMode="contain"
+                                                        />
+                                                    ) : (
+                                                        <View style={styles.itemImage} />
+                                                    )}
+                                                    <Text style={styles.itemName} numberOfLines={2}>
+                                                        {meta.name}
+                                                    </Text>
+                                                    <Text style={styles.boosterUseLabel} numberOfLines={1}>
+                                                        {formatRemaining(remaining)}
+                                                    </Text>
+                                                </View>
+                                            );
+                                        })()}
+                                    </View>
+                                )}
+                            </>
                         )}
                     </ScrollView>
                 </View>
@@ -353,6 +455,36 @@ const styles = StyleSheet.create({
     },
     scrollBody: {
         paddingHorizontal: 16,
+    },
+    tabNavigation: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    tabButton: {
+        flex: 1,
+        marginHorizontal: 2,
+        backgroundColor: '#dbf3db',
+        borderColor: '#003300',
+        borderWidth: 2,
+        paddingVertical: 8,
+        alignItems: 'center',
+        borderTopColor: '#006600',
+        borderLeftColor: '#006600',
+        borderRightColor: '#001100',
+        borderBottomColor: '#001100',
+    },
+    activeTab: {
+        backgroundColor: '#b8e6b8',
+        borderTopColor: '#001100',
+        borderLeftColor: '#001100',
+        borderRightColor: '#006600',
+        borderBottomColor: '#006600',
+    },
+    tabButtonText: {
+        fontFamily: 'Monaco',
+        fontSize: 14,
+        color: '#003300',
     },
     sectionHeading: {
         color: '#E8F5E8',

@@ -14,7 +14,7 @@ import {
     Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import SettingsService, { MenuButton } from '../services/SettingsService';
+import SettingsService, { MenuButton, type SoundLevel } from '../services/SettingsService';
 import { Menu, Backgrounds } from '../assets';
 
 interface Props {
@@ -30,10 +30,11 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
     const bottomBarReserve = screenHeight * 0.10;
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
-    const [soundEnabled, setSoundEnabled] = useState(true);
+    const [soundLevel, setSoundLevelState] = useState<SoundLevel>(3);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [theme, setTheme] = useState('default');
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    const [menuExpanded, setMenuExpanded] = useState(false);
     const panRefs = useRef<{ [key: string]: Animated.Value }>({});
 
     useEffect(() => {
@@ -55,7 +56,7 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
         await settingsService.initialize();
         const buttons = settingsService.getMenuButtons();
         setMenuButtons(buttons);
-        setSoundEnabled(settingsService.isSoundEnabled());
+        setSoundLevelState(settingsService.getSoundLevel());
         setNotificationsEnabled(settingsService.isNotificationsEnabled());
         setTheme(settingsService.getTheme());
     };
@@ -79,10 +80,9 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
         );
     };
 
-    const updateSoundSetting = async (enabled: boolean) => {
-        await settingsService.setSoundEnabled(enabled);
-        setSoundEnabled(enabled);
-        onNotification?.(`Sound ${enabled ? 'enabled' : 'disabled'}`, 'success');
+    const updateSoundLevel = async (level: SoundLevel) => {
+        await settingsService.setSoundLevel(level);
+        setSoundLevelState(level);
     };
 
     const updateNotificationSetting = async (enabled: boolean) => {
@@ -99,7 +99,7 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
 
     return (
         <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
-            <ImageBackground source={Backgrounds.settings} style={styles.bg} resizeMode="cover">
+            <ImageBackground source={Backgrounds.settings} style={styles.bg} resizeMode="cover" testID="settings-screen">
                 <View
                     style={[
                         styles.scrollClipper,
@@ -118,7 +118,17 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
                     showsVerticalScrollIndicator={false}
                 >
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Menu Buttons</Text>
+                    <TouchableOpacity
+                        style={styles.collapseHeader}
+                        onPress={() => setMenuExpanded((v) => !v)}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.sectionTitle}>Menu Buttons</Text>
+                        <Text style={styles.collapseChevron}>{menuExpanded ? '−' : '+'}</Text>
+                    </TouchableOpacity>
+
+                    {menuExpanded && (
+                        <>
                     <Text style={styles.sectionDescription}>
                         Drag to reorder which buttons appear in the interaction menu.
                     </Text>
@@ -221,19 +231,56 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
                     <TouchableOpacity style={styles.resetButton} onPress={resetToDefault}>
                         <Text style={styles.resetButtonText}>Reset to Default</Text>
                     </TouchableOpacity>
+                        </>
+                    )}
                 </View>
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>General</Text>
 
                     <View style={styles.settingRow}>
-                        <Text style={styles.settingLabel}>Sound</Text>
-                        <Switch
-                            value={soundEnabled}
-                            onValueChange={updateSoundSetting}
-                            trackColor={{ false: '#767577', true: '#81b0ff' }}
-                            thumbColor={soundEnabled ? '#f5dd4b' : '#f4f3f4'}
-                        />
+                        <Text style={styles.settingLabel}>Volume</Text>
+                        <View style={styles.volumeRow}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.volumeMute,
+                                    soundLevel === 0 && styles.volumeMuteActive,
+                                ]}
+                                onPress={() => updateSoundLevel(0)}
+                                activeOpacity={0.7}
+                            >
+                                <Text
+                                    style={[
+                                        styles.volumeMuteText,
+                                        soundLevel === 0 && styles.volumeMuteTextActive,
+                                    ]}
+                                >
+                                    OFF
+                                </Text>
+                            </TouchableOpacity>
+                            <View style={styles.volumeBarTrack}>
+                                {[1, 2, 3, 4].map((level) => {
+                                    const filled = soundLevel >= level;
+                                    return (
+                                        <TouchableOpacity
+                                            key={level}
+                                            onPress={() => updateSoundLevel(level as SoundLevel)}
+                                            activeOpacity={0.6}
+                                            style={styles.volumeBarHit}
+                                            hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
+                                        >
+                                            <View
+                                                style={[
+                                                    styles.volumeBar,
+                                                    { height: 8 + level * 5 },
+                                                    filled && styles.volumeBarFilled,
+                                                ]}
+                                            />
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </View>
                     </View>
 
                     <View style={styles.settingRow}>
@@ -345,6 +392,67 @@ const styles = StyleSheet.create({
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         marginBottom: 6,
+    },
+    collapseHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 2,
+    },
+    collapseChevron: {
+        fontSize: 22,
+        color: '#2E5A3E',
+        fontFamily: 'Monaco',
+        marginBottom: 6,
+        paddingHorizontal: 6,
+    },
+    volumeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    volumeMute: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderWidth: 2,
+        borderColor: '#2E5A3E',
+        backgroundColor: '#f0fff0',
+        marginRight: 8,
+    },
+    volumeMuteActive: {
+        backgroundColor: '#2E5A3E',
+    },
+    volumeMuteText: {
+        color: '#2E5A3E',
+        fontFamily: 'Monaco',
+        fontSize: 12,
+        letterSpacing: 1,
+    },
+    volumeMuteTextActive: {
+        color: '#f0fff0',
+    },
+    volumeBarTrack: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        height: 36,
+        paddingHorizontal: 4,
+        paddingBottom: 4,
+        borderWidth: 2,
+        borderColor: '#2E5A3E',
+        backgroundColor: '#f0fff0',
+    },
+    volumeBarHit: {
+        justifyContent: 'flex-end',
+        alignSelf: 'stretch',
+        paddingHorizontal: 3,
+    },
+    volumeBar: {
+        width: 8,
+        backgroundColor: '#d4ead4',
+        borderWidth: 1,
+        borderColor: '#2E5A3E',
+    },
+    volumeBarFilled: {
+        backgroundColor: '#2E5A3E',
     },
     sectionDescription: {
         fontSize: 13,

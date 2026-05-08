@@ -26,6 +26,12 @@ tags:
     id: "menu-sleep"
 - extendedWaitUntil:
     visible:
+      id: "sleep-confirm"
+    timeout: 10000
+- tapOn:
+    id: "sleep-confirm"
+- extendedWaitUntil:
+    visible:
       id: "sleep-screen"
     timeout: 10000
 - tapOn:

@@ -1039,7 +1039,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 
     return (
         <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
-            <ImageBackground source={Backgrounds.shop} style={styles.bg} resizeMode="cover">
+            <ImageBackground source={Backgrounds.shop} style={styles.bg} resizeMode="cover" testID="shop-screen">
                 <View
                     style={[
                         styles.scrollClipper,

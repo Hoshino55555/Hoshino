@@ -63,7 +63,6 @@ const MoonokoInteraction: React.FC<Props> = ({
     onShop,
     onInventory,
     onChat,
-    onBack,
     onSettings,
     onGallery,
     onArcade,
@@ -301,6 +300,7 @@ const MoonokoInteraction: React.FC<Props> = ({
 
     const [showSettings, setShowSettings] = useState(false);
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
+    const [selectedMenuIndex, setSelectedMenuIndex] = useState(0);
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuBarLayout, setMenuBarLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
     const bobAnim = useRef(new Animated.Value(0)).current;
@@ -328,21 +328,22 @@ const MoonokoInteraction: React.FC<Props> = ({
         return () => loop.stop();
     }, [bobAnim]);
 
-    // Navigation functions for physical device buttons
-    const goToPreviousMenu = () => {
-        if (onInventory) {
-            onInventory();
-        } else {
-            onNotification?.('📦 Opening inventory...', 'info');
-        }
+    // The three center buttons act as a cursor controller for the menu grid:
+    // left/right move a highlight across the rendered menu icons, and the
+    // center button activates the highlighted icon. Direct icon taps still
+    // work — this is an alternate input path for one-handed / physical-button
+    // use without overriding the existing tap UX.
+    const moveSelection = (delta: number) => {
+        if (menuButtons.length === 0) return;
+        setSelectedMenuIndex((i) => {
+            const len = menuButtons.length;
+            return ((i + delta) % len + len) % len;
+        });
     };
 
-    const goToNextMenu = () => {
-        if (onShop) {
-            onShop();
-        } else {
-            onNotification?.('🏪 Opening shop...', 'info');
-        }
+    const confirmSelection = () => {
+        const btn = menuButtons[selectedMenuIndex];
+        if (btn) handleMenuButtonAction(btn.action);
     };
 
     // Load menu buttons from settings
@@ -365,6 +366,14 @@ const MoonokoInteraction: React.FC<Props> = ({
             loadMenuButtons();
         }
     }, [showSettings, settingsService]);
+
+    // Keep the selection cursor inside bounds if the menu list shrinks
+    // (e.g. user disabled a button in Settings).
+    useEffect(() => {
+        if (menuButtons.length > 0 && selectedMenuIndex >= menuButtons.length) {
+            setSelectedMenuIndex(0);
+        }
+    }, [menuButtons.length, selectedMenuIndex]);
 
     // Handle menu button actions
     const handleMenuButtonAction = async (action: string) => {
@@ -428,8 +437,9 @@ const MoonokoInteraction: React.FC<Props> = ({
         settings: Menu.settings,
     };
 
-    // Render menu button
-    const renderMenuButton = (button: MenuButton) => {
+    // Render menu button. `index` is the absolute position in `menuButtons`
+    // (not the slice index) so the selection highlight matches the cursor.
+    const renderMenuButton = (button: MenuButton, index: number) => {
         const getImageSource = (iconName: string) => {
             switch (iconName) {
                 case 'feed': return imageSources.feed;
@@ -444,19 +454,19 @@ const MoonokoInteraction: React.FC<Props> = ({
             }
         };
 
+        const isSelected = index === selectedMenuIndex;
+
         return (
-            <TouchableOpacity
+            <View
                 key={button.id}
-                style={styles.menuIcon}
-                onPress={() => handleMenuButtonAction(button.action)}
-                activeOpacity={0.7}
+                style={[styles.menuIcon, isSelected && styles.menuIconSelected]}
                 testID={`menu-${button.action}`}
             >
                 <Image
                     source={getImageSource(button.icon)}
                     style={[styles.menuImage, { width: menuIconSize, height: menuIconSize }]}
                 />
-            </TouchableOpacity>
+            </View>
         );
     };
 
@@ -506,9 +516,9 @@ const MoonokoInteraction: React.FC<Props> = ({
                     </View>
                 </>
             }
-            onLeftButtonPress={() => onBack?.()}
-            onCenterButtonPress={() => onNotification?.('🎮 Moonoko Interaction: Care for your character!', 'info')}
-            onRightButtonPress={() => onNotification?.('🎮 Moonoko Help: Feed, play, sleep, and care for your cosmic companion!', 'info')}
+            onLeftButtonPress={() => moveSelection(-1)}
+            onCenterButtonPress={confirmSelection}
+            onRightButtonPress={() => moveSelection(1)}
             leftButtonText=""
             centerButtonText=""
             rightButtonText=""
@@ -580,11 +590,11 @@ const MoonokoInteraction: React.FC<Props> = ({
                 >
                     <View style={styles.integratedMenuBarInner}>
                         <View style={styles.menuRow}>
-                            {menuButtons.slice(0, 4).map(renderMenuButton)}
+                            {menuButtons.slice(0, 4).map((b, i) => renderMenuButton(b, i))}
                         </View>
                         {menuButtons.length > 4 && (
                             <View style={styles.menuRow}>
-                                {menuButtons.slice(4, 8).map(renderMenuButton)}
+                                {menuButtons.slice(4, 8).map((b, i) => renderMenuButton(b, i + 4))}
                             </View>
                         )}
                     </View>
@@ -707,6 +717,14 @@ const styles = StyleSheet.create({
         padding: 6,
         alignItems: 'center',
         justifyContent: 'center',
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: 'transparent',
+        backgroundColor: 'transparent',
+    },
+    menuIconSelected: {
+        borderColor: 'rgba(46, 90, 62, 0.85)',
+        backgroundColor: 'rgba(232, 245, 232, 0.55)',
     },
     menuImage: {
         width: 48,

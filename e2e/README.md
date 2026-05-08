@@ -54,9 +54,19 @@ Naming: `<screen>-<element>` in kebab-case.
 | `menu-<action>`          | MoonokoInteraction menu buttons (sleep, feed,  |
 |                          | shop, chat, games, gallery, inventory,         |
 |                          | settings)                                       |
+| `sleep-confirm`         | SleepConfirmationModal "Sleep" button          |
 | `sleep-screen`          | SleepScreen root ImageBackground               |
 | `sleep-wake-button`     | SleepScreen wake-up TouchableOpacity           |
 | `feeding-screen`        | FeedingPage root ImageBackground               |
+| `shop-screen`           | Shop root ImageBackground                      |
+| `inventory-screen`      | InventoryPage root ImageBackground             |
+| `games-screen`          | GamesList root ImageBackground                 |
+| `chat-screen`           | CharacterChat root View                        |
+| `gallery-screen`        | Gallery root Animated.View                     |
+| `settings-screen`       | Settings root ImageBackground                  |
+| `profile-screen`        | Profile root SafeArea View                     |
+| `profile-logout`        | Profile "Log out" TouchableOpacity             |
+| `wallet-pill`           | WalletButton connected pill (top-right)        |
 
 ### Flow files
 
@@ -89,17 +99,27 @@ Firestore seed via `firebase-admin`) is on the roadmap.
 |                       |                  | different menu — verifies the home UI    |
 |                       |                  | isn't blocked by a stale sleep overlay   |
 |                       |                  | (regression for v0.1.11 fix).            |
+| `menu-navigation`     | smoke, navigation| Tap feed/shop/inventory/games/settings,  |
+|                       |                  | verify each screen mounts and the back   |
+|                       |                  | button still routes home.                |
+| `shop-browse`         | shop, smoke      | Open shop, scroll, return — catches      |
+|                       |                  | catalog render crashes + back zIndex.    |
+| `feeding-open`        | feeding, smoke   | Open feeding, verify manual-cook card +  |
+|                       |                  | recipe book mount. (No-cook smoke;       |
+|                       |                  | actual cook flow waits on fixtures.)     |
+| `logout`              | auth             | Wallet pill → Profile → Log out → assert |
+|                       |                  | back at LoginScreen.                     |
+| `welcome-no-flash`    | regression       | After sign-in, assert interaction mounts |
+|                       |                  | directly (no Welcome paint regression).  |
 
 ## Roadmap (next scenarios)
 
-1. **feeding-happy-path** — feed an ingredient, verify hunger stat
-   increases
-2. **menu-navigation** — tap each menu item, verify the right screen mounts
-3. **shop-browse** — open shop, scroll catalog, no crash
-4. **logout** — sign out from settings, verify back at login screen
-5. **welcome-flow-no-flash** — assert WelcomeScreen never paints between
-   splash and interaction for a returning user (regression for the bug
-   fixed alongside v0.1.11)
+1. **feeding-happy-path** — cook a recipe end-to-end, verify hunger stat
+   increases. Needs fixture seeding (Firestore inventory + custom-token
+   auth) so we can assert deterministic ingredient counts.
+2. **shop-checkout** — buy a small SKU, verify reveal modal opens and
+   wallet decrements. Needs a fixture user so we don't burn the dev
+   account's fragments.
 
 ## Fixtures (TODO)
 

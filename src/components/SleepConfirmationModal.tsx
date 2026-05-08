@@ -381,6 +381,7 @@ const SleepConfirmationModal: React.FC<Props> = ({
                                 style={[styles.button, styles.yesButton]}
                                 onPress={() => close(() => onConfirm(wakeAtMs))}
                                 activeOpacity={0.8}
+                                testID="sleep-confirm"
                             >
                                 <Text style={styles.buttonText}>Sleep</Text>
                             </TouchableOpacity>
