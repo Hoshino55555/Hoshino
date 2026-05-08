@@ -41,6 +41,15 @@ import {
 import { INGREDIENT_TIER } from '../services/RecipeCatalog';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import type { BoosterSkuId } from '../services/GameStateService';
+import BoxRevealModal, { type BoxReveal } from './BoxRevealModal';
+
+// Per-line dispatch result. Drives the post-checkout reveal queue:
+// boxes open via BoxRevealModal (TCG pack-style), spin replays the reel
+// animation, instants accumulate into a single summary toast.
+type LineResult =
+    | { kind: 'spin' }
+    | { kind: 'box'; reveal: BoxReveal }
+    | { kind: 'instant'; line: string };
 
 // Per-tap idempotency token. Server validates `[A-Za-z0-9_-]{1,128}` and
 // dedups inside a Firestore tx so retries / double-taps don't double-spend.
@@ -173,6 +182,18 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     // the pending ones so we walk them sequentially once SF dispatch is done.
     const [iapItem, setIapItem] = useState<ShopItem | null>(null);
     const [iapQueue, setIapQueue] = useState<ShopItem[]>([]);
+    // Reveal queue — populated at the end of dispatch, walked one stage at
+    // a time. Each stage's "close" callback flushes the next stage so the
+    // player sees spin → boxes → instant summary → IAP modal in order
+    // instead of stacked overlays.
+    const [revealBoxes, setRevealBoxes] = useState<BoxReveal[]>([]);
+    const pendingRevealsRef = useRef<{
+        spin: boolean;
+        boxes: BoxReveal[];
+        instants: string[];
+        iapItems: ShopItem[];
+        purchased: MarketplaceItem[];
+    } | null>(null);
     const [iapToken, setIapToken] = useState<IAPPaymentToken>('USDC');
     const [iapPurchasing, setIapPurchasing] = useState(false);
     const [boosterPurchasingId, setBoosterPurchasingId] = useState<string | null>(null);
@@ -302,10 +323,60 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         stopReelAndReveal,
     ]);
 
+    // Walks the post-checkout reveal queue one stage at a time. Called from
+    // each stage's close handler so overlays don't stack; populated by
+    // handleCheckout via pendingRevealsRef. Stages: spin → box reveals →
+    // instant summary toast → IAP modal walker. The ref lives outside React
+    // state so close handlers don't need to be in the render closure.
+    const runNextReveal = useCallback(() => {
+        const queue = pendingRevealsRef.current;
+        if (!queue) return;
+        if (queue.spin) {
+            queue.spin = false;
+            // On success the user taps Continue → closeSpinModal flushes the
+            // rest of the queue. On failure handleDailySpin re-throws after
+            // toasting, so we flush from the catch side too — otherwise box
+            // reveals after a failed spin would never run.
+            handleDailySpin().catch(() => runNextReveal());
+            return;
+        }
+        if (queue.boxes.length > 0) {
+            const boxes = queue.boxes;
+            queue.boxes = [];
+            setRevealBoxes(boxes);
+            return;
+        }
+        if (queue.instants.length > 0) {
+            const summary = queue.instants.join(' · ');
+            queue.instants = [];
+            onNotification?.(summary, 'success');
+        }
+        // SF items report to the parent before IAP starts — IAP items are
+        // announced individually by handleIAPPurchase as the modal walks.
+        if (queue.purchased.length > 0) {
+            onItemsPurchased?.(queue.purchased);
+            queue.purchased = [];
+        }
+        if (queue.iapItems.length > 0) {
+            const [first, ...rest] = queue.iapItems;
+            queue.iapItems = [];
+            setIapQueue(rest);
+            setIapItem(first);
+            return;
+        }
+        pendingRevealsRef.current = null;
+    }, [handleDailySpin, onNotification, onItemsPurchased]);
+
     const closeSpinModal = useCallback(() => {
         setSpinPhase('idle');
         setSpinReward(null);
-    }, []);
+        runNextReveal();
+    }, [runNextReveal]);
+
+    const closeBoxReveal = useCallback(() => {
+        setRevealBoxes([]);
+        runNextReveal();
+    }, [runNextReveal]);
 
     const [claimingHackathon, setClaimingHackathon] = useState(false);
     const handleHackathonSpecial = useCallback(async () => {
@@ -667,13 +738,19 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         onNotification?.('Cart cleared.', 'info');
     };
 
-    // Dispatch a single SF cart line through the right per-SKU callable.
-    // Phase 1A: existing per-SKU callables. Phase 2 collapses these into
-    // one atomic checkoutStarFragments. Throws on backend failure so the
-    // outer dispatcher can halt + leave the line in cart.
-    const dispatchSfLine = async (item: ShopItem, qty: number): Promise<void> => {
+    // Dispatch a single SF cart line through its existing per-SKU callable
+    // and return a list of reveal descriptors for handleCheckout to play
+    // back AFTER all lines settle. State that persists outside the reveal
+    // (balance, caps, active camp) is updated immediately so the wallet UI
+    // reflects truth even before the player taps through reveals. The
+    // daily-spin case is intentionally a no-op claim — handleCheckout calls
+    // handleDailySpin separately so the reel modal animates after dispatch.
+    // Throws on backend failure so the outer loop halts + leaves the line
+    // in cart for retry.
+    const dispatchSfLine = async (item: ShopItem, qty: number): Promise<LineResult[]> => {
         const id = item.id;
         if (id.startsWith('box-ingredients-')) {
+            const results: LineResult[] = [];
             for (let i = 0; i < qty; i++) {
                 const res = await starFragmentService.purchaseIngredientBox(
                     id as 'box-ingredients-common' | 'box-ingredients-uncommon' | 'box-ingredients-rare',
@@ -681,20 +758,27 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 );
                 setBalance(res.newBalance);
                 await refreshPantry();
-                const summary = Object.entries(res.granted)
-                    .map(([gid, n]) => `${ingredientLabel(gid)} ×${n}`)
-                    .join(', ');
-                onNotification?.(`Opened ${item.name} — ${summary}`, 'success');
+                results.push({
+                    kind: 'box',
+                    reveal: {
+                        itemName: item.name,
+                        image: item.image,
+                        granted: res.granted,
+                    },
+                });
             }
-            return;
+            return results;
         }
         if (BOOSTER_SKU_IDS.has(id as BoosterSkuId)) {
-            const res = await applyBoosterCtx(id as BoosterSkuId, newRequestId('b'));
-            setBalance(res.newBalance);
-            const label = STAT_LABEL[res.stat] || res.stat;
-            const newVal = res.state[res.stat as 'mood' | 'energy' | 'hunger'];
-            onNotification?.(`${label} restored — now ${newVal}/5.`, 'success');
-            return;
+            const lines: string[] = [];
+            for (let i = 0; i < qty; i++) {
+                const res = await applyBoosterCtx(id as BoosterSkuId, newRequestId('b'));
+                setBalance(res.newBalance);
+                const label = STAT_LABEL[res.stat] || res.stat;
+                const newVal = res.state[res.stat as 'mood' | 'energy' | 'hunger'];
+                lines.push(`${label} → ${newVal}/5`);
+            }
+            return [{ kind: 'instant', line: lines.join(' · ') }];
         }
         if (id === 'upgrade-carry') {
             const res = await starFragmentService.upgradeCarryCapacity(newRequestId('up'));
@@ -703,8 +787,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 carryCap: res.carryCap,
                 inventoryCap: prev?.inventoryCap ?? 0,
             }));
-            onNotification?.(`${item.name} upgraded — now ${res.carryCap}`, 'success');
-            return;
+            return [{ kind: 'instant', line: `${item.name} → ${res.carryCap}` }];
         }
         if (id === 'upgrade-inventory') {
             const res = await starFragmentService.upgradeInventorySize(newRequestId('up'));
@@ -713,31 +796,28 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 carryCap: prev?.carryCap ?? 0,
                 inventoryCap: res.inventoryCap,
             }));
-            onNotification?.(`${item.name} upgraded — now ${res.inventoryCap}`, 'success');
-            return;
+            return [{ kind: 'instant', line: `${item.name} → ${res.inventoryCap}` }];
         }
         if (id === 'sleeping-camp') {
             const res = await starFragmentService.purchaseCamp('sleeping-camp', newRequestId('camp'));
             setBalance(res.newBalance);
             setActiveCamp(res.activeCamp);
-            onNotification?.(`${item.name} active — boost engaged!`, 'success');
-            return;
+            return [{ kind: 'instant', line: `${item.name} active — boost engaged` }];
         }
         if (id === 'daily-spin') {
-            // Delegate to the animated handler so the reel/reveal modal still
-            // plays — claiming SF directly here would skip the slot-machine UX
-            // that's the whole point of the daily-spin SKU.
-            await handleDailySpin();
-            return;
+            // No-op claim — the reel animation in handleDailySpin both claims
+            // the reward and reveals it, run from handleCheckout post-dispatch.
+            return [{ kind: 'spin' }];
         }
         if (id === 'hackathon-special') {
             const res = await starFragmentService.claimHackathonSpecial();
             setBalance(res.newBalance);
-            onNotification?.(
-                `Hackathon Special — +${res.granted.toLocaleString()} Shards!`,
-                'success'
-            );
-            return;
+            return [
+                {
+                    kind: 'instant',
+                    line: `Hackathon Special +${res.granted.toLocaleString()} Shards`,
+                },
+            ];
         }
         throw new Error(`Unknown SF SKU: ${id}`);
     };
@@ -765,6 +845,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         setPurchasing(true);
         const succeededIds = new Set<string>();
         const purchased: MarketplaceItem[] = [];
+        const lineResults: LineResult[] = [];
 
         try {
             // SF: batch loose ingredients (currently unreachable through the
@@ -796,6 +877,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                             for (let i = 0; i < c.quantity; i++) purchased.push(toMarketplace(c.item));
                         }
                     }
+                    const summary = Object.entries(res.granted)
+                        .map(([id, n]) => `${ingredientLabel(id)} ×${n}`)
+                        .join(', ');
+                    lineResults.push({ kind: 'instant', line: `Ingredients: ${summary}` });
                 } catch (err: any) {
                     onNotification?.(err?.message || 'Ingredient purchase failed.', 'error');
                     await refreshBalance();
@@ -804,9 +889,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 
             for (const c of otherSf) {
                 try {
-                    await dispatchSfLine(c.item, c.quantity);
+                    const results = await dispatchSfLine(c.item, c.quantity);
                     succeededIds.add(c.item.id);
                     for (let i = 0; i < c.quantity; i++) purchased.push(toMarketplace(c.item));
+                    lineResults.push(...results);
                 } catch (err: any) {
                     onNotification?.(`${c.item.name}: ${err?.message || 'failed'}`, 'error');
                     await refreshBalance();
@@ -814,29 +900,29 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 }
             }
 
-            // Drop the SF lines that succeeded before opening the IAP modal —
-            // the modal handler reads cart to know what to remove on confirm.
+            // Drop succeeded lines from cart before reveals start so the
+            // cart UI mirrors what was actually paid for, even if the user
+            // dismisses the reveal modals mid-walk.
             if (succeededIds.size > 0) {
                 setCart((prev) => prev.filter((c) => !succeededIds.has(c.item.id)));
             }
 
-            // IAP: queue the lines and open the modal for the first.
-            // handleIAPPurchase advances through the queue on success;
-            // handleIAPCancel clears it without dropping cart entries.
-            if (iapLines.length > 0) {
-                const expanded = iapLines.flatMap((c) =>
-                    Array.from({ length: c.quantity }, () => c.item)
-                );
-                const [first, ...rest] = expanded;
-                setIapQueue(rest);
-                setIapItem(first);
-            } else if (purchased.length > 0) {
-                onItemsPurchased?.(purchased);
-                onNotification?.(
-                    `Purchase complete — ${purchased.length} item${purchased.length === 1 ? '' : 's'} added.`,
-                    'success'
-                );
-            }
+            // Build the reveal queue. runNextReveal pulls from this ref as
+            // each stage closes — the close handlers don't need to re-enter
+            // handleCheckout's closure, they just call runNextReveal.
+            const expandedIap = iapLines.flatMap((c) =>
+                Array.from({ length: c.quantity }, () => c.item)
+            );
+            pendingRevealsRef.current = {
+                spin: lineResults.some((r) => r.kind === 'spin'),
+                boxes: lineResults.flatMap((r) => (r.kind === 'box' ? [r.reveal] : [])),
+                instants: lineResults.flatMap((r) =>
+                    r.kind === 'instant' ? [r.line] : []
+                ),
+                iapItems: expandedIap,
+                purchased,
+            };
+            runNextReveal();
         } finally {
             setPurchasing(false);
         }
@@ -1265,6 +1351,9 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     </TouchableOpacity>
                 </View>
             </ImageBackground>
+            {revealBoxes.length > 0 && (
+                <BoxRevealModal boxes={revealBoxes} onClose={closeBoxReveal} />
+            )}
             <Modal
                 transparent
                 visible={spinPhase !== 'idle'}
