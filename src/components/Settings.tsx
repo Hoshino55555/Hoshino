@@ -307,9 +307,13 @@ const styles = StyleSheet.create({
     backButton: {
         paddingVertical: 6,
         paddingHorizontal: 10,
+        backgroundColor: 'rgba(46, 90, 62, 0.85)',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#E8F5E8',
     },
     backButtonText: {
-        fontSize: 17,
+        fontSize: 14,
         color: '#E8F5E8',
         fontFamily: 'Monaco',
     },

@@ -669,6 +669,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-start',
         paddingHorizontal: 16,
+        zIndex: 2,
     },
     backButton: {
         paddingVertical: 6,
@@ -680,8 +681,8 @@ const styles = StyleSheet.create({
     },
     backButtonText: {
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: 'Monaco',
+        fontSize: 14,
     },
     scrollClipper: {
         position: 'absolute',

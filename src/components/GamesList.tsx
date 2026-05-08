@@ -143,6 +143,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-start',
         paddingHorizontal: 16,
+        zIndex: 2,
     },
     backButton: {
         paddingVertical: 6,
