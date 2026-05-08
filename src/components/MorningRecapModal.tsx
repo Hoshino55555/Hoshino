@@ -26,8 +26,11 @@ export interface MorningRecapDeltas {
 interface Props {
     visible: boolean;
     characterId: string | null | undefined;
-    deltas: MorningRecapDeltas;
+    // Omitted on the cold-launch path where we don't have a pre-sleep snapshot
+    // to diff against — the modal then renders only the greeting + items.
+    deltas?: MorningRecapDeltas;
     overnightItems: ForagedItem[];
+    playerName?: string;
     onDismiss: () => void;
 }
 
@@ -101,6 +104,7 @@ const MorningRecapModal: React.FC<Props> = ({
     characterId,
     deltas,
     overnightItems,
+    playerName,
     onDismiss,
 }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -119,7 +123,9 @@ const MorningRecapModal: React.FC<Props> = ({
             useNativeDriver: true,
         }).start();
 
-        const tallyTotalMs = ROW_STAGGER_MS * 4 + COUNT_UP_MS;
+        // Cold-launch path skips the tally so the items reveal can fire as soon
+        // as the modal fades in.
+        const tallyTotalMs = deltas ? ROW_STAGGER_MS * 4 + COUNT_UP_MS : 280;
         const itemsTimer = setTimeout(() => setItemsVisible(true), tallyTotalMs);
 
         const loop = Animated.loop(
@@ -143,7 +149,7 @@ const MorningRecapModal: React.FC<Props> = ({
             clearTimeout(itemsTimer);
             loop.stop();
         };
-    }, [visible]);
+    }, [visible, deltas]);
 
     if (!visible) return null;
 
@@ -170,37 +176,43 @@ const MorningRecapModal: React.FC<Props> = ({
                                 resizeMode="contain"
                             />
                         </Animated.View>
-                        <Text style={styles.heroTitle}>GOOD MORNING</Text>
+                        <Text style={styles.heroTitle}>
+                            {playerName && playerName.trim().length > 0
+                                ? `GOOD MORNING, ${playerName.trim().toUpperCase()}`
+                                : 'GOOD MORNING'}
+                        </Text>
                     </View>
 
-                    <View style={styles.window}>
-                        <View style={styles.windowHeader}>
-                            <Text style={styles.windowHeaderText}>Sleep Recap</Text>
+                    {deltas && (
+                        <View style={styles.window}>
+                            <View style={styles.windowHeader}>
+                                <Text style={styles.windowHeaderText}>Sleep Recap</Text>
+                            </View>
+                            <View style={styles.windowBody}>
+                                <TallyRow
+                                    label="Energy"
+                                    target={deltas.energyGained}
+                                    delay={0}
+                                />
+                                <TallyRow
+                                    label="Mood"
+                                    target={deltas.moodGained}
+                                    delay={ROW_STAGGER_MS}
+                                />
+                                <TallyRow
+                                    label="XP"
+                                    target={deltas.xpGained}
+                                    delay={ROW_STAGGER_MS * 2}
+                                />
+                                <TallyRow
+                                    label="Total Sleeps"
+                                    target={deltas.totalSleeps}
+                                    prefix=""
+                                    delay={ROW_STAGGER_MS * 3}
+                                />
+                            </View>
                         </View>
-                        <View style={styles.windowBody}>
-                            <TallyRow
-                                label="Energy"
-                                target={deltas.energyGained}
-                                delay={0}
-                            />
-                            <TallyRow
-                                label="Mood"
-                                target={deltas.moodGained}
-                                delay={ROW_STAGGER_MS}
-                            />
-                            <TallyRow
-                                label="XP"
-                                target={deltas.xpGained}
-                                delay={ROW_STAGGER_MS * 2}
-                            />
-                            <TallyRow
-                                label="Total Sleeps"
-                                target={deltas.totalSleeps}
-                                prefix=""
-                                delay={ROW_STAGGER_MS * 3}
-                            />
-                        </View>
-                    </View>
+                    )}
 
                     {itemsVisible && aggregated.length > 0 && (
                         <View style={styles.window}>

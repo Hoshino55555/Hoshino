@@ -1176,6 +1176,7 @@ function App() {
                     selectedCharacter={selectedCharacter}
                     sleepModalVisible={sleepModalVisible}
                     setSleepModalVisible={setSleepModalVisible}
+                    playerName={playerName}
                     onNotification={addNotification}
                 />
 
@@ -1389,10 +1390,27 @@ interface SleepControllerProps {
     selectedCharacter: Character | null;
     sleepModalVisible: boolean;
     setSleepModalVisible: (v: boolean) => void;
+    playerName: string;
     onNotification: (
         message: string,
         type: 'success' | 'error' | 'info' | 'warning',
     ) => void;
+}
+
+// Mirrors server's localDateKey (game-state-engine.js): YYYY-MM-DD in the
+// caller's timezone. Used by the cold-launch recap trigger to compare against
+// the server-tracked foragedRecapDateKey without a callable round-trip.
+function clientLocalDateKey(timezone: string, ms: number): string {
+    try {
+        return new Intl.DateTimeFormat('en-CA', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(new Date(ms));
+    } catch {
+        return new Date(ms).toISOString().slice(0, 10);
+    }
 }
 
 function SleepController({
@@ -1401,6 +1419,7 @@ function SleepController({
     selectedCharacter,
     sleepModalVisible,
     setSleepModalVisible,
+    playerName,
     onNotification,
 }: SleepControllerProps) {
     const {
@@ -1419,9 +1438,14 @@ function SleepController({
     const [wakeRequested, setWakeRequested] = useState(false);
     const [pickedWakeAtMs, setPickedWakeAtMs] = useState<number | null>(null);
     const [recapState, setRecapState] = useState<{
-        deltas: MorningRecapDeltas;
+        deltas?: MorningRecapDeltas;
         items: ForagedItem[];
     } | null>(null);
+    // Per-character latch: once we've shown a cold-launch recap (or dismissed
+    // one), we don't want the effect to re-fire on every gameState refresh
+    // before the server's foragedRecapDateKey/foragedItems have caught up.
+    // Resets when the active character changes.
+    const coldLaunchHandledRef = useRef<string | null>(null);
 
     const isSleeping =
         (serverSleeping || pendingStartSleep) && !pendingEndSleep;
@@ -1433,7 +1457,36 @@ function SleepController({
         setPendingStartSleep(false);
         setPendingEndSleep(false);
         setWakeRequested(false);
+        coldLaunchHandledRef.current = null;
     }, [selectedCharacter?.id]);
+
+    // Cold-launch morning recap: if the user slept and hasn't seen today's
+    // recap yet (foragedRecapDateKey lags todayKey), show it as the first
+    // thing they see — even if they killed the app and re-opened hours past
+    // wake-time. The wake-button path (handleWake) sets recapState directly
+    // with computed deltas; this path has no preWake snapshot, so we render
+    // greeting + items only.
+    useEffect(() => {
+        if (!gameState) return;
+        if (recapState) return;
+        // Skip during any in-flight sleep transition. handleWake owns the
+        // recap-with-deltas path; we don't want this effect racing it and
+        // dropping a no-deltas modal in front of a fresh wake.
+        if (isSleeping || pendingEndSleep || pendingStartSleep) return;
+        if (coldLaunchHandledRef.current === gameState.characterId) return;
+
+        const tz = gameState.timezone || 'UTC';
+        const todayKey = clientLocalDateKey(tz, Date.now());
+        if (gameState.foragedRecapDateKey === todayKey) return;
+
+        const sleepItems = (gameState.foragedItems ?? []).filter(
+            (f) => f.source === 'sleep',
+        );
+        if (sleepItems.length === 0) return;
+
+        coldLaunchHandledRef.current = gameState.characterId;
+        setRecapState({ items: sleepItems });
+    }, [gameState, recapState, isSleeping, pendingEndSleep, pendingStartSleep]);
 
     // Clear pendingEndSleep only when serverSleeping actually transitions
     // true→false (i.e. endSleep landed). Without the transition guard, the
@@ -1571,7 +1624,7 @@ function SleepController({
             <SleepConfirmationModal
                 visible={sleepModalVisible}
                 character={selectedCharacter}
-                playerName={undefined}
+                playerName={playerName}
                 defaultWakeAtMs={Date.now() + SLEEP_REQUIRED_MS}
                 onCancel={() => setSleepModalVisible(false)}
                 onSmokeTest={() => {
@@ -1626,8 +1679,10 @@ function SleepController({
                     characterId={selectedCharacter?.id}
                     deltas={recapState.deltas}
                     overnightItems={recapState.items}
+                    playerName={playerName}
                     onDismiss={() => {
                         setRecapState(null);
+                        coldLaunchHandledRef.current = selectedCharacter?.id ?? null;
                         if ((gameState?.foragedItems ?? []).length > 0) {
                             drainForaged().catch((e: any) => {
                                 onNotification(
