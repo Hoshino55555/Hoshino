@@ -89,6 +89,41 @@ const callPurchaseCamp = httpsCallable<
     { newBalance: number; activeCamp: ActiveCamp; replayed?: boolean }
 >(functions, 'purchaseCamp');
 
+// Phase 2: atomic SF cart checkout. Each line type the resolver accepts.
+// Daily-spin is intentionally excluded — it stays its own callable so the
+// reel reveal animation owns its UX flow.
+export type CartLine =
+    | { kind: 'ingredients'; counts: Record<string, number> }
+    | { kind: 'box'; boxId: IngredientBoxId; qty: number }
+    | { kind: 'upgrade-carry' }
+    | { kind: 'upgrade-inventory' }
+    | { kind: 'camp'; campId: CampId }
+    | { kind: 'hackathon' }
+    | { kind: 'booster'; skuId: string; qty: number };
+
+export interface CartCheckoutResult {
+    newBalance: number;
+    grossCost: number;
+    netCost: number;
+    granted: {
+        ingredients: Record<string, number>;
+        boxes: { boxId: IngredientBoxId; tier: string; rolls: number; granted: Record<string, number> }[];
+        upgrades: { carryCap?: number; inventoryCap?: number };
+        activeCamp: ActiveCamp | null;
+        hackathonGranted: number;
+        boosters: Record<string, number>;
+    };
+    caps: ServerCaps;
+    activeCamp: ActiveCamp | null;
+    boosters: Record<string, number>;
+    replayed: boolean;
+}
+
+const callCheckoutStarFragments = httpsCallable<
+    { lines: CartLine[]; requestId?: string },
+    CartCheckoutResult
+>(functions, 'checkoutStarFragments');
+
 export interface Mission {
     id: string
     name: string
@@ -491,6 +526,15 @@ export class StarFragmentService {
     // is already active; the wallet shows activeCamp until expiresAtMs.
     async purchaseCamp(campId: CampId, requestId?: string): Promise<{ newBalance: number; activeCamp: ActiveCamp; replayed?: boolean }> {
         const res = await callPurchaseCamp({ campId, requestId })
+        return res.data
+    }
+
+    // Phase 2: atomic cart checkout. Replaces the per-SKU loop in Shop —
+    // either every line lands or none of them do. Box rolls are committed
+    // server-side and persisted on the idempotency ledger so a network
+    // retry returns the SAME items the user already revealed.
+    async checkout(lines: CartLine[], requestId?: string): Promise<CartCheckoutResult> {
+        const res = await callCheckoutStarFragments({ lines, requestId })
         return res.data
     }
 

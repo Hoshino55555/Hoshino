@@ -62,6 +62,7 @@ exports.upgradeCarryCapacity = starFragments.upgradeCarryCapacity;
 exports.upgradeInventorySize = starFragments.upgradeInventorySize;
 exports.purchaseCamp = starFragments.purchaseCamp;
 exports.claimHackathonSpecial = starFragments.claimHackathonSpecial;
+exports.checkoutStarFragments = starFragments.checkoutStarFragments;
 
 // IAP (dual-rail: crypto SOL/USDC/SKR + fiat onramp via Privy useFundWallet)
 exports.createPurchaseIntent = iap.createPurchaseIntent;
@@ -91,6 +92,7 @@ exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) 
       'applyBooster',
       'consumeBooster',
       'purchaseCamp',
+      'checkoutStarFragments',
       'cook',
       'getInventory',
       'getCookingProfile',

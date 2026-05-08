@@ -20,6 +20,8 @@ import StarFragmentService, {
     type ServerCapLimits,
     type ActiveCamp,
     type CampId,
+    type CartLine,
+    type IngredientBoxId,
 } from '../services/StarFragmentService';
 import { ingredientLabel } from '../services/RecipeCatalog';
 import { getIngredientArt } from '../assets';
@@ -147,7 +149,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 
     const walletKey = publicKey ?? FALLBACK_WALLET;
     const starFragmentService = useMemo(() => new StarFragmentService(connection), [connection]);
-    const { refreshPantry, applyBooster: applyBoosterCtx } = useGameStateContext();
+    const { refreshPantry } = useGameStateContext();
 
     const [selectedTab, setSelectedTab] = useState<ShopTab>('consumables');
     const [balance, setBalance] = useState<number>(0);
@@ -565,91 +567,44 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         onNotification?.('Cart cleared.', 'info');
     };
 
-    // Dispatch a single SF cart line through its existing per-SKU callable
-    // and return a list of reveal descriptors for handleCheckout to play
-    // back AFTER all lines settle. State that persists outside the reveal
-    // (balance, caps, active camp) is updated immediately so the wallet UI
-    // reflects truth even before the player taps through reveals. The
-    // daily-spin case is intentionally a no-op claim — handleCheckout calls
-    // handleDailySpin separately so the reel modal animates after dispatch.
-    // Throws on backend failure so the outer loop halts + leaves the line
-    // in cart for retry.
-    const dispatchSfLine = async (item: ShopItem, qty: number): Promise<LineResult[]> => {
-        const id = item.id;
-        if (id.startsWith('box-ingredients-')) {
-            const results: LineResult[] = [];
-            for (let i = 0; i < qty; i++) {
-                const res = await starFragmentService.purchaseIngredientBox(
-                    id as 'box-ingredients-common' | 'box-ingredients-uncommon' | 'box-ingredients-rare',
-                    newRequestId('box')
-                );
-                setBalance(res.newBalance);
-                await refreshPantry();
-                results.push({
+    // Project the SF cart into the server's CartLine shape. Loose
+    // ingredients collapse into a single 'ingredients' line; everything else
+    // maps 1:1 onto a typed line kind. Unknown SKUs throw so a stale catalog
+    // entry surfaces immediately instead of silently dropping a line the
+    // user paid for.
+    const buildCheckoutLines = (
+        cartItems: { item: ShopItem; quantity: number }[]
+    ): CartLine[] => {
+        const ingredientCounts: Record<string, number> = {};
+        const lines: CartLine[] = [];
+        for (const c of cartItems) {
+            const id = c.item.id;
+            if (id in INGREDIENT_TIER) {
+                ingredientCounts[id] = (ingredientCounts[id] || 0) + c.quantity;
+            } else if (id.startsWith('box-ingredients-')) {
+                lines.push({
                     kind: 'box',
-                    reveal: {
-                        itemName: item.name,
-                        image: item.image,
-                        granted: res.granted,
-                    },
+                    boxId: id as IngredientBoxId,
+                    qty: c.quantity,
                 });
+            } else if (id === 'upgrade-carry') {
+                lines.push({ kind: 'upgrade-carry' });
+            } else if (id === 'upgrade-inventory') {
+                lines.push({ kind: 'upgrade-inventory' });
+            } else if (id === 'sleeping-camp') {
+                lines.push({ kind: 'camp', campId: 'sleeping-camp' });
+            } else if (id === 'hackathon-special') {
+                lines.push({ kind: 'hackathon' });
+            } else if (BOOSTER_SKU_IDS.has(id as BoosterSkuId)) {
+                lines.push({ kind: 'booster', skuId: id, qty: c.quantity });
+            } else {
+                throw new Error(`Unknown SF SKU: ${id}`);
             }
-            return results;
         }
-        if (BOOSTER_SKU_IDS.has(id as BoosterSkuId)) {
-            // Boosters are now inventory consumables: purchase grants charges
-            // to wallet.boosters[skuId]; the stat bump fires later when the
-            // player taps "use" from the inventory page.
-            const res = await applyBoosterCtx(id as BoosterSkuId, qty, newRequestId('b'));
-            setBalance(res.newBalance);
-            const noun = qty === 1 ? 'charge' : 'charges';
-            return [
-                {
-                    kind: 'instant',
-                    line: `${item.name} ×${qty} ${noun} — use from inventory`,
-                },
-            ];
+        if (Object.keys(ingredientCounts).length > 0) {
+            lines.push({ kind: 'ingredients', counts: ingredientCounts });
         }
-        if (id === 'upgrade-carry') {
-            const res = await starFragmentService.upgradeCarryCapacity(newRequestId('up'));
-            setBalance(res.newBalance);
-            setCaps((prev) => ({
-                carryCap: res.carryCap,
-                inventoryCap: prev?.inventoryCap ?? 0,
-            }));
-            return [{ kind: 'instant', line: `${item.name} → ${res.carryCap}` }];
-        }
-        if (id === 'upgrade-inventory') {
-            const res = await starFragmentService.upgradeInventorySize(newRequestId('up'));
-            setBalance(res.newBalance);
-            setCaps((prev) => ({
-                carryCap: prev?.carryCap ?? 0,
-                inventoryCap: res.inventoryCap,
-            }));
-            return [{ kind: 'instant', line: `${item.name} → ${res.inventoryCap}` }];
-        }
-        if (id === 'sleeping-camp') {
-            const res = await starFragmentService.purchaseCamp('sleeping-camp', newRequestId('camp'));
-            setBalance(res.newBalance);
-            setActiveCamp(res.activeCamp);
-            return [{ kind: 'instant', line: `${item.name} active — boost engaged` }];
-        }
-        if (id === 'daily-spin') {
-            // No-op claim — the reel animation in handleDailySpin both claims
-            // the reward and reveals it, run from handleCheckout post-dispatch.
-            return [{ kind: 'spin' }];
-        }
-        if (id === 'hackathon-special') {
-            const res = await starFragmentService.claimHackathonSpecial();
-            setBalance(res.newBalance);
-            return [
-                {
-                    kind: 'instant',
-                    line: `Hackathon Special +${res.granted.toLocaleString()} Shards`,
-                },
-            ];
-        }
-        throw new Error(`Unknown SF SKU: ${id}`);
+        return lines;
     };
 
     const handleCheckout = async () => {
@@ -659,11 +614,16 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             return;
         }
 
-        // Split the cart by rail. SF lines run through their existing
-        // per-SKU callables; IAP lines walk through the modal one at a time.
-        const sfLines = cart.filter((c) => c.item.currency === 'starFragments');
+        // Split the cart by rail. Daily-spin keeps its dedicated callable
+        // because the reel animation owns its UX; everything else runs
+        // through the atomic checkoutStarFragments resolver. IAP lines walk
+        // through the funding modal one at a time post-checkout.
+        const sfCart = cart.filter((c) => c.item.currency === 'starFragments');
         const iapLines = cart.filter((c) => c.item.currency === 'usd');
-        const sfTotal = sfLines.reduce(
+        const spinLines = sfCart.filter((c) => c.item.id === 'daily-spin');
+        const checkoutCart = sfCart.filter((c) => c.item.id !== 'daily-spin');
+
+        const sfTotal = checkoutCart.reduce(
             (s, c) => s + c.item.priceStarFragments * c.quantity,
             0
         );
@@ -678,56 +638,125 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         const lineResults: LineResult[] = [];
 
         try {
-            // SF: batch loose ingredients (currently unreachable through the
-            // catalog but kept for forward compat), then sequentially walk
-            // the rest. On any line failure we halt so the user sees the
-            // exact message and remaining lines stay in cart.
-            const ingredientCounts: Record<string, number> = {};
-            const otherSf: typeof cart = [];
-            for (const c of sfLines) {
-                if (c.item.id in INGREDIENT_TIER) {
-                    ingredientCounts[c.item.id] =
-                        (ingredientCounts[c.item.id] || 0) + c.quantity;
-                } else {
-                    otherSf.push(c);
-                }
-            }
-
-            if (Object.keys(ingredientCounts).length > 0) {
+            if (checkoutCart.length > 0) {
+                let lines: CartLine[];
                 try {
-                    const res = await starFragmentService.purchaseIngredients(
-                        ingredientCounts,
-                        newRequestId('ing')
+                    lines = buildCheckoutLines(checkoutCart);
+                } catch (err: any) {
+                    onNotification?.(err?.message || 'Cart contains an unknown item.', 'error');
+                    return;
+                }
+
+                try {
+                    const res = await starFragmentService.checkout(
+                        lines,
+                        newRequestId('checkout')
                     );
                     setBalance(res.newBalance);
-                    await refreshPantry();
-                    for (const c of sfLines) {
-                        if (c.item.id in INGREDIENT_TIER) {
-                            succeededIds.add(c.item.id);
-                            for (let i = 0; i < c.quantity; i++) purchased.push(toMarketplace(c.item));
+                    if (res.caps) setCaps(res.caps);
+                    setActiveCamp(res.activeCamp);
+                    if (
+                        Object.keys(res.granted.ingredients).length > 0 ||
+                        res.granted.boxes.length > 0
+                    ) {
+                        await refreshPantry();
+                    }
+
+                    // Atomic checkout: every line either succeeded or the
+                    // whole call threw. Mark everything in checkoutCart as
+                    // settled so the cart UI clears those lines.
+                    for (const c of checkoutCart) {
+                        succeededIds.add(c.item.id);
+                        for (let i = 0; i < c.quantity; i++) {
+                            purchased.push(toMarketplace(c.item));
                         }
                     }
-                    const summary = Object.entries(res.granted)
-                        .map(([id, n]) => `${ingredientLabel(id)} ×${n}`)
-                        .join(', ');
-                    lineResults.push({ kind: 'instant', line: `Ingredients: ${summary}` });
+
+                    // Build reveal queue in display order. Ingredients first
+                    // (single summary toast), then box reveals in cart order,
+                    // then the rest as instant toasts.
+                    if (Object.keys(res.granted.ingredients).length > 0) {
+                        const summary = Object.entries(res.granted.ingredients)
+                            .map(([id, n]) => `${ingredientLabel(id)} ×${n}`)
+                            .join(', ');
+                        lineResults.push({
+                            kind: 'instant',
+                            line: `Ingredients: ${summary}`,
+                        });
+                    }
+                    for (const box of res.granted.boxes) {
+                        const item = checkoutCart.find(
+                            (c) => c.item.id === box.boxId
+                        )?.item;
+                        lineResults.push({
+                            kind: 'box',
+                            reveal: {
+                                itemName: item?.name ?? box.boxId,
+                                image: item?.image,
+                                granted: box.granted,
+                            },
+                        });
+                    }
+                    if (res.granted.upgrades.carryCap !== undefined) {
+                        const item = checkoutCart.find(
+                            (c) => c.item.id === 'upgrade-carry'
+                        )?.item;
+                        lineResults.push({
+                            kind: 'instant',
+                            line: `${item?.name ?? 'Carry Capacity'} → ${res.granted.upgrades.carryCap}`,
+                        });
+                    }
+                    if (res.granted.upgrades.inventoryCap !== undefined) {
+                        const item = checkoutCart.find(
+                            (c) => c.item.id === 'upgrade-inventory'
+                        )?.item;
+                        lineResults.push({
+                            kind: 'instant',
+                            line: `${item?.name ?? 'Inventory Size'} → ${res.granted.upgrades.inventoryCap}`,
+                        });
+                    }
+                    if (res.granted.activeCamp) {
+                        const item = checkoutCart.find(
+                            (c) => c.item.id === 'sleeping-camp'
+                        )?.item;
+                        lineResults.push({
+                            kind: 'instant',
+                            line: `${item?.name ?? 'Camp'} active — boost engaged`,
+                        });
+                    }
+                    if (res.granted.hackathonGranted > 0) {
+                        lineResults.push({
+                            kind: 'instant',
+                            line: `Hackathon Special +${res.granted.hackathonGranted.toLocaleString()} Shards`,
+                        });
+                    }
+                    if (Object.keys(res.granted.boosters).length > 0) {
+                        const parts: string[] = [];
+                        for (const [skuId, qty] of Object.entries(
+                            res.granted.boosters
+                        )) {
+                            const item = checkoutCart.find(
+                                (c) => c.item.id === skuId
+                            )?.item;
+                            const noun = qty === 1 ? 'charge' : 'charges';
+                            parts.push(`${item?.name ?? skuId} ×${qty} ${noun}`);
+                        }
+                        lineResults.push({
+                            kind: 'instant',
+                            line: `${parts.join(' · ')} — use from inventory`,
+                        });
+                    }
                 } catch (err: any) {
-                    onNotification?.(err?.message || 'Ingredient purchase failed.', 'error');
+                    onNotification?.(err?.message || 'Checkout failed.', 'error');
                     await refreshBalance();
+                    return;
                 }
             }
 
-            for (const c of otherSf) {
-                try {
-                    const results = await dispatchSfLine(c.item, c.quantity);
-                    succeededIds.add(c.item.id);
-                    for (let i = 0; i < c.quantity; i++) purchased.push(toMarketplace(c.item));
-                    lineResults.push(...results);
-                } catch (err: any) {
-                    onNotification?.(`${c.item.name}: ${err?.message || 'failed'}`, 'error');
-                    await refreshBalance();
-                    break;
-                }
+            // Daily spin always queues post-checkout (free + animated).
+            for (const _ of spinLines) {
+                succeededIds.add('daily-spin');
+                lineResults.push({ kind: 'spin' });
             }
 
             // Drop succeeded lines from cart before reveals start so the

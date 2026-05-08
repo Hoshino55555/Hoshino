@@ -776,3 +776,425 @@ exports.purchaseCamp = onCall(COMMON_OPTS, async (request) => {
     });
     return result;
 });
+
+// Booster price catalog mirror — the canonical source is BOOSTER_SKUS in
+// game-state.js, but reaching across modules in the cart resolver creates a
+// circular import (game-state.js requires star-fragments.js). Keep this
+// table in sync; CI lint check enforces parity.
+const BOOSTER_PRICE_SF = {
+    'booster-mood': 40,
+    'booster-sleep': 40,
+    'booster-hunger': 40,
+};
+
+// ---------------------------------------------------------------------------
+// Phase 2: atomic SF cart checkout. Walks an entire cart in a single
+// Firestore transaction so partial failure becomes impossible — either the
+// whole basket lands or none of it. Replaces the per-SKU loop in the client
+// (which spent on each line sequentially and could leave the cart half-
+// charged on mid-loop failure).
+//
+// Daily-spin is intentionally NOT a checkout line — it stays a separate
+// callable because the reel reveal animation owns its own UX flow. Boxes
+// keep their RNG: rolls are computed pre-transaction and recorded on the
+// ledger so replay returns the same items the user already saw.
+// ---------------------------------------------------------------------------
+
+const HACKATHON_SPECIAL_LINE_AMOUNT = HACKATHON_SPECIAL_AMOUNT;
+
+// Stable canonical key for a cart payload — sorted line tuples joined with
+// '|'. Used to detect a requestId reused for a structurally different cart
+// (replay-protection mismatch) vs. a clean retry of the same basket.
+function cartKey(lines) {
+    const parts = lines.map((l) => {
+        switch (l.kind) {
+            case 'ingredients': {
+                const k = Object.keys(l.counts)
+                    .sort()
+                    .map((id) => `${id}:${l.counts[id]}`)
+                    .join(',');
+                return `ing#${k}`;
+            }
+            case 'box':
+                return `box#${l.boxId}#${l.qty}`;
+            case 'upgrade-carry':
+                return 'upcarry#1';
+            case 'upgrade-inventory':
+                return 'upinv#1';
+            case 'camp':
+                return `camp#${l.campId}`;
+            case 'hackathon':
+                return 'hack#1';
+            case 'booster':
+                return `boost#${l.skuId}#${l.qty}`;
+            default:
+                return `unknown#${l.kind}`;
+        }
+    });
+    return parts.sort().join('|');
+}
+
+function validateCartLines(rawLines) {
+    if (!Array.isArray(rawLines) || rawLines.length === 0) {
+        throw new HttpsError('invalid-argument', 'lines must be a non-empty array');
+    }
+    if (rawLines.length > 32) {
+        throw new HttpsError('invalid-argument', 'cart too large (max 32 lines)');
+    }
+    const out = [];
+    let upgradeCarryCount = 0;
+    let upgradeInventoryCount = 0;
+    let campCount = 0;
+    for (const l of rawLines) {
+        if (!l || typeof l !== 'object') {
+            throw new HttpsError('invalid-argument', 'line must be an object');
+        }
+        switch (l.kind) {
+            case 'ingredients': {
+                if (!l.counts || typeof l.counts !== 'object' || Array.isArray(l.counts)) {
+                    throw new HttpsError('invalid-argument', 'ingredients.counts must be an object');
+                }
+                const cleaned = {};
+                for (const [id, qty] of Object.entries(l.counts)) {
+                    if (!isKnownIngredient(id)) continue;
+                    const n = Math.floor(Number(qty));
+                    if (!Number.isFinite(n) || n <= 0 || n > 999) continue;
+                    cleaned[id] = n;
+                }
+                if (Object.keys(cleaned).length === 0) {
+                    throw new HttpsError('invalid-argument', 'ingredients line has no purchasable items');
+                }
+                out.push({ kind: 'ingredients', counts: cleaned });
+                break;
+            }
+            case 'box': {
+                const boxId = String(l.boxId || '');
+                if (!INGREDIENT_BOX_DEFS[boxId]) {
+                    throw new HttpsError('invalid-argument', `unknown box: ${boxId}`);
+                }
+                const qty = Math.floor(Number(l.qty));
+                if (!Number.isFinite(qty) || qty <= 0 || qty > 32) {
+                    throw new HttpsError('invalid-argument', 'box.qty must be 1-32');
+                }
+                out.push({ kind: 'box', boxId, qty });
+                break;
+            }
+            case 'upgrade-carry':
+                upgradeCarryCount++;
+                if (upgradeCarryCount > 1) {
+                    throw new HttpsError('invalid-argument', 'only one upgrade-carry line per checkout');
+                }
+                out.push({ kind: 'upgrade-carry' });
+                break;
+            case 'upgrade-inventory':
+                upgradeInventoryCount++;
+                if (upgradeInventoryCount > 1) {
+                    throw new HttpsError('invalid-argument', 'only one upgrade-inventory line per checkout');
+                }
+                out.push({ kind: 'upgrade-inventory' });
+                break;
+            case 'camp': {
+                const campId = String(l.campId || '');
+                if (!CAMP_DEFS[campId]) {
+                    throw new HttpsError('invalid-argument', `unknown camp: ${campId}`);
+                }
+                campCount++;
+                if (campCount > 1) {
+                    throw new HttpsError('invalid-argument', 'only one camp line per checkout');
+                }
+                out.push({ kind: 'camp', campId });
+                break;
+            }
+            case 'hackathon':
+                out.push({ kind: 'hackathon' });
+                break;
+            case 'booster': {
+                const skuId = String(l.skuId || '');
+                if (!BOOSTER_PRICE_SF[skuId]) {
+                    throw new HttpsError('invalid-argument', `unknown booster sku: ${skuId}`);
+                }
+                const qty = Math.floor(Number(l.qty));
+                if (!Number.isFinite(qty) || qty <= 0 || qty > 99) {
+                    throw new HttpsError('invalid-argument', 'booster.qty must be 1-99');
+                }
+                out.push({ kind: 'booster', skuId, qty });
+                break;
+            }
+            default:
+                throw new HttpsError('invalid-argument', `unknown line kind: ${l.kind}`);
+        }
+    }
+    return out;
+}
+
+exports.checkoutStarFragments = onCall(COMMON_OPTS, async (request) => {
+    const uid = requireAuth(request);
+    const lines = validateCartLines(request.data && request.data.lines);
+    const requestId = idem.validateRequestId(request.data && request.data.requestId);
+
+    // Roll all box lines pre-transaction so the rolled grants persist on the
+    // idempotency ledger — a replay must surface the same items the user
+    // already revealed, not a fresh draw. boxResults is parallel to the
+    // 'box' lines, in cart order, so the client reveal queue can pair them.
+    const boxResults = [];
+    for (const l of lines) {
+        if (l.kind !== 'box') continue;
+        const def = INGREDIENT_BOX_DEFS[l.boxId];
+        const pool = TIER_INGREDIENTS[def.tier] || [];
+        if (pool.length === 0) {
+            throw new HttpsError('failed-precondition', 'tier pool empty');
+        }
+        for (let q = 0; q < l.qty; q++) {
+            const granted = {};
+            for (let i = 0; i < def.rolls; i++) {
+                const id = pool[Math.floor(Math.random() * pool.length)];
+                granted[id] = (granted[id] || 0) + 1;
+            }
+            boxResults.push({
+                boxId: l.boxId,
+                tier: def.tier,
+                rolls: def.rolls,
+                granted,
+            });
+        }
+    }
+
+    const key = cartKey(lines);
+    const lRef = requestId
+        ? idem.ledgerRef({ uid, collection: 'checkouts', requestId })
+        : null;
+
+    const result = await admin.firestore().runTransaction(async (tx) => {
+        if (lRef) {
+            const replay = await idem.checkIdempotency(tx, lRef, { cartKey: key });
+            if (replay.hit) {
+                return { ...replay.cached.payload, replayed: true };
+            }
+        }
+
+        const wRef = walletRef(uid);
+        const wSnap = await tx.get(wRef);
+        const wData = wSnap.exists ? wSnap.data() : {};
+        const rawBalance = wData.balance;
+        const balance =
+            Number.isSafeInteger(rawBalance) && rawBalance >= 0 ? rawBalance : 0;
+        const caps = readCaps(wData);
+        const currentBoosters =
+            wData && typeof wData.boosters === 'object' && wData.boosters
+                ? { ...wData.boosters }
+                : {};
+
+        // Read inventory once if any line touches ingredients.
+        const needsInventory = lines.some(
+            (l) => l.kind === 'ingredients' || l.kind === 'box'
+        );
+        let nextCounts = null;
+        let pantryUsed = 0;
+        if (needsInventory) {
+            const iRef = inventoryRef(uid);
+            const iSnap = await tx.get(iRef);
+            const cur = (iSnap.exists && iSnap.data().counts) || {};
+            nextCounts = { ...cur };
+            pantryUsed = totalIngredients(cur);
+        }
+
+        // Walk lines, accumulating cost/grants without writing yet — we want
+        // the whole cart validated before any side-effects in the tx.
+        let grossCost = 0;
+        let hackathonGranted = 0;
+        const grantedIngredients = {};
+        const grantedBoxes = [];
+        const grantedUpgrades = {};
+        const grantedBoosters = {};
+        let nextCarryCap = caps.carryCap;
+        let nextInventoryCap = caps.inventoryCap;
+        let activeCampOut = null;
+        const nowMs = Date.now();
+        const existingCamp = wData.activeCamp;
+        const campStillActive =
+            existingCamp &&
+            typeof existingCamp.expiresAtMs === 'number' &&
+            existingCamp.expiresAtMs > nowMs
+                ? existingCamp
+                : null;
+        let boxCursor = 0;
+
+        for (const l of lines) {
+            switch (l.kind) {
+                case 'ingredients': {
+                    let lineGrant = 0;
+                    for (const [id, n] of Object.entries(l.counts)) {
+                        const price = ingredientPrice(id);
+                        if (price == null) continue;
+                        grossCost += price * n;
+                        grantedIngredients[id] = (grantedIngredients[id] || 0) + n;
+                        nextCounts[id] = (nextCounts[id] || 0) + n;
+                        lineGrant += n;
+                    }
+                    pantryUsed += lineGrant;
+                    break;
+                }
+                case 'box': {
+                    const def = INGREDIENT_BOX_DEFS[l.boxId];
+                    grossCost += def.priceSF * l.qty;
+                    for (let q = 0; q < l.qty; q++) {
+                        const rolled = boxResults[boxCursor++];
+                        grantedBoxes.push(rolled);
+                        for (const [id, n] of Object.entries(rolled.granted)) {
+                            nextCounts[id] = (nextCounts[id] || 0) + n;
+                            pantryUsed += n;
+                        }
+                    }
+                    break;
+                }
+                case 'upgrade-carry': {
+                    if (nextCarryCap >= CARRY_CAP_MAX) {
+                        throw new HttpsError(
+                            'failed-precondition',
+                            `Carry Capacity already at max (${CARRY_CAP_MAX})`
+                        );
+                    }
+                    grossCost += UPGRADE_CARRY_PRICE_SF;
+                    nextCarryCap = Math.min(
+                        CARRY_CAP_MAX,
+                        nextCarryCap + CARRY_CAP_INCREMENT
+                    );
+                    grantedUpgrades.carryCap = nextCarryCap;
+                    break;
+                }
+                case 'upgrade-inventory': {
+                    if (nextInventoryCap >= INVENTORY_CAP_MAX) {
+                        throw new HttpsError(
+                            'failed-precondition',
+                            `Inventory Size already at max (${INVENTORY_CAP_MAX})`
+                        );
+                    }
+                    grossCost += UPGRADE_INVENTORY_PRICE_SF;
+                    nextInventoryCap = Math.min(
+                        INVENTORY_CAP_MAX,
+                        nextInventoryCap + INVENTORY_CAP_INCREMENT
+                    );
+                    grantedUpgrades.inventoryCap = nextInventoryCap;
+                    break;
+                }
+                case 'camp': {
+                    if (campStillActive) {
+                        const remainingMs = campStillActive.expiresAtMs - nowMs;
+                        const days = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+                        throw new HttpsError(
+                            'failed-precondition',
+                            `Camp still active — ${days} day${days === 1 ? '' : 's'} remaining.`
+                        );
+                    }
+                    const def = CAMP_DEFS[l.campId];
+                    grossCost += def.priceSF;
+                    activeCampOut = {
+                        id: l.campId,
+                        startedAtMs: nowMs,
+                        expiresAtMs: nowMs + def.durationMs,
+                    };
+                    break;
+                }
+                case 'hackathon': {
+                    hackathonGranted += HACKATHON_SPECIAL_LINE_AMOUNT;
+                    break;
+                }
+                case 'booster': {
+                    const price = BOOSTER_PRICE_SF[l.skuId];
+                    grossCost += price * l.qty;
+                    grantedBoosters[l.skuId] = (grantedBoosters[l.skuId] || 0) + l.qty;
+                    currentBoosters[l.skuId] = (currentBoosters[l.skuId] || 0) + l.qty;
+                    break;
+                }
+            }
+        }
+
+        // Honor pantry cap against the post-checkout total. Refuse the whole
+        // cart so the user keeps their SF — better than partially silently
+        // dropping items they paid for.
+        if (needsInventory && pantryUsed > nextInventoryCap) {
+            throw new HttpsError(
+                'failed-precondition',
+                `Pantry full (${pantryUsed}/${nextInventoryCap}) — upgrade Inventory Size or cook to free up room`
+            );
+        }
+
+        if (balance < grossCost) {
+            throw new HttpsError(
+                'failed-precondition',
+                `Insufficient Star Fragments (need ${grossCost}, have ${balance})`
+            );
+        }
+
+        const newBalance = balance - grossCost + hackathonGranted;
+        const netCost = grossCost - hackathonGranted;
+
+        // Single wallet write covering balance + caps + camp + boosters.
+        const walletPatch = { balance: newBalance, updatedAt: nowMs };
+        if (grantedUpgrades.carryCap !== undefined) {
+            walletPatch.carryCap = grantedUpgrades.carryCap;
+        }
+        if (grantedUpgrades.inventoryCap !== undefined) {
+            walletPatch.inventoryCap = grantedUpgrades.inventoryCap;
+        }
+        if (activeCampOut) walletPatch.activeCamp = activeCampOut;
+        if (Object.keys(grantedBoosters).length > 0) {
+            walletPatch.boosters = currentBoosters;
+        }
+        tx.set(wRef, walletPatch, { merge: true });
+
+        if (needsInventory && nextCounts) {
+            tx.set(
+                inventoryRef(uid),
+                { counts: nextCounts, updatedAt: nowMs },
+                { merge: true }
+            );
+        }
+
+        const payload = {
+            newBalance,
+            grossCost,
+            netCost,
+            granted: {
+                ingredients: grantedIngredients,
+                boxes: grantedBoxes,
+                upgrades: grantedUpgrades,
+                activeCamp: activeCampOut,
+                hackathonGranted,
+                boosters: grantedBoosters,
+            },
+            caps: { carryCap: nextCarryCap, inventoryCap: nextInventoryCap },
+            activeCamp: activeCampOut || campStillActive,
+            boosters: currentBoosters,
+        };
+
+        if (lRef) {
+            idem.writeLedger(tx, lRef, {
+                uid,
+                cartKey: key,
+                payload,
+            });
+        }
+
+        return { ...payload, replayed: false };
+    });
+
+    // Best-effort summary log. One row per checkout is enough for audit.
+    try {
+        await admin
+            .firestore()
+            .collection('users')
+            .doc(uid)
+            .collection('walletTx')
+            .add({
+                amount: -result.netCost,
+                reason: 'cart_checkout',
+                balanceAfter: result.newBalance,
+                lineCount: lines.length,
+                hackathonGranted: result.granted.hackathonGranted,
+                atMs: Date.now(),
+            });
+    } catch (_e) {}
+
+    return result;
+});
