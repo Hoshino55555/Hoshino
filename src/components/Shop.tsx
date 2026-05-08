@@ -60,6 +60,34 @@ const STAT_LABEL: Record<string, string> = {
     hunger: 'Hunger',
 };
 
+// Cart qty rule. Phase 1A: only items whose grant repeats cleanly through
+// existing batched/loopable callables can stack — ingredient boxes (loop the
+// per-box callable) and loose ingredients (one batched purchase). Boosters
+// become qty>=N in Phase 1B (after the inventory-consumable refactor); SF
+// packs and IAP bundles become qty>=N in Phase 3 (cart-shaped IAP intents).
+const isStackableSku = (item: ShopItem): boolean => {
+    if (item.id.startsWith('box-ingredients-')) return true;
+    if (item.id in INGREDIENT_TIER) return true;
+    return false;
+};
+
+// Catalog ShopItem → onItemsPurchased payload shape. The legacy
+// MarketplaceItem fields are a strict subset of ShopItem, so this is a
+// straight projection — pulled out as a helper because the cart dispatcher
+// and the IAP completion path both need to push into the same `purchased`
+// list, one element per cart-line quantity.
+const toMarketplace = (item: ShopItem): MarketplaceItem => ({
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    imageUrl: item.imageUrl,
+    category: item.category,
+    rarity: item.rarity,
+    priceSOL: item.priceSOL,
+    priceStarFragments: item.priceStarFragments,
+    inStock: item.inStock,
+});
+
 interface ShopProps {
     connection: Connection;
     onNotification?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
@@ -140,9 +168,11 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     const [activeCamp, setActiveCamp] = useState<ActiveCamp | null>(null);
     const [purchasingCampId, setPurchasingCampId] = useState<string | null>(null);
     const campInFlightRef = useRef(false);
-    // IAP modal state — opened when user taps an iap-pending SKU (SF packs,
-    // season pass, bundles). Picks payment rail then calls IAPService.
+    // IAP modal state — opened when checkout reaches an iap-pending line
+    // (SF packs, season pass, bundles). One modal per item; iapQueue holds
+    // the pending ones so we walk them sequentially once SF dispatch is done.
     const [iapItem, setIapItem] = useState<ShopItem | null>(null);
+    const [iapQueue, setIapQueue] = useState<ShopItem[]>([]);
     const [iapToken, setIapToken] = useState<IAPPaymentToken>('USDC');
     const [iapPurchasing, setIapPurchasing] = useState(false);
     const [boosterPurchasingId, setBoosterPurchasingId] = useState<string | null>(null);
@@ -228,6 +258,9 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         });
     }, [reelTranslateX, revealScale, revealGlow]);
 
+    // Re-throws on failure so the cart dispatcher can leave the line in
+    // cart for retry. Each error path also surfaces a toast directly so the
+    // user sees the cause regardless of who's awaiting.
     const handleDailySpin = useCallback(async () => {
         if (spinning || !spinAvailable) return;
         setSpinning(true);
@@ -255,6 +288,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             }
             setSpinPhase('idle');
             onNotification?.(err?.message || 'Daily spin failed', 'error');
+            throw err;
         } finally {
             setSpinning(false);
         }
@@ -453,7 +487,14 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             } else {
                 onNotification?.('Purchase complete.', 'success');
             }
-            setIapItem(null);
+            // Drop the carted line + advance to the next IAP item, if any.
+            const justPurchasedId = iapItem.id;
+            setCart((prev) => prev.filter((c) => c.item.id !== justPurchasedId));
+            setIapQueue((prev) => {
+                const [next, ...rest] = prev;
+                setIapItem(next ?? null);
+                return rest;
+            });
             await refreshBalance();
         } catch (err: any) {
             onNotification?.(err?.message || 'Purchase failed', 'error');
@@ -461,6 +502,14 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             setIapPurchasing(false);
         }
     }, [iapItem, iapToken, iapPurchasing, signer, onNotification, refreshBalance]);
+
+    // Cancel the IAP modal — drops the queue so the user can retry from the
+    // cart. Cancelled IAP lines stay in cart for retry.
+    const handleIAPCancel = useCallback(() => {
+        if (iapPurchasing) return;
+        setIapItem(null);
+        setIapQueue([]);
+    }, [iapPurchasing]);
 
     const formatCooldown = (ms: number) => {
         if (ms <= 0) return 'Ready';
@@ -482,6 +531,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 
     const cartTotal = useMemo(
         () => cart.reduce((sum, c) => sum + c.item.priceStarFragments * c.quantity, 0),
+        [cart]
+    );
+    const cartUsdTotal = useMemo(
+        () => cart.reduce((sum, c) => sum + (c.item.priceUsd ?? 0) * c.quantity, 0),
         [cart]
     );
     const remainingBalance = balance - cartTotal;
@@ -536,36 +589,63 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     );
 
     const addToCart = (item: ShopItem) => {
-        if (BOOSTER_SKU_IDS.has(item.id as BoosterSkuId)) {
-            void handleBoosterPurchase(item);
-            return;
-        }
-        if (item.status === 'iap-pending') {
-            // IAP scaffolding is wired but treasury/SKR are still placeholders;
-            // open the rail picker anyway so QA can exercise the flow on devnet.
-            setIapItem(item);
-            return;
-        }
         if (item.status === 'effect-pending') {
-            onNotification?.('Coming soon — this item\'s effect is being wired up.', 'info');
+            onNotification?.("Coming soon — this item's effect is being wired up.", 'info');
             return;
         }
-        if (item.currency !== 'starFragments') {
-            onNotification?.('This item is not available yet.', 'info');
+        // Per-SKU "already-active / cooldown" guards. Server is source of
+        // truth, but surfacing here stops the cart from queueing an
+        // obviously-failing line.
+        if (
+            item.id === 'sleeping-camp' &&
+            activeCamp &&
+            activeCamp.expiresAtMs > Date.now()
+        ) {
+            onNotification?.('A camp is already active.', 'info');
             return;
         }
-        const projected = cartTotal + item.priceStarFragments;
-        if (projected > balance) {
-            onNotification?.(
-                `Not enough Shards — need ${projected}, have ${balance}.`,
-                'error'
-            );
+        if (item.id === 'daily-spin' && !spinAvailable) {
+            onNotification?.('Daily spin is on cooldown.', 'info');
+            return;
+        }
+        if (
+            (item.id === 'upgrade-carry' || item.id === 'upgrade-inventory') &&
+            caps && capLimits
+        ) {
+            const cur = item.id === 'upgrade-carry' ? caps.carryCap : caps.inventoryCap;
+            const max =
+                item.id === 'upgrade-carry'
+                    ? capLimits.carryCapMax
+                    : capLimits.inventoryCapMax;
+            if (cur >= max) {
+                onNotification?.('Already at max.', 'info');
+                return;
+            }
+        }
+
+        const stackable = isStackableSku(item);
+        const existing = cart.find((c) => c.item.id === item.id);
+        if (existing && !stackable) {
+            onNotification?.('Already in cart.', 'info');
             return;
         }
 
+        // Balance check applies only to SF-priced items. IAP items are
+        // paid in USD at checkout, so they don't reserve SF balance.
+        if (item.currency === 'starFragments') {
+            const projected = cartTotal + item.priceStarFragments;
+            if (projected > balance) {
+                onNotification?.(
+                    `Not enough Shards — need ${projected}, have ${balance}.`,
+                    'error'
+                );
+                return;
+            }
+        }
+
         setCart((prev) => {
-            const existing = prev.find((c) => c.item.id === item.id);
-            if (existing) {
+            const found = prev.find((c) => c.item.id === item.id);
+            if (found) {
                 return prev.map((c) =>
                     c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
                 );
@@ -587,59 +667,176 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         onNotification?.('Cart cleared.', 'info');
     };
 
+    // Dispatch a single SF cart line through the right per-SKU callable.
+    // Phase 1A: existing per-SKU callables. Phase 2 collapses these into
+    // one atomic checkoutStarFragments. Throws on backend failure so the
+    // outer dispatcher can halt + leave the line in cart.
+    const dispatchSfLine = async (item: ShopItem, qty: number): Promise<void> => {
+        const id = item.id;
+        if (id.startsWith('box-ingredients-')) {
+            for (let i = 0; i < qty; i++) {
+                const res = await starFragmentService.purchaseIngredientBox(
+                    id as 'box-ingredients-common' | 'box-ingredients-uncommon' | 'box-ingredients-rare',
+                    newRequestId('box')
+                );
+                setBalance(res.newBalance);
+                await refreshPantry();
+                const summary = Object.entries(res.granted)
+                    .map(([gid, n]) => `${ingredientLabel(gid)} ×${n}`)
+                    .join(', ');
+                onNotification?.(`Opened ${item.name} — ${summary}`, 'success');
+            }
+            return;
+        }
+        if (BOOSTER_SKU_IDS.has(id as BoosterSkuId)) {
+            const res = await applyBoosterCtx(id as BoosterSkuId, newRequestId('b'));
+            setBalance(res.newBalance);
+            const label = STAT_LABEL[res.stat] || res.stat;
+            const newVal = res.state[res.stat as 'mood' | 'energy' | 'hunger'];
+            onNotification?.(`${label} restored — now ${newVal}/5.`, 'success');
+            return;
+        }
+        if (id === 'upgrade-carry') {
+            const res = await starFragmentService.upgradeCarryCapacity(newRequestId('up'));
+            setBalance(res.newBalance);
+            setCaps((prev) => ({
+                carryCap: res.carryCap,
+                inventoryCap: prev?.inventoryCap ?? 0,
+            }));
+            onNotification?.(`${item.name} upgraded — now ${res.carryCap}`, 'success');
+            return;
+        }
+        if (id === 'upgrade-inventory') {
+            const res = await starFragmentService.upgradeInventorySize(newRequestId('up'));
+            setBalance(res.newBalance);
+            setCaps((prev) => ({
+                carryCap: prev?.carryCap ?? 0,
+                inventoryCap: res.inventoryCap,
+            }));
+            onNotification?.(`${item.name} upgraded — now ${res.inventoryCap}`, 'success');
+            return;
+        }
+        if (id === 'sleeping-camp') {
+            const res = await starFragmentService.purchaseCamp('sleeping-camp', newRequestId('camp'));
+            setBalance(res.newBalance);
+            setActiveCamp(res.activeCamp);
+            onNotification?.(`${item.name} active — boost engaged!`, 'success');
+            return;
+        }
+        if (id === 'daily-spin') {
+            // Delegate to the animated handler so the reel/reveal modal still
+            // plays — claiming SF directly here would skip the slot-machine UX
+            // that's the whole point of the daily-spin SKU.
+            await handleDailySpin();
+            return;
+        }
+        if (id === 'hackathon-special') {
+            const res = await starFragmentService.claimHackathonSpecial();
+            setBalance(res.newBalance);
+            onNotification?.(
+                `Hackathon Special — +${res.granted.toLocaleString()} Shards!`,
+                'success'
+            );
+            return;
+        }
+        throw new Error(`Unknown SF SKU: ${id}`);
+    };
+
     const handleCheckout = async () => {
         if (purchasing) return;
         if (cart.length === 0) {
             onNotification?.('Your cart is empty!', 'warning');
             return;
         }
-        // Currently the only purchasable items are ingredients (effect-pending
-        // items are blocked at addToCart). The atomic purchase callable
-        // deducts SF + grants ingredients in one server transaction.
-        const ingredientCounts: Record<string, number> = {};
-        for (const c of cart) {
-            if (c.item.id in INGREDIENT_TIER) {
-                ingredientCounts[c.item.id] =
-                    (ingredientCounts[c.item.id] || 0) + c.quantity;
-            }
-        }
-        if (Object.keys(ingredientCounts).length === 0) {
-            onNotification?.('Nothing purchasable in cart yet.', 'warning');
-            return;
-        }
-        if (cartTotal > balance) {
-            onNotification?.('Insufficient Shards.', 'error');
+
+        // Split the cart by rail. SF lines run through their existing
+        // per-SKU callables; IAP lines walk through the modal one at a time.
+        const sfLines = cart.filter((c) => c.item.currency === 'starFragments');
+        const iapLines = cart.filter((c) => c.item.currency === 'usd');
+        const sfTotal = sfLines.reduce(
+            (s, c) => s + c.item.priceStarFragments * c.quantity,
+            0
+        );
+        if (sfTotal > balance) {
+            onNotification?.('Insufficient Shards for the SF items in cart.', 'error');
             return;
         }
 
         setPurchasing(true);
-        try {
-            const result = await starFragmentService.purchaseIngredients(
-                ingredientCounts,
-                newRequestId('ing')
-            );
-            setBalance(result.newBalance);
-            await refreshPantry();
+        const succeededIds = new Set<string>();
+        const purchased: MarketplaceItem[] = [];
 
-            const purchased: MarketplaceItem[] = cart.flatMap((c) =>
-                Array.from({ length: c.quantity }, () => ({
-                    id: c.item.id,
-                    name: c.item.name,
-                    description: c.item.description,
-                    imageUrl: c.item.imageUrl,
-                    category: c.item.category,
-                    rarity: c.item.rarity,
-                    priceSOL: c.item.priceSOL,
-                    priceStarFragments: c.item.priceStarFragments,
-                    inStock: c.item.inStock,
-                }))
-            );
-            onItemsPurchased?.(purchased);
-            setCart([]);
-            onNotification?.(`Purchase complete — ${purchased.length} item${purchased.length === 1 ? '' : 's'} added.`, 'success');
-        } catch (err: any) {
-            onNotification?.(err?.message || 'Purchase failed.', 'error');
-            await refreshBalance();
+        try {
+            // SF: batch loose ingredients (currently unreachable through the
+            // catalog but kept for forward compat), then sequentially walk
+            // the rest. On any line failure we halt so the user sees the
+            // exact message and remaining lines stay in cart.
+            const ingredientCounts: Record<string, number> = {};
+            const otherSf: typeof cart = [];
+            for (const c of sfLines) {
+                if (c.item.id in INGREDIENT_TIER) {
+                    ingredientCounts[c.item.id] =
+                        (ingredientCounts[c.item.id] || 0) + c.quantity;
+                } else {
+                    otherSf.push(c);
+                }
+            }
+
+            if (Object.keys(ingredientCounts).length > 0) {
+                try {
+                    const res = await starFragmentService.purchaseIngredients(
+                        ingredientCounts,
+                        newRequestId('ing')
+                    );
+                    setBalance(res.newBalance);
+                    await refreshPantry();
+                    for (const c of sfLines) {
+                        if (c.item.id in INGREDIENT_TIER) {
+                            succeededIds.add(c.item.id);
+                            for (let i = 0; i < c.quantity; i++) purchased.push(toMarketplace(c.item));
+                        }
+                    }
+                } catch (err: any) {
+                    onNotification?.(err?.message || 'Ingredient purchase failed.', 'error');
+                    await refreshBalance();
+                }
+            }
+
+            for (const c of otherSf) {
+                try {
+                    await dispatchSfLine(c.item, c.quantity);
+                    succeededIds.add(c.item.id);
+                    for (let i = 0; i < c.quantity; i++) purchased.push(toMarketplace(c.item));
+                } catch (err: any) {
+                    onNotification?.(`${c.item.name}: ${err?.message || 'failed'}`, 'error');
+                    await refreshBalance();
+                    break;
+                }
+            }
+
+            // Drop the SF lines that succeeded before opening the IAP modal —
+            // the modal handler reads cart to know what to remove on confirm.
+            if (succeededIds.size > 0) {
+                setCart((prev) => prev.filter((c) => !succeededIds.has(c.item.id)));
+            }
+
+            // IAP: queue the lines and open the modal for the first.
+            // handleIAPPurchase advances through the queue on success;
+            // handleIAPCancel clears it without dropping cart entries.
+            if (iapLines.length > 0) {
+                const expanded = iapLines.flatMap((c) =>
+                    Array.from({ length: c.quantity }, () => c.item)
+                );
+                const [first, ...rest] = expanded;
+                setIapQueue(rest);
+                setIapItem(first);
+            } else if (purchased.length > 0) {
+                onItemsPurchased?.(purchased);
+                onNotification?.(
+                    `Purchase complete — ${purchased.length} item${purchased.length === 1 ? '' : 's'} added.`,
+                    'success'
+                );
+            }
         } finally {
             setPurchasing(false);
         }
@@ -655,7 +852,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             >
                 <TouchableOpacity
                     style={[styles.itemClickArea, !ready && styles.disabledItem]}
-                    onPress={handleDailySpin}
+                    onPress={() => addToCart(item)}
                     disabled={!ready || spinning}
                 >
                     <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
@@ -682,7 +879,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         >
             <TouchableOpacity
                 style={[styles.itemClickArea, claimingHackathon && styles.disabledItem]}
-                onPress={handleHackathonSpecial}
+                onPress={() => addToCart(item)}
                 disabled={claimingHackathon}
             >
                 <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
@@ -712,7 +909,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             >
                 <TouchableOpacity
                     style={[styles.itemClickArea, disabled && styles.disabledItem]}
-                    onPress={() => handleBoxPurchase(item)}
+                    onPress={() => addToCart(item)}
                     disabled={disabled}
                 >
                     <Image
@@ -769,7 +966,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             >
                 <TouchableOpacity
                     style={[styles.itemClickArea, disabled && styles.disabledItem]}
-                    onPress={() => handleUpgrade(item, kind)}
+                    onPress={() => addToCart(item)}
                     disabled={disabled}
                 >
                     <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
@@ -813,7 +1010,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             >
                 <TouchableOpacity
                     style={[styles.itemClickArea, disabled && styles.disabledItem]}
-                    onPress={() => handleCampPurchase(item, campId)}
+                    onPress={() => addToCart(item)}
                     disabled={disabled}
                 >
                     <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
@@ -963,10 +1160,17 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                         <View style={styles.cartHeader}>
                             <Text style={styles.cartTitle}>CART ({cart.length})</Text>
                             <View style={styles.cartHeaderRight}>
-                                <View style={styles.cartTotal}>
-                                    <Image source={Stars.fragment} style={styles.cartTotalIcon} resizeMode="contain" />
-                                    <Text style={styles.cartTotalText}>{cartTotal}</Text>
-                                </View>
+                                {cartTotal > 0 && (
+                                    <View style={styles.cartTotal}>
+                                        <Image source={Stars.fragment} style={styles.cartTotalIcon} resizeMode="contain" />
+                                        <Text style={styles.cartTotalText}>{cartTotal}</Text>
+                                    </View>
+                                )}
+                                {cartUsdTotal > 0 && (
+                                    <View style={styles.cartTotal}>
+                                        <Text style={styles.cartTotalText}>${cartUsdTotal.toFixed(2)}</Text>
+                                    </View>
+                                )}
                                 {cart.length > 0 && (
                                     <TouchableOpacity style={styles.clearCartButton} onPress={clearCart}>
                                         <Text style={styles.clearCartText}>CLEAR</Text>
@@ -1193,7 +1397,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 visible={iapItem !== null}
                 transparent
                 animationType="fade"
-                onRequestClose={() => !iapPurchasing && setIapItem(null)}
+                onRequestClose={handleIAPCancel}
             >
                 <View style={styles.iapModalBackdrop}>
                     <View style={styles.iapModalCard}>
@@ -1256,7 +1460,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                         <View style={styles.iapButtonRow}>
                             <TouchableOpacity
                                 style={[styles.iapBtn, styles.iapCancelBtn]}
-                                onPress={() => !iapPurchasing && setIapItem(null)}
+                                onPress={handleIAPCancel}
                                 disabled={iapPurchasing}
                             >
                                 <Text style={styles.iapBtnText}>Cancel</Text>
