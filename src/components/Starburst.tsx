@@ -256,7 +256,7 @@ const Starburst: React.FC<StarburstProps> = ({ onBack, onGameEnd }) => {
     };
 
     return (
-        <View style={StyleSheet.absoluteFill}>
+        <View style={[StyleSheet.absoluteFill, styles.screenBg]}>
             <View style={[styles.content, { paddingBottom: insets.bottom + 60 }]}>
                 <Text style={styles.title}>Starburst</Text>
 
@@ -365,6 +365,11 @@ const { width } = Dimensions.get('window');
 const CELL_SIZE = Math.min((width - 48) / (GRID_SIZE + 1), 64);
 
 const styles = StyleSheet.create({
+    // Solid backdrop so the game doesn't bleed onto the prior route's art —
+    // matches Profile's safeArea tone and keeps the dark-green title legible.
+    screenBg: {
+        backgroundColor: '#E8F5E8',
+    },
     bottomBar: {
         position: 'absolute',
         bottom: 0,
