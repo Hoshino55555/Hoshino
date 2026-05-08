@@ -73,9 +73,12 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
     const { inventory, consumeBooster } = useGameStateContext();
     const { ready, firebaseUid } = useFirebaseAuth();
     const insets = useSafeAreaInsets();
-    const { height: screenHeight } = useWindowDimensions();
-    const bannerReserve = screenHeight * 0.27;
-    const bottomBarReserve = screenHeight * 0.10;
+    const { width: screenWidth } = useWindowDimensions();
+    // Reserves match the painted strip art aspect ratios (heights at 1200
+    // wide, mirroring FeedingPage). Reusing the cooking-bg-* trio for now
+    // until the inventory-specific banner/bottom art lands.
+    const bannerReserve = screenWidth * (807 / 1200);
+    const bottomBarReserve = screenWidth * (284 / 1200);
 
     const [boosters, setBoosters] = useState<Record<string, number>>({});
     const [consumingId, setConsumingId] = useState<BoosterSkuId | null>(null);
@@ -154,16 +157,16 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                 <View
                     style={[
                         styles.scrollClipper,
-                        {
-                            marginTop: bannerReserve + insets.top,
-                            marginBottom: bottomBarReserve,
-                        },
+                        { top: 0, bottom: 0 },
                     ]}
                 >
                     <ScrollView
                         contentContainerStyle={[
                             styles.scrollBody,
-                            { paddingBottom: insets.bottom + 16 },
+                            {
+                                paddingTop: bannerReserve + insets.top + 8,
+                                paddingBottom: bottomBarReserve + insets.bottom + 16,
+                            },
                         ]}
                         showsVerticalScrollIndicator={false}
                     >
@@ -259,6 +262,27 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                 </View>
 
                 <View
+                    pointerEvents="none"
+                    style={[styles.bottomOverlay, { height: bottomBarReserve }]}
+                >
+                    <Image
+                        source={Backgrounds.cookingBottom}
+                        style={styles.overlayImage}
+                        resizeMode="contain"
+                    />
+                </View>
+                <View
+                    pointerEvents="none"
+                    style={[styles.bannerOverlay, { top: 0, height: bannerReserve }]}
+                >
+                    <Image
+                        source={Backgrounds.cookingBanner}
+                        style={styles.overlayImage}
+                        resizeMode="contain"
+                    />
+                </View>
+
+                <View
                     style={[
                         styles.bottomBar,
                         { height: bottomBarReserve, paddingBottom: insets.bottom },
@@ -285,9 +309,11 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        justifyContent: 'center',
-        alignItems: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
         paddingHorizontal: 16,
+        zIndex: 2,
     },
     backButton: {
         paddingVertical: 6,
@@ -303,12 +329,30 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     scrollClipper: {
-        flex: 1,
+        position: 'absolute',
+        left: 0,
+        right: 0,
         overflow: 'hidden',
+    },
+    bannerOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 1,
+    },
+    bottomOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1,
+    },
+    overlayImage: {
+        width: '100%',
+        height: '100%',
     },
     scrollBody: {
         paddingHorizontal: 16,
-        paddingTop: 8,
     },
     sectionHeading: {
         color: '#E8F5E8',
