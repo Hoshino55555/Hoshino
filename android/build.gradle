@@ -17,6 +17,10 @@ allprojects {
     google()
     mavenCentral()
     maven { url 'https://www.jitpack.io' }
+    // Notifee ships its `app.notifee:core` artifact as a local Maven folder
+    // bundled inside its npm package. Without this the :app module fails to
+    // resolve `app.notifee:core:+` even though the AAR is on disk.
+    maven { url "$rootDir/../node_modules/@notifee/react-native/android/libs" }
   }
 }
 

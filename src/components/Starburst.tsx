@@ -1,19 +1,41 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ZoomOutOverlay from './ZoomOutOverlay';
 
 interface StarburstProps {
     onBack: () => void;
+    // Fired exactly once per finished round, with the win/loss outcome — wires
+    // into the bonding-streak meters (10 plays drains energy, 5 wins lifts
+    // mood). Backing out mid-round does not fire this.
+    onGameEnd?: (won: boolean) => void;
 }
 
 type CellValue = 0 | 1 | 2 | 3;
 type GameStatus = 'playing' | 'won' | 'lost';
+// 'flip' is the destructive action; the rest are sudoku-style scratch
+// marks the player toggles to track their guesses without committing.
+type InputMode = 'flip' | 'note-bomb' | 'note-1' | 'note-2' | 'note-3';
+
+interface CellNotes {
+    bomb: boolean;
+    n1: boolean;
+    n2: boolean;
+    n3: boolean;
+}
 
 interface GridCell {
     value: CellValue;
     flipped: boolean;
+    notes: CellNotes;
 }
+
+const EMPTY_NOTES: CellNotes = { bomb: false, n1: false, n2: false, n3: false };
+const NOTE_KEY: Record<Exclude<InputMode, 'flip'>, keyof CellNotes> = {
+    'note-bomb': 'bomb',
+    'note-1': 'n1',
+    'note-2': 'n2',
+    'note-3': 'n3',
+};
 
 interface RowHint {
     sum: number;
@@ -22,14 +44,14 @@ interface RowHint {
 
 const GRID_SIZE = 5;
 
-const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
+const Starburst: React.FC<StarburstProps> = ({ onBack, onGameEnd }) => {
     const insets = useSafeAreaInsets();
     const [grid, setGrid] = useState<GridCell[][]>([]);
     const [rowHints, setRowHints] = useState<RowHint[]>([]);
     const [colHints, setColHints] = useState<RowHint[]>([]);
     const [score, setScore] = useState<number>(1);
     const [gameStatus, setGameStatus] = useState<GameStatus>('playing');
-    const [isClosing, setIsClosing] = useState(false);
+    const [inputMode, setInputMode] = useState<InputMode>('flip');
 
     const generateGrid = useCallback((): GridCell[][] => {
         const newGrid: GridCell[][] = [];
@@ -44,7 +66,7 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
                 else if (rand < 0.85) value = 3;
                 else value = 0;
 
-                newGrid[i][j] = { value, flipped: false };
+                newGrid[i][j] = { value, flipped: false, notes: { ...EMPTY_NOTES } };
             }
         }
 
@@ -121,6 +143,14 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
         setGameStatus('playing');
     }, []);
 
+    // Fire the bonding callback exactly when a round ends. handleNewGame flips
+    // status back to 'playing' which is a no-op here, so each won/lost
+    // transition reports once.
+    useEffect(() => {
+        if (gameStatus === 'won') onGameEnd?.(true);
+        else if (gameStatus === 'lost') onGameEnd?.(false);
+    }, [gameStatus]);
+
     const checkWinCondition = useCallback((currentGrid: GridCell[][]): boolean => {
         for (let i = 0; i < GRID_SIZE; i++) {
             for (let j = 0; j < GRID_SIZE; j++) {
@@ -137,8 +167,25 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
         if (gameStatus !== 'playing') return;
         if (grid[row][col].flipped) return;
 
-        const newGrid = grid.map(r => r.map(c => ({ ...c })));
+        // Note mode: toggle the corresponding mark on/off; never reveals.
+        // Notes are wiped when a cell is later flipped — they're scratch.
+        if (inputMode !== 'flip') {
+            const key = NOTE_KEY[inputMode];
+            setGrid((prev) =>
+                prev.map((r, ri) =>
+                    r.map((c, ci) =>
+                        ri === row && ci === col
+                            ? { ...c, notes: { ...c.notes, [key]: !c.notes[key] } }
+                            : c,
+                    ),
+                ),
+            );
+            return;
+        }
+
+        const newGrid = grid.map(r => r.map(c => ({ ...c, notes: { ...c.notes } })));
         newGrid[row][col].flipped = true;
+        newGrid[row][col].notes = { ...EMPTY_NOTES };
 
         const cellValue = newGrid[row][col].value;
 
@@ -160,18 +207,43 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
         setGrid(newGrid);
         setScore(1);
         setGameStatus('playing');
+        setInputMode('flip');
     };
 
     const handleBack = () => {
-        if (isClosing) return;
-        setIsClosing(true);
+        onBack();
     };
 
-    const getCellDisplay = (cell: GridCell): string => {
-        if (!cell.flipped) return '?';
-        if (cell.value === 0) return '⭐';
-        return cell.value.toString();
+    const renderCellContent = (cell: GridCell) => {
+        if (cell.flipped) {
+            const text = cell.value === 0 ? '⭐' : cell.value.toString();
+            return <Text style={styles.cellText}>{text}</Text>;
+        }
+        const hasNotes =
+            cell.notes.bomb || cell.notes.n1 || cell.notes.n2 || cell.notes.n3;
+        if (!hasNotes) return <Text style={styles.cellText}>?</Text>;
+        // 2x2 corner layout matching the toolbar order: bomb, 1, 2, 3.
+        return (
+            <View style={styles.notesGrid}>
+                <View style={styles.notesRow}>
+                    <Text style={styles.noteText}>{cell.notes.bomb ? '⭐' : ' '}</Text>
+                    <Text style={styles.noteText}>{cell.notes.n1 ? '1' : ' '}</Text>
+                </View>
+                <View style={styles.notesRow}>
+                    <Text style={styles.noteText}>{cell.notes.n2 ? '2' : ' '}</Text>
+                    <Text style={styles.noteText}>{cell.notes.n3 ? '3' : ' '}</Text>
+                </View>
+            </View>
+        );
     };
+
+    const MODE_BUTTONS: Array<{ mode: InputMode; label: string }> = [
+        { mode: 'flip', label: 'Flip' },
+        { mode: 'note-bomb', label: '⭐' },
+        { mode: 'note-1', label: '1' },
+        { mode: 'note-2', label: '2' },
+        { mode: 'note-3', label: '3' },
+    ];
 
     const getCellStyle = (cell: GridCell) => {
         if (!cell.flipped) {
@@ -184,22 +256,8 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
     };
 
     return (
-        <ZoomOutOverlay
-            exiting={isClosing}
-            onExitComplete={onBack}
-            backgroundColor="#D4E8D4"
-        >
-            <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-                <TouchableOpacity
-                    style={styles.topButton}
-                    onPress={handleBack}
-                    hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                >
-                    <Text style={styles.topButtonText}>{'<'} Back</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={[styles.content, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={StyleSheet.absoluteFill}>
+            <View style={[styles.content, { paddingBottom: insets.bottom + 60 }]}>
                 <Text style={styles.title}>Starburst</Text>
 
                 <View style={styles.scoreContainer}>
@@ -244,11 +302,34 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
                                     onPress={() => handleCellPress(rowIdx, colIdx)}
                                     disabled={gameStatus !== 'playing' || cell.flipped}
                                 >
-                                    <Text style={styles.cellText}>{getCellDisplay(cell)}</Text>
+                                    {renderCellContent(cell)}
                                 </TouchableOpacity>
                             ))}
                         </View>
                     ))}
+                </View>
+
+                <View style={styles.modeBar}>
+                    {MODE_BUTTONS.map(({ mode, label }) => {
+                        const active = inputMode === mode;
+                        return (
+                            <TouchableOpacity
+                                key={mode}
+                                style={[styles.modeButton, active && styles.modeButtonActive]}
+                                onPress={() => setInputMode(mode)}
+                                disabled={gameStatus !== 'playing'}
+                            >
+                                <Text
+                                    style={[
+                                        styles.modeButtonText,
+                                        active && styles.modeButtonTextActive,
+                                    ]}
+                                >
+                                    {label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
 
                 <Text style={styles.instructionText}>
@@ -263,7 +344,17 @@ const Starburst: React.FC<StarburstProps> = ({ onBack }) => {
                     <Text style={styles.newGameButtonText}>New Game</Text>
                 </TouchableOpacity>
             </View>
-        </ZoomOutOverlay>
+
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
+                <TouchableOpacity
+                    style={styles.topButton}
+                    onPress={handleBack}
+                    hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                >
+                    <Text style={styles.topButtonText}>{'<'} Back</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
     );
 };
 
@@ -274,9 +365,13 @@ const { width } = Dimensions.get('window');
 const CELL_SIZE = Math.min((width - 48) / (GRID_SIZE + 1), 64);
 
 const styles = StyleSheet.create({
-    topBar: {
+    bottomBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         paddingHorizontal: 16,
-        paddingBottom: 4,
+        paddingTop: 4,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'flex-start',
@@ -291,8 +386,8 @@ const styles = StyleSheet.create({
     },
     topButtonText: {
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: 'Monaco',
+        fontSize: 14,
     },
     content: {
         flex: 1,
@@ -302,9 +397,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
     },
     title: {
-        fontSize: 16,
+        fontSize: 22,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         marginBottom: 8,
     },
     scoreContainer: {
@@ -314,15 +409,15 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     scoreLabel: {
-        fontSize: 10,
+        fontSize: 14,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         marginRight: 8,
     },
     scoreValue: {
-        fontSize: 14,
+        fontSize: 20,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     messageContainer: {
         backgroundColor: '#2E5A3E',
@@ -333,14 +428,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     winMessage: {
-        fontSize: 12,
+        fontSize: 17,
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     loseMessage: {
-        fontSize: 12,
+        fontSize: 17,
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     gameBoard: {
         alignItems: 'center',
@@ -370,14 +465,14 @@ const styles = StyleSheet.create({
         marginHorizontal: 2,
     },
     hintSum: {
-        fontSize: 10,
+        fontSize: 14,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     hintStar: {
-        fontSize: 8,
+        fontSize: 11,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     cell: {
         width: CELL_SIZE,
@@ -399,14 +494,59 @@ const styles = StyleSheet.create({
         backgroundColor: '#FF6B6B',
     },
     cellText: {
-        fontSize: 14,
+        fontSize: 20,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
+    },
+    notesGrid: {
+        flex: 1,
+        alignSelf: 'stretch',
+        paddingVertical: 2,
+        paddingHorizontal: 2,
+    },
+    notesRow: {
+        flex: 1,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    noteText: {
+        fontSize: 11,
+        color: '#2E5A3E',
+        fontFamily: 'Monaco',
+        textAlign: 'center',
+        minWidth: 8,
+    },
+    modeBar: {
+        flexDirection: 'row',
+        marginTop: 10,
+        gap: 6,
+    },
+    modeButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        backgroundColor: '#D4E8D4',
+        borderWidth: 2,
+        borderColor: '#2E5A3E',
+        borderRadius: 6,
+        minWidth: 36,
+        alignItems: 'center',
+    },
+    modeButtonActive: {
+        backgroundColor: '#2E5A3E',
+    },
+    modeButtonText: {
+        color: '#2E5A3E',
+        fontFamily: 'Monaco',
+        fontSize: 14,
+    },
+    modeButtonTextActive: {
+        color: '#E8F5E8',
     },
     instructionText: {
-        fontSize: 8,
+        fontSize: 11,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         textAlign: 'center',
         marginTop: 4,
     },
@@ -422,8 +562,8 @@ const styles = StyleSheet.create({
     },
     newGameButtonText: {
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 14,
+        fontFamily: 'Monaco',
+        fontSize: 20,
         textAlign: 'center',
     },
 });

@@ -30,7 +30,6 @@ import IAPService, {
     type IAPSkuId,
 } from '../services/IAPService';
 import { useFundSolanaWallet } from '@privy-io/expo/ui';
-import ZoomOutOverlay from './ZoomOutOverlay';
 import { Backgrounds, Stars } from '../assets';
 import {
     SHOP_TABS,
@@ -65,7 +64,6 @@ interface ShopProps {
     connection: Connection;
     onNotification?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
     onClose: () => void;
-    onCloseStart?: () => void;
     onItemsPurchased?: (items: MarketplaceItem[]) => void;
 }
 
@@ -73,38 +71,6 @@ interface ShopProps {
 // Matches the placeholder used elsewhere (GameContainer's IngredientSelection)
 // so balances persist across the same local profile pre-Privy.
 const FALLBACK_WALLET = 'demo-wallet';
-
-// Layered star-fragment "pile" sprites for the Deals tab SF packs. Bigger
-// pack = more fragments stacked. Positions are within a 44×44 image area;
-// arrays go back-to-front so closer/lower fragments paint over farther ones.
-type PileStar = { x: number; y: number; size: number };
-const FRAGMENT_PILES: Record<string, PileStar[]> = {
-    'star-fragments-small': [
-        { x: 2,  y: 12, size: 18 },
-        { x: 22, y: 12, size: 18 },
-        { x: 12, y: 20, size: 22 },
-    ],
-    'star-fragments-medium': [
-        { x: 2,  y: 4,  size: 14 },
-        { x: 14, y: 2,  size: 14 },
-        { x: 26, y: 4,  size: 14 },
-        { x: 4,  y: 16, size: 18 },
-        { x: 22, y: 16, size: 18 },
-        { x: 12, y: 24, size: 18 },
-    ],
-    'star-fragments-large': [
-        { x: 0,  y: 2,  size: 12 },
-        { x: 10, y: 0,  size: 12 },
-        { x: 22, y: 0,  size: 12 },
-        { x: 32, y: 2,  size: 12 },
-        { x: 2,  y: 12, size: 14 },
-        { x: 14, y: 10, size: 16 },
-        { x: 26, y: 12, size: 14 },
-        { x: 4,  y: 22, size: 16 },
-        { x: 24, y: 22, size: 16 },
-        { x: 14, y: 28, size: 16 },
-    ],
-};
 
 // Daily-spin reel preview pool. Mirrors backend SPIN_POOL — every distinct
 // reward type is shown so the player knows what's possible. Tier color
@@ -137,13 +103,17 @@ const REEL_TILE_SIZE = 84;
 const REEL_TILE_GAP = 8;
 const REEL_STEP = REEL_TILE_SIZE + REEL_TILE_GAP;
 
-const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onCloseStart, onItemsPurchased }) => {
+const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItemsPurchased }) => {
     const insets = useSafeAreaInsets();
     const { publicKey, walletSource, signer } = useWallet();
-    const screenHeight = Dimensions.get('window').height;
-    const bannerReserve = screenHeight * 0.27;
-    // Painted strip at the bottom of HOSHI-DEPO.gif — back button lives there.
-    const bottomBarReserve = screenHeight * 0.10;
+    const screenWidth = Dimensions.get('window').width;
+    // Banner is 1200×773 (transparent shadow stripped); size to native aspect.
+    const bannerReserve = screenWidth * (773 / 1200);
+    // Shadow PNG is 1200×790; sits BEHIND the banner so its bottom 17px peaks
+    // out below as a soft transparent fade over scroll content.
+    const bannerShadowReserve = screenWidth * (790 / 1200);
+    // Bottom strip is 1200×284 with the shadow built into its top edge.
+    const bottomBarReserve = screenWidth * (284 / 1200);
 
     const walletKey = publicKey ?? FALLBACK_WALLET;
     const starFragmentService = useMemo(() => new StarFragmentService(connection), [connection]);
@@ -153,7 +123,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
     const [balance, setBalance] = useState<number>(0);
     const [cart, setCart] = useState<{ item: ShopItem; quantity: number }[]>([]);
     const [flashingItem, setFlashingItem] = useState<string | null>(null);
-    const [isClosing, setIsClosing] = useState(false);
     const [spinAvailable, setSpinAvailable] = useState(false);
     const [spinNextAtMs, setSpinNextAtMs] = useState(0);
     const [spinning, setSpinning] = useState(false);
@@ -508,9 +477,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
     }, [refreshBalance]);
 
     const handleClose = () => {
-        if (isClosing) return;
-        setIsClosing(true);
-        onCloseStart?.();
+        onClose();
     };
 
     const cartTotal = useMemo(
@@ -691,7 +658,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                     onPress={handleDailySpin}
                     disabled={!ready || spinning}
                 >
-                    <Image source={Stars.fragment} style={styles.itemImage} resizeMode="contain" />
+                    <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
                     <Text style={styles.itemName} numberOfLines={2}>
                         {item.name}
                     </Text>
@@ -718,7 +685,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                 onPress={handleHackathonSpecial}
                 disabled={claimingHackathon}
             >
-                <Image source={Stars.fragment} style={styles.itemImage} resizeMode="contain" />
+                <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
                 <Text style={styles.itemName} numberOfLines={2}>
                     {item.name}
                 </Text>
@@ -805,7 +772,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                     onPress={() => handleUpgrade(item, kind)}
                     disabled={disabled}
                 >
-                    <Image source={Stars.fragment} style={styles.itemImage} resizeMode="contain" />
+                    <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
                     <Text style={styles.itemName} numberOfLines={2}>
                         {item.name}
                     </Text>
@@ -849,7 +816,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                     onPress={() => handleCampPurchase(item, campId)}
                     disabled={disabled}
                 >
-                    <Image source={Stars.fragment} style={styles.itemImage} resizeMode="contain" />
+                    <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
                     <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
                     <Text style={styles.itemSummary} numberOfLines={2}>{summary}</Text>
                     <View style={styles.priceContainer}>
@@ -873,7 +840,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
         if (item.id === 'upgrade-inventory') return renderUpgradeCard(item, 'inventoryCap');
         if (item.id === 'sleeping-camp') return renderCampCard(item, 'sleeping-camp');
         if (item.id.startsWith('box-ingredients-')) return renderBoxCard(item);
-        const pile = FRAGMENT_PILES[item.id];
         // iap-pending now opens the IAP modal (purchasable on devnet); only
         // effect-pending stays as a hard "Coming Soon" lock.
         const isIap = item.status === 'iap-pending';
@@ -900,23 +866,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                     onPress={() => addToCart(item)}
                     disabled={(insufficient && !locked) || boosterBusy || otherBoosterBusy}
                 >
-                    {pile ? (
-                        <View style={styles.pile}>
-                            {pile.map((p, i) => (
-                                <Image
-                                    key={i}
-                                    source={Stars.fragment}
-                                    style={[
-                                        styles.pileStar,
-                                        { left: p.x, top: p.y, width: p.size, height: p.size },
-                                    ]}
-                                    resizeMode="contain"
-                                />
-                            ))}
-                        </View>
-                    ) : (
-                        <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
-                    )}
+                    <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
+
                     <Text style={[styles.itemName, disabled && styles.disabledText]} numberOfLines={2}>
                         {item.name}
                     </Text>
@@ -956,21 +907,21 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
     };
 
     return (
-        <ZoomOutOverlay exiting={isClosing} onExitComplete={onClose} backgroundColor="#1a1033">
+        <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
             <ImageBackground source={Backgrounds.shop} style={styles.bg} resizeMode="cover">
                 <View
                     style={[
                         styles.scrollClipper,
-                        {
-                            marginTop: bannerReserve + insets.top,
-                            marginBottom: bottomBarReserve,
-                        },
+                        { top: 0, bottom: 0 },
                     ]}
                 >
                 <ScrollView
                     contentContainerStyle={[
                         styles.scrollBody,
-                        { paddingBottom: insets.bottom + 16 },
+                        {
+                            paddingTop: bannerShadowReserve + 8,
+                            paddingBottom: bottomBarReserve - 4,
+                        },
                     ]}
                     showsVerticalScrollIndicator={false}
                 >
@@ -1061,6 +1012,37 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                         )}
                     </View>
                 </ScrollView>
+                </View>
+
+                <View
+                    pointerEvents="none"
+                    style={[styles.shopBottomOverlay, { height: bottomBarReserve }]}
+                >
+                    <Image
+                        source={Backgrounds.shopBottom}
+                        style={styles.shopBannerImage}
+                        resizeMode="contain"
+                    />
+                </View>
+                <View
+                    pointerEvents="none"
+                    style={[styles.shopBannerOverlay, { top: 0, height: bannerShadowReserve }]}
+                >
+                    <Image
+                        source={Backgrounds.shopBannerShadow}
+                        style={styles.shopBannerImage}
+                        resizeMode="contain"
+                    />
+                </View>
+                <View
+                    pointerEvents="none"
+                    style={[styles.shopBannerOverlay, { top: 0, height: bannerReserve }]}
+                >
+                    <Image
+                        source={Backgrounds.shopBanner}
+                        style={styles.shopBannerImage}
+                        resizeMode="contain"
+                    />
                 </View>
 
                 <View
@@ -1296,15 +1278,14 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onClos
                     </View>
                 </View>
             </Modal>
-        </ZoomOutOverlay>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     bg: { flex: 1, width: '100%', height: '100%' },
-    // Sits in the painted bottom strip baked into HOSHI-DEPO.gif. Absolute
-    // positioning so the scroll content above isn't shifted — scrollClipper
-    // already reserves the matching height via marginBottom.
+    // Sits on top of the shopBottom strip overlay so the back button stays
+    // tappable above the painted strip art. zIndex tops the bottom overlay.
     bottomBar: {
         position: 'absolute',
         left: 0,
@@ -1314,6 +1295,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-start',
         paddingHorizontal: 16,
+        zIndex: 2,
     },
     spinBackdrop: {
         flex: 1,
@@ -1332,14 +1314,14 @@ const styles = StyleSheet.create({
         maxWidth: 380,
     },
     spinTitle: {
-        fontFamily: 'PressStart2P',
-        fontSize: 14,
+        fontFamily: 'Monaco',
+        fontSize: 20,
         color: '#3a2a1a',
         marginBottom: 12,
     },
     spinPoolLabel: {
-        fontFamily: '04b03',
-        fontSize: 12,
+        fontFamily: 'Monaco',
+        fontSize: 14,
         color: '#5a4a3a',
         marginBottom: 6,
     },
@@ -1364,8 +1346,8 @@ const styles = StyleSheet.create({
         height: 28,
     },
     spinPoolText: {
-        fontFamily: '04b03',
-        fontSize: 9,
+        fontFamily: 'Monaco',
+        fontSize: 11,
         color: '#3a2a1a',
         marginTop: -2,
     },
@@ -1408,14 +1390,14 @@ const styles = StyleSheet.create({
         height: 48,
     },
     reelTileText: {
-        fontFamily: '04b03',
-        fontSize: 12,
+        fontFamily: 'Monaco',
+        fontSize: 14,
         color: '#3a2a1a',
         marginTop: 2,
     },
     spinStatus: {
-        fontFamily: 'PressStart2P',
-        fontSize: 11,
+        fontFamily: 'Monaco',
+        fontSize: 14,
         color: '#3a2a1a',
         marginBottom: 10,
     },
@@ -1437,8 +1419,8 @@ const styles = StyleSheet.create({
         height: 72,
     },
     revealText: {
-        fontFamily: '04b03',
-        fontSize: 13,
+        fontFamily: 'Monaco',
+        fontSize: 16,
         color: '#3a2a1a',
         marginTop: 6,
         textAlign: 'center',
@@ -1455,8 +1437,8 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     spinRewardText: {
-        fontFamily: '04b03',
-        fontSize: 16,
+        fontFamily: 'Monaco',
+        fontSize: 18,
         color: '#3a2a1a',
     },
     spinCloseButton: {
@@ -1468,8 +1450,8 @@ const styles = StyleSheet.create({
         marginTop: 6,
     },
     spinCloseText: {
-        fontFamily: 'PressStart2P',
-        fontSize: 11,
+        fontFamily: 'Monaco',
+        fontSize: 14,
         color: '#3a2a1a',
     },
     backButton: {
@@ -1482,12 +1464,31 @@ const styles = StyleSheet.create({
     },
     backButtonText: {
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: 'Monaco',
+        fontSize: 14,
     },
     scrollClipper: {
-        flex: 1,
+        position: 'absolute',
+        left: 0,
+        right: 0,
         overflow: 'hidden',
+    },
+    shopBannerOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 1,
+    },
+    shopBottomOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1,
+    },
+    shopBannerImage: {
+        width: '100%',
+        height: '100%',
     },
     // Sized to match the bundle cluster's footprint so the box-card layout
     // (title + summary + price below) lines up identically whether we're
@@ -1522,19 +1523,21 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     dustAmount: {
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
+        fontSize: 20,
         color: '#003300',
         textAlign: 'right',
     },
     walletLabel: {
-        fontSize: 12,
+        fontFamily: 'Monaco',
+        fontSize: 14,
         color: '#666',
         textAlign: 'right',
         marginBottom: 2,
     },
     walletSubLabel: {
-        fontSize: 10,
+        fontFamily: 'Monaco',
+        fontSize: 14,
         color: '#a85d00',
         textAlign: 'right',
         marginTop: 2,
@@ -1565,8 +1568,8 @@ const styles = StyleSheet.create({
         borderBottomColor: '#006600',
     },
     tabButtonText: {
-        fontSize: 12,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
+        fontSize: 17,
         color: '#003300',
     },
     itemsContainer: {
@@ -1583,8 +1586,8 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     sectionHeader: {
-        fontSize: 12,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
+        fontSize: 17,
         color: '#003300',
         marginBottom: 6,
         paddingBottom: 2,
@@ -1619,34 +1622,27 @@ const styles = StyleSheet.create({
         height: 44,
         marginBottom: 4,
     },
-    pile: {
-        width: 44,
-        height: 44,
-        marginBottom: 4,
-        position: 'relative',
-    },
-    pileStar: {
-        position: 'absolute',
-    },
     itemName: {
-        fontSize: 10,
-        lineHeight: 13,
+        fontFamily: 'Monaco',
+        fontSize: 14,
+        lineHeight: 16,
         // Reserve 2 lines so titles that wrap (e.g. "Common Ingredient Box")
         // line up vertically with shorter titles (e.g. "Rare Ingredient Box")
         // — keeps the price row at the same Y across every card in a row.
-        minHeight: 26,
-        fontWeight: 'bold',
+        minHeight: 32,
         marginBottom: 2,
         textAlign: 'center',
         color: '#003300',
     },
     itemDuration: {
-        fontSize: 8,
+        fontFamily: 'Monaco',
+        fontSize: 12,
         color: '#7a3b00',
         marginBottom: 2,
     },
     itemSummary: {
-        fontSize: 8,
+        fontFamily: 'Monaco',
+        fontSize: 12,
         color: '#406040',
         textAlign: 'center',
         marginBottom: 4,
@@ -1658,8 +1654,8 @@ const styles = StyleSheet.create({
         color: '#999999',
     },
     insufficientText: {
-        fontSize: 7,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
+        fontSize: 11,
         color: '#ff6b6b',
         marginTop: 2,
         textAlign: 'center',
@@ -1684,8 +1680,8 @@ const styles = StyleSheet.create({
         marginRight: 4,
     },
     itemPrice: {
-        fontSize: 10,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
+        fontSize: 14,
         color: '#003300',
     },
     comingSoonBadge: {
@@ -1699,9 +1695,9 @@ const styles = StyleSheet.create({
         borderColor: '#5a2f00',
     },
     comingSoonText: {
+        fontFamily: 'Monaco',
         color: 'white',
-        fontSize: 7,
-        fontWeight: 'bold',
+        fontSize: 10,
     },
     flashingCard: {
         backgroundColor: '#e6ffe6',
@@ -1736,8 +1732,8 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     cartTitle: {
-        fontSize: 12,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
+        fontSize: 17,
         color: '#003300',
     },
     cartTotal: {
@@ -1745,8 +1741,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     cartTotalText: {
-        fontSize: 12,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
+        fontSize: 17,
         color: '#003300',
     },
     clearCartButton: {
@@ -1757,8 +1753,8 @@ const styles = StyleSheet.create({
         paddingVertical: 3,
     },
     clearCartText: {
-        fontSize: 10,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
+        fontSize: 14,
         color: 'white',
     },
     cartItems: {
@@ -1784,8 +1780,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#f0fff0',
     },
     cartItemQuantity: {
-        fontSize: 10,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
+        fontSize: 14,
         color: '#003300',
         marginTop: 2,
         textAlign: 'center',
@@ -1805,9 +1801,9 @@ const styles = StyleSheet.create({
         zIndex: 1,
     },
     removeButtonText: {
+        fontFamily: 'Monaco',
         color: 'white',
-        fontWeight: 'bold',
-        fontSize: 12,
+        fontSize: 14,
         lineHeight: 10,
     },
     emptyCart: {
@@ -1815,7 +1811,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     emptyCartText: {
-        fontSize: 12,
+        fontFamily: 'Monaco',
+        fontSize: 14,
         color: '#666',
     },
     checkoutButton: {
@@ -1831,9 +1828,9 @@ const styles = StyleSheet.create({
         borderBottomColor: '#002200',
     },
     checkoutButtonText: {
+        fontFamily: 'Monaco',
         color: 'white',
-        fontWeight: 'bold',
-        fontSize: 12,
+        fontSize: 17,
     },
     iapModalBackdrop: {
         flex: 1,
@@ -1852,29 +1849,30 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     iapTitle: {
+        fontFamily: 'Monaco',
         color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 22,
         textAlign: 'center',
         marginBottom: 4,
     },
     iapSummary: {
+        fontFamily: 'Monaco',
         color: '#cfc4e6',
-        fontSize: 13,
+        fontSize: 16,
         textAlign: 'center',
         marginBottom: 8,
     },
     iapPrice: {
+        fontFamily: 'Monaco',
         color: '#FFD54F',
-        fontSize: 22,
-        fontWeight: 'bold',
+        fontSize: 26,
         textAlign: 'center',
         marginBottom: 16,
     },
     iapSectionLabel: {
+        fontFamily: 'Monaco',
         color: '#bba8d6',
-        fontSize: 12,
-        fontWeight: 'bold',
+        fontSize: 14,
         marginBottom: 6,
         textTransform: 'uppercase',
     },
@@ -1895,11 +1893,12 @@ const styles = StyleSheet.create({
         borderColor: '#FFD54F',
         backgroundColor: '#2a1a4a',
     },
-    iapRailText: { color: '#bba8d6', fontWeight: 'bold' },
+    iapRailText: { color: '#bba8d6', fontFamily: 'Monaco' },
     iapRailTextActive: { color: '#FFD54F' },
     iapNote: {
+        fontFamily: 'Monaco',
         color: '#a99fc4',
-        fontSize: 11,
+        fontSize: 14,
         textAlign: 'center',
         marginVertical: 10,
     },
@@ -1917,7 +1916,7 @@ const styles = StyleSheet.create({
     iapCancelBtn: { backgroundColor: '#3d2a5e' },
     iapBuyBtn: { backgroundColor: '#7B3FB8' },
     iapBtnDisabled: { opacity: 0.5 },
-    iapBtnText: { color: '#fff', fontWeight: 'bold' },
+    iapBtnText: { color: '#fff', fontFamily: 'Monaco' },
     iapTopUpBtn: {
         marginTop: 8,
         paddingVertical: 10,
@@ -1926,7 +1925,7 @@ const styles = StyleSheet.create({
         borderColor: '#FFD54F',
         alignItems: 'center',
     },
-    iapTopUpText: { color: '#FFD54F', fontWeight: 'bold', fontSize: 12 },
+    iapTopUpText: { color: '#FFD54F', fontFamily: 'Monaco', fontSize: 17 },
 });
 
 export default Shop;

@@ -237,8 +237,8 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     glyphText: {
-        fontFamily: 'PressStart2P',
-        fontSize: 11,
+        fontFamily: 'Monaco',
+        fontSize: 15,
         lineHeight: 13,
     },
     messageWrap: {
@@ -246,15 +246,15 @@ const styles = StyleSheet.create({
     },
     message: {
         color: '#f0f7ff',
-        fontFamily: 'PressStart2P',
-        fontSize: 9,
+        fontFamily: 'Monaco',
+        fontSize: 13,
         lineHeight: 14,
     },
     statusText: {
         marginTop: 4,
         color: '#9bb4c7',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: 'Monaco',
+        fontSize: 14,
     },
     closeButton: {
         marginLeft: 6,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
         color: '#9bb4c7',
         fontSize: 18,
         lineHeight: 18,
-        fontWeight: '600',
+        fontFamily: 'Monaco',
     },
     bannerContainer: {
         position: 'absolute',
@@ -295,9 +295,9 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     bannerTitle: {
-        fontWeight: 'bold',
         fontSize: 18,
         color: 'white',
+        fontFamily: 'Monaco',
     },
     bannerDescription: {
         fontSize: 14,

@@ -14,9 +14,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-import ZoomOutOverlay from './ZoomOutOverlay';
 import chatService from '../services/ChatService';
 import { getCharacterAnim } from '../assets';
+import { useGameStateContext } from '../contexts/GameStateContext';
 
 interface Character {
     id: string;
@@ -67,7 +67,6 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [isThinking, setIsThinking] = useState(false);
-    const [isClosing, setIsClosing] = useState(false);
     // Track the soft keyboard height directly. We can't rely on adjustResize
     // alone because Android 14+ edge-to-edge mode reports the IME via window
     // insets without shrinking the activity, so KeyboardAvoidingView is a
@@ -79,6 +78,7 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     const [typingDots, setTypingDots] = useState(0);
     const messagesEndRef = useRef<ScrollView>(null);
     const capacityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { chat: bumpChatMood } = useGameStateContext();
 
     const toggleCapacityBar = () => {
         if (capacityTimerRef.current) {
@@ -116,9 +116,8 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     }, [isThinking]);
 
     const handleClose = () => {
-        if (isClosing) return;
         Keyboard.dismiss();
-        setIsClosing(true);
+        onExit();
     };
 
     useEffect(() => {
@@ -202,6 +201,12 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
         setInputText('');
         setIsThinking(true);
 
+        // Sending a message bonds the player with their moonoko — fire and
+        // forget the server-side mood bump so a slow callable doesn't delay
+        // the AI response. Server clamps mood at 5 and rejects while the
+        // moonoko is sleeping (chat UI is unreachable during sleep anyway).
+        bumpChatMood().catch((e) => console.warn('chat mood update failed', e));
+
         try {
             const characterResponse = await generateCharacterResponse(userMessage.text);
 
@@ -222,7 +227,7 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     };
 
     return (
-        <ZoomOutOverlay exiting={isClosing} onExitComplete={onExit} backgroundColor="#1a1a1a">
+        <View style={{ flex: 1, backgroundColor: '#1a1a1a' }}>
             <KeyboardAvoidingView
                 style={styles.flex}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -430,7 +435,7 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
                     </View>
                 </View>
             </KeyboardAvoidingView>
-        </ZoomOutOverlay>
+        </View>
     );
 };
 
@@ -454,15 +459,15 @@ const styles = StyleSheet.create({
     },
     headerSideText: {
         color: '#f5d65f',
-        fontFamily: 'PressStart2P',
-        fontSize: 14,
+        fontFamily: 'Monaco',
+        fontSize: 20,
     },
     headerTitle: {
         flex: 1,
         textAlign: 'center',
         color: '#f5d65f',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: 'Monaco',
+        fontSize: 14,
         letterSpacing: 0.5,
     },
     body: {
@@ -487,15 +492,15 @@ const styles = StyleSheet.create({
     },
     capacityPct: {
         color: '#ffffff',
-        fontFamily: 'PressStart2P',
-        fontSize: 9,
+        fontFamily: 'Monaco',
+        fontSize: 13,
         marginBottom: 2,
         textAlign: 'center',
     },
     capacityLabel: {
         color: '#f5d65f',
-        fontFamily: 'PressStart2P',
-        fontSize: 5,
+        fontFamily: 'Monaco',
+        fontSize: 7,
         marginBottom: 1,
         textAlign: 'center',
     },
@@ -535,8 +540,8 @@ const styles = StyleSheet.create({
     emptyHint: {
         textAlign: 'center',
         color: '#5a4a2a',
-        fontFamily: 'PressStart2P',
-        fontSize: 9,
+        fontFamily: 'Monaco',
+        fontSize: 13,
         marginTop: 32,
         paddingHorizontal: 24,
         lineHeight: 16,
@@ -579,8 +584,8 @@ const styles = StyleSheet.create({
     },
     namePillText: {
         color: '#1a1a1a',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: 'Monaco',
+        fontSize: 14,
         letterSpacing: 0.5,
     },
     messageBox: {
@@ -635,8 +640,8 @@ const styles = StyleSheet.create({
     },
     sendButtonText: {
         color: '#f5d65f',
-        fontFamily: 'PressStart2P',
-        fontSize: 11,
+        fontFamily: 'Monaco',
+        fontSize: 15,
     },
 });
 

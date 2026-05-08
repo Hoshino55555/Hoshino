@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Linking, Image } from 'react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+} from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
@@ -21,6 +25,11 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 import MoonokoSelection from './src/components/MoonokoSelection';
 import MoonokoInteraction from './src/components/MoonokoInteraction';
+import GamesList from './src/components/GamesList';
+import Starburst from './src/components/Starburst';
+import SleepScreen from './src/components/SleepScreen';
+import SleepConfirmationModal from './src/components/SleepConfirmationModal';
+import MorningRecapModal, { MorningRecapDeltas } from './src/components/MorningRecapModal';
 import MoonokoCollection from './src/components/MoonokoCollection';
 import Shop from './src/components/Shop';
 import FeedingPage from './src/components/FeedingPage';
@@ -41,6 +50,7 @@ import { HoshinoPrivyProvider } from './src/contexts/PrivyContext';
 import { usePrivy } from '@privy-io/expo';
 import LoginScreen from './src/components/LoginScreen';
 import { DeviceCasing, DeviceButtons } from './src/components/DeviceChrome';
+import ZoomOutOverlay, { IRIS_DURATION_MS } from './src/components/ZoomOutOverlay';
 import { Logos } from './src/assets';
 import { Connection, PublicKey } from '@solana/web3.js';
 
@@ -50,7 +60,9 @@ import { getGameCharacters, MOONOKOS_BY_ID, toGameCharacter } from './src/data/m
 import { ENABLE_VRF_DEV_SCREEN } from './src/config/vrf';
 import { FirebaseAuthProvider, useFirebaseAuth } from './src/contexts/FirebaseAuthContext';
 import { GameStateProvider, useGameStateContext } from './src/contexts/GameStateContext';
-import { GameStateService } from './src/services/GameStateService';
+import { GameStateService, SLEEP_REQUIRED_MS } from './src/services/GameStateService';
+import type { ForagedItem } from './src/services/GameStateService';
+import { scheduleSleepAlarm, cancelSleepAlarm } from './src/services/AlarmService';
 import { pushEmptySnapshot } from './src/widgets/widgetService';
 
 // Pending one-shot action requested by a widget tap. Includes characterId so
@@ -213,6 +225,177 @@ function App() {
     // a no-op rather than a drain on the wrong pet.
     const [pendingWidgetAction, setPendingWidgetAction] =
         useState<PendingWidgetAction | null>(null);
+
+    // Single App-owned iris state machine. The whole tree (persistent MI
+    // layer, route overlay layer, chrome, wallet pill, notifications) lives
+    // INSIDE one <ZoomOutOverlay> rendered below. Screens never animate
+    // their own iris — they just call transitionTo(view) and the machine
+    // runs:
+    //   idle    -> closing  (iris animates closed, screen still on screen A)
+    //           -> covered  (currentView swaps to B; iris fully black; new
+    //                        screen mounts and gets at least one paint
+    //                        committed before the open animates so the
+    //                        first frame of B is visible behind a still-
+    //                        closed iris instead of mid-animation)
+    //           -> opening  (iris animates open over the now-painted B)
+    //           -> idle
+    // setCurrentView is no longer called directly anywhere that wants the
+    // iris — call transitionTo. Direct setCurrentView still works for
+    // bypass cases (initial hydration, deep links into a fresh state).
+    type TransitionPhase = 'idle' | 'closing' | 'covered' | 'opening';
+    const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>('idle');
+    // Sleep modal opens from the room's sleep menu button. The modal itself
+    // doesn't need the iris (it's a transient confirmation), but the
+    // start-sleep + wake actions it triggers DO route through transitionTo.
+    // SleepController consumes this flag.
+    const [sleepModalVisible, setSleepModalVisible] = useState(false);
+    const pendingViewRef = useRef<string | null>(null);
+    const coverRafRef = useRef<number | null>(null);
+    const coverHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Black "cover panel" that overlaps the close→open seam. The iris alone
+    // can't fully bridge the seam — any sub-frame gap in the screens'
+    // unmount→mount sequence, or a momentary lapse in iris opacity at
+    // INITIAL_SCALE, exposes whatever's behind. Cover panel mounts BEFORE
+    // the close finishes (during late-close) and unmounts AFTER the open
+    // begins (during early-open) so there's always a fully opaque layer
+    // covering the swap, with overlap on both ends. See COVER_OVERLAP_MS.
+    const [coverMounted, setCoverMounted] = useState(false);
+    const coverPanelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Two independent overlaps so the close side can be tighter than the
+    // open side (or vice versa). CLOSE_OVERLAP = how many ms before the
+    // close finishes the cover mounts; OPEN_OVERLAP = how many ms after the
+    // open starts the cover unmounts.
+    const COVER_CLOSE_OVERLAP_MS = 95;
+    const COVER_OPEN_OVERLAP_MS = 120;
+    // Cover fades out (rather than unmounting) during the open animation so
+    // there's no discrete handoff frame between "cover visible" and "iris has
+    // grown enough to cover". Binary unmount used to expose a black→open gap
+    // because the cubic-ease-in iris has barely moved off INITIAL_SCALE in
+    // the first few hundred ms. Animating opacity in lockstep with the iris
+    // means the new screen is revealed by the cover's transparency curve and
+    // the iris's growth simultaneously — no swap frame.
+    const coverOpacity = useSharedValue(1);
+    // Match the iris's duration + easing exactly so the cover's transparency
+    // curve mirrors the iris hole's growth curve. The iris uses
+    // Easing.in(Easing.cubic) over IRIS_DURATION_MS — slow start, fast end —
+    // so for the first several hundred ms the iris hole is still essentially
+    // sub-pixel. A linear 600ms fade emptied the cover long before the iris
+    // had grown enough to take over, leaving a black-then-bare beat. Same
+    // curve + duration means: while the iris hole is tiny, the cover is also
+    // still nearly opaque; both transition off in the final stretch together.
+    const animatedCoverStyle = useAnimatedStyle(() => ({
+        opacity: coverOpacity.value,
+    }));
+    // Refs mirror state for the iris callbacks below. Without them, the
+    // useCallback identities would change every time currentView or
+    // transitionPhase ticks, which would re-fire ZoomOutOverlay's animation
+    // useEffect mid-transition and restart the timing.
+    const currentViewRef = useRef(currentView);
+    const transitionPhaseRef = useRef<TransitionPhase>('idle');
+    useEffect(() => {
+        currentViewRef.current = currentView;
+    }, [currentView]);
+    useEffect(() => {
+        transitionPhaseRef.current = transitionPhase;
+    }, [transitionPhase]);
+    const transitionTo = useCallback((view: string) => {
+        if (transitionPhaseRef.current !== 'idle') return;
+        if (view === currentViewRef.current) return;
+        pendingViewRef.current = view;
+        setTransitionPhase('closing');
+    }, []);
+    const handleIrisClosed = useCallback(() => {
+        const next = pendingViewRef.current;
+        pendingViewRef.current = null;
+        if (next != null) {
+            setPreviousView(currentViewRef.current);
+            setCurrentView(next);
+        }
+        setTransitionPhase('covered');
+    }, []);
+    const handleIrisOpened = useCallback(() => {
+        setTransitionPhase((p) => (p === 'opening' ? 'idle' : p));
+    }, []);
+    // Hold the 'covered' phase long enough to (a) let React commit + Android
+    // paint the new currentView behind the still-closed iris, and (b) give
+    // the user a clearly visible held-black beat that masks the screen swap
+    // through the iris's sub-pixel pinhole. The 2-RAF wait covers (a); the
+    // setTimeout covers (b). Without the held duration the seam is a single-
+    // frame flash and any iris-pinhole leakage is perceived as jitter rather
+    // than a deliberate transition.
+    const COVERED_HOLD_MS = 200;
+    useEffect(() => {
+        if (transitionPhase !== 'covered') return;
+        const id1 = requestAnimationFrame(() => {
+            coverRafRef.current = requestAnimationFrame(() => {
+                coverRafRef.current = null;
+                coverHoldRef.current = setTimeout(() => {
+                    coverHoldRef.current = null;
+                    setTransitionPhase('opening');
+                }, COVERED_HOLD_MS);
+            });
+        });
+        return () => {
+            cancelAnimationFrame(id1);
+            if (coverRafRef.current != null) {
+                cancelAnimationFrame(coverRafRef.current);
+                coverRafRef.current = null;
+            }
+            if (coverHoldRef.current != null) {
+                clearTimeout(coverHoldRef.current);
+                coverHoldRef.current = null;
+            }
+        };
+    }, [transitionPhase]);
+
+    // Drive the cover panel with overlap on both ends of the seam:
+    //   closing → schedule mount at (closeDuration - OVERLAP)  [late-close]
+    //   covered → ensure mounted (in case timer didn't fire)
+    //   opening → schedule unmount at +OVERLAP                  [early-open]
+    //   idle    → ensure unmounted
+    // The overlap means the cover is already in place before the close iris
+    // reaches INITIAL_SCALE, and is still in place after the open iris has
+    // started moving — so there's never a frame where the swap is exposed
+    // between the iris and the cover handing off to each other.
+    useEffect(() => {
+        const clearTimer = () => {
+            if (coverPanelTimerRef.current != null) {
+                clearTimeout(coverPanelTimerRef.current);
+                coverPanelTimerRef.current = null;
+            }
+        };
+        clearTimer();
+
+        if (transitionPhase === 'closing') {
+            // Reset opacity so a re-entered transition starts fully opaque.
+            coverOpacity.value = 1;
+            const armDelay = Math.max(0, IRIS_DURATION_MS - COVER_CLOSE_OVERLAP_MS);
+            coverPanelTimerRef.current = setTimeout(() => {
+                coverPanelTimerRef.current = null;
+                setCoverMounted(true);
+            }, armDelay);
+        } else if (transitionPhase === 'covered') {
+            // Defensive: in case 'closing' was very short or skipped.
+            coverOpacity.value = 1;
+            setCoverMounted(true);
+        } else if (transitionPhase === 'opening') {
+            // Snap-unmount after a short overlap. With the sub-pixel pinhole
+            // fix in place (IRIS_INITIAL_SCALE = 0.0001 → 0.1px star hole),
+            // the iris is genuinely opaque even when "closed", so the cover
+            // doesn't need to fade — it can just disappear once the iris has
+            // started moving and the user no longer expects the cover.
+            coverOpacity.value = 1;
+            coverPanelTimerRef.current = setTimeout(() => {
+                coverPanelTimerRef.current = null;
+                setCoverMounted(false);
+            }, COVER_OPEN_OVERLAP_MS);
+        } else {
+            coverOpacity.value = 1;
+            setCoverMounted(false);
+        }
+
+        return clearTimer;
+    }, [transitionPhase]);
 
     const navigateToView = (view: string) => {
         setPreviousView(currentView);
@@ -664,12 +847,6 @@ function App() {
         }, 1000);
     };
 
-    useEffect(() => {
-        if (['game', 'memory-game', 'star-game'].includes(currentView)) {
-            setCurrentView('interaction');
-        }
-    }, [currentView]);
-
     // Deep-link router for widget taps and external launches.
     // Supported URIs:
     //   hoshino://forage/drain?characterId=ABC -> jump to interaction view,
@@ -754,9 +931,9 @@ function App() {
             selectedCharacter={selectedCharacter}
             onSelectCharacter={() => {
                 setShouldFadeInInteraction(false);
-                navigateToView('selection');
+                transitionTo('selection');
             }}
-            onFeed={() => setCurrentView('feeding')}
+            onFeed={() => transitionTo('feeding')}
             connected={connected}
             walletAddress={publicKey?.toString()}
             playerName={playerName}
@@ -764,14 +941,13 @@ function App() {
             onRefreshNFTs={() => {
                 addNotification('🔍 Checking wallet for NFTs...', 'info');
             }}
-            onGame={() => setCurrentView('game')}
-            onMemoryGame={() => setCurrentView('memory-game')}
-            onStarGame={() => setCurrentView('star-game')}
-            onShop={() => setCurrentView('shop')}
-            onInventory={() => setCurrentView('inventory')}
-            onGallery={() => setCurrentView('gallery')}
-            onChat={() => setCurrentView('chat')}
-            onSettings={() => setCurrentView('settings')}
+            onArcade={() => transitionTo('arcade')}
+            onSleepRequest={() => setSleepModalVisible(true)}
+            onShop={() => transitionTo('shop')}
+            onInventory={() => transitionTo('inventory')}
+            onGallery={() => transitionTo('gallery')}
+            onChat={() => transitionTo('chat')}
+            onSettings={() => transitionTo('settings')}
             shouldFadeIn={shouldFadeInInteraction}
             onFadeInComplete={() => setShouldFadeInInteraction(false)}
             pendingWidgetAction={pendingWidgetAction}
@@ -824,14 +1000,10 @@ function App() {
             case 'interaction':
             case 'feeding':
                 return null;
-            case 'game':
-            case 'memory-game':
-            case 'star-game':
-                return (
-                    <View style={styles.gamePlaceholder}>
-                        <Text style={styles.gameText}>🎮 Redirecting to moonoko interaction...</Text>
-                    </View>
-                );
+            case 'arcade':
+            case 'starburst':
+            case 'sleep':
+                return null;
             case 'chat':
                 return selectedCharacter ? null : (
                     <View style={styles.noCharacterContainer}>
@@ -896,103 +1068,175 @@ function App() {
         <SafeAreaView style={styles.container}>
             <StatusBar style="light" hidden={true} />
             <DeviceCasing />
-            {miMounted && (
-                <View
-                    key="mi-layer"
-                    style={StyleSheet.absoluteFill}
-                    pointerEvents="box-none"
-                >
-                    {moonokoInteractionElement}
-                </View>
-            )}
-            {currentView === 'feeding' && (
-                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                    <FeedingPage
-                        onBack={() => setCurrentView('interaction')}
-                        onNotification={addNotification}
-                    />
-                </View>
-            )}
-            {currentView === 'shop' && (
-                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                    <Shop
-                        connection={connection}
-                        onNotification={addNotification}
-                        onClose={() => setCurrentView('interaction')}
-                    />
-                </View>
-            )}
-            {currentView === 'gallery' && (
-                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                    <Gallery onBack={() => setCurrentView('interaction')} />
-                </View>
-            )}
-            {currentView === 'inventory' && (
-                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                    <InventoryPage onBack={() => setCurrentView('interaction')} />
-                </View>
-            )}
-            {currentView === 'settings' && (
-                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                    <Settings
-                        onBack={() => setCurrentView('interaction')}
-                        onNotification={addNotification}
-                    />
-                </View>
-            )}
-            {currentView === 'profile' && (
-                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                    <Profile
-                        onBack={() => setCurrentView(previousView || 'interaction')}
-                        onNotification={addNotification}
-                        playerName={playerName}
-                        publicKey={publicKey?.toString() ?? null}
-                        email={email}
-                        walletSource={walletSource}
-                        onUpdatePlayerName={updatePlayerName}
-                        onLogout={disconnectWallet}
-                    />
-                </View>
-            )}
-            {currentView === 'chat' && selectedCharacter && (
-                <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                    <CharacterChat
-                        character={selectedCharacter}
-                        onExit={() => setCurrentView('interaction')}
-                        playerName={playerName}
-                        onNotification={addNotification}
-                    />
-                </View>
-            )}
-            {!miMounted && renderContent()}
-            <DeviceButtons />
+            {/* Single global iris. Everything that should be hidden during a
+                page transition lives inside this overlay — the persistent MI
+                layer, the route-overlay layer, the chrome buttons, the
+                wallet pill, and notifications. Per-screen iris instances
+                were removed so there's exactly one Reanimated timer running
+                a transition at any time. The iris is "open" (FINAL_SCALE)
+                while transitionPhase is idle/opening and "closed"
+                (INITIAL_SCALE) while closing/covered. handleIrisClosed
+                swaps currentView during the covered window so the new
+                screen mounts and paints behind the still-closed iris
+                before the open animation kicks off. */}
+            <ZoomOutOverlay
+                exiting={transitionPhase === 'closing' || transitionPhase === 'covered'}
+                initialOpen
+                onExitComplete={handleIrisClosed}
+                onOpenComplete={handleIrisOpened}
+            >
+                {miMounted && (
+                    <View
+                        key="mi-layer"
+                        style={StyleSheet.absoluteFill}
+                        pointerEvents="box-none"
+                    >
+                        {moonokoInteractionElement}
+                    </View>
+                )}
+                {currentView === 'feeding' && (
+                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                        <FeedingPage
+                            onBack={() => transitionTo('interaction')}
+                            onNotification={addNotification}
+                        />
+                    </View>
+                )}
+                {currentView === 'shop' && (
+                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                        <Shop
+                            connection={connection}
+                            onNotification={addNotification}
+                            onClose={() => transitionTo('interaction')}
+                        />
+                    </View>
+                )}
+                {currentView === 'gallery' && (
+                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                        <Gallery onBack={() => transitionTo('interaction')} />
+                    </View>
+                )}
+                {currentView === 'arcade' && (
+                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                        <GamesList
+                            onClose={() => transitionTo('interaction')}
+                            onSelectGame={(gameId) => transitionTo(gameId)}
+                        />
+                    </View>
+                )}
+                {currentView === 'starburst' && (
+                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                        <StarburstView onBack={() => transitionTo('arcade')} />
+                    </View>
+                )}
+                {currentView === 'inventory' && (
+                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                        <InventoryPage onBack={() => transitionTo('interaction')} />
+                    </View>
+                )}
+                {currentView === 'settings' && (
+                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                        <Settings
+                            onBack={() => transitionTo('interaction')}
+                            onNotification={addNotification}
+                        />
+                    </View>
+                )}
+                {currentView === 'profile' && (
+                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                        <Profile
+                            onBack={() => transitionTo(previousView || 'interaction')}
+                            onNotification={addNotification}
+                            playerName={playerName}
+                            publicKey={publicKey?.toString() ?? null}
+                            email={email}
+                            walletSource={walletSource}
+                            onUpdatePlayerName={updatePlayerName}
+                            onLogout={disconnectWallet}
+                        />
+                    </View>
+                )}
+                {currentView === 'chat' && selectedCharacter && (
+                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                        <CharacterChat
+                            character={selectedCharacter}
+                            onExit={() => transitionTo('interaction')}
+                            playerName={playerName}
+                            onNotification={addNotification}
+                        />
+                    </View>
+                )}
+                {!miMounted && renderContent()}
 
-            {ENABLE_VRF_DEV_SCREEN && currentView !== 'vrf-dev' && (
-                <TouchableOpacity
-                    style={styles.vrfDevButton}
-                    onPress={() => navigateToView('vrf-dev')}
-                >
-                    <Text style={styles.vrfDevButtonText}>VRF</Text>
-                </TouchableOpacity>
-            )}
-
-            <WalletButton
-                connected={connected}
-                publicKey={publicKey}
-                playerName={playerName}
-                onConnect={connectWallet}
-                onOpenProfile={() => navigateToView('profile')}
-            />
-
-            {notifications.map((notification, i) => (
-                <Notification
-                    key={notification.id}
-                    message={notification.message}
-                    type={notification.type}
-                    index={i}
-                    onClose={() => removeNotification(notification.id)}
+                {/* Sleep is App-level — SleepController owns the modal,
+                    SleepScreen overlay, and morning recap. Lives inside the
+                    iris so its overlay is hidden during page transitions and
+                    inside GameStateProvider so it can call startSleep /
+                    endSleep / drainForaged directly. */}
+                <SleepController
+                    currentView={currentView}
+                    transitionTo={transitionTo}
+                    selectedCharacter={selectedCharacter}
+                    sleepModalVisible={sleepModalVisible}
+                    setSleepModalVisible={setSleepModalVisible}
+                    onNotification={addNotification}
                 />
-            ))}
+
+                {/* Chrome (DeviceButtons + WalletButton + notifications) sits
+                    inside the iris with no zIndex of its own — natural render
+                    order puts it on top of the mi-layer (zIndex 0) on the
+                    home screen, but BEHIND the zIndex:50 overlay layer when
+                    Shop/Inventory/Settings/etc. is up. The iris covers it
+                    during page transitions because the iris is the last
+                    sibling rendered inside ZoomOutOverlay's wrapper. */}
+                <DeviceButtons />
+
+                {ENABLE_VRF_DEV_SCREEN && currentView !== 'vrf-dev' && (
+                    <TouchableOpacity
+                        style={styles.vrfDevButton}
+                        onPress={() => navigateToView('vrf-dev')}
+                    >
+                        <Text style={styles.vrfDevButtonText}>VRF</Text>
+                    </TouchableOpacity>
+                )}
+
+                <WalletButton
+                    connected={connected}
+                    publicKey={publicKey}
+                    playerName={playerName}
+                    onConnect={connectWallet}
+                    onOpenProfile={() => transitionTo('profile')}
+                />
+
+                {notifications.map((notification, i) => (
+                    <Notification
+                        key={notification.id}
+                        message={notification.message}
+                        type={notification.type}
+                        index={i}
+                        onClose={() => removeNotification(notification.id)}
+                    />
+                ))}
+
+                {/* Cover panel — solid black layer that overlaps the seam.
+                    Mounts during late-close (before the iris reaches
+                    INITIAL_SCALE) and unmounts during early-open (after the
+                    iris has begun growing). zIndex/elevation 100 puts it
+                    above the screens (50) but below the iris (999) so the
+                    iris still renders on top during its animation; the
+                    cover's job is to be a stable opaque layer that doesn't
+                    change while the screens swap underneath. */}
+                {coverMounted && (
+                    <Animated.View
+                        pointerEvents="none"
+                        style={[
+                            StyleSheet.absoluteFill,
+                            { backgroundColor: 'black', zIndex: 100, elevation: 100 },
+                            animatedCoverStyle,
+                        ]}
+                    />
+                )}
+            </ZoomOutOverlay>
         </SafeAreaView>
         </GameStateGate>
         </GameStateProvider>
@@ -1118,6 +1362,291 @@ function GameStateGate({
     return <>{children}</>;
 }
 
+// Tiny wrapper so the App-level Starburst route can call play() — App itself
+// renders OUTSIDE GameStateProvider, but this component renders inside it.
+function StarburstView({ onBack }: { onBack: () => void }) {
+    const { play } = useGameStateContext();
+    return (
+        <Starburst
+            onBack={onBack}
+            onGameEnd={(won) => {
+                play(won).catch((e) => console.warn('play mood update failed', e));
+            }}
+        />
+    );
+}
+
+// Sleep is App-level navigation: a first-class route managed by the App's
+// iris transition, not an in-place overlay inside MoonokoInteraction.
+// SleepController owns the entire sleep state machine — server callables,
+// optimistic flags, alarm scheduling, recap — and renders its UI surfaces
+// (modal, SleepScreen, MorningRecapModal) from a single place. It lives
+// inside GameStateProvider so it can use useGameStateContext directly;
+// App passes down currentView, transitionTo, the modal-visible flag, and
+// the active character. See ZoomOutOverlay for the iris itself; see
+// MoonokoInteraction's `case 'sleep'` for the trigger that opens the
+// modal (it just calls onSleepRequest now).
+interface SleepControllerProps {
+    currentView: string;
+    transitionTo: (view: string) => void;
+    selectedCharacter: Character | null;
+    sleepModalVisible: boolean;
+    setSleepModalVisible: (v: boolean) => void;
+    onNotification: (
+        message: string,
+        type: 'success' | 'error' | 'info' | 'warning',
+    ) => void;
+}
+
+function SleepController({
+    currentView,
+    transitionTo,
+    selectedCharacter,
+    sleepModalVisible,
+    setSleepModalVisible,
+    onNotification,
+}: SleepControllerProps) {
+    const {
+        state: gameState,
+        startSleep,
+        endSleep,
+        drainForaged,
+    } = useGameStateContext();
+
+    const serverSleeping = gameState?.sleepStartedAt != null;
+    const [pendingStartSleep, setPendingStartSleep] = useState(false);
+    const [pendingEndSleep, setPendingEndSleep] = useState(false);
+    // Bumps SleepScreen's wakeRequested prop to trigger its onWake — used
+    // when something other than the in-screen Wake button initiates the
+    // wake (re-tap of the menu sleep button while already sleeping).
+    const [wakeRequested, setWakeRequested] = useState(false);
+    const [pickedWakeAtMs, setPickedWakeAtMs] = useState<number | null>(null);
+    const [recapState, setRecapState] = useState<{
+        deltas: MorningRecapDeltas;
+        items: ForagedItem[];
+    } | null>(null);
+
+    const isSleeping =
+        (serverSleeping || pendingStartSleep) && !pendingEndSleep;
+
+    // Reset optimistic flags when the active character changes — a startSleep
+    // in flight on character A shouldn't keep us on the sleep route after
+    // the user swaps to character B.
+    useEffect(() => {
+        setPendingStartSleep(false);
+        setPendingEndSleep(false);
+        setWakeRequested(false);
+    }, [selectedCharacter?.id]);
+
+    // Clear pendingEndSleep only when serverSleeping actually transitions
+    // true→false (i.e. endSleep landed). Without the transition guard, the
+    // bare check fires the moment we set the flag and unsticks us before
+    // startSleep has even resolved.
+    const prevServerSleepingRef = useRef(false);
+    useEffect(() => {
+        const wasSleeping = prevServerSleepingRef.current;
+        prevServerSleepingRef.current = serverSleeping;
+        if (wasSleeping && !serverSleeping && pendingEndSleep) {
+            setPendingEndSleep(false);
+        }
+    }, [serverSleeping, pendingEndSleep]);
+
+    // Drive the route from sleep state. Two automatic paths:
+    //   (a) cold-launch with serverSleeping → route to 'sleep'.
+    //   (b) sleep ends (server cleared sleepStartedAt) → route off 'sleep'.
+    // The user-driven paths (modal confirm, wake button) call transitionTo
+    // directly in the handlers below; this effect is the safety net for
+    // server-side or restored state we didn't initiate locally.
+    useEffect(() => {
+        if (isSleeping && currentView !== 'sleep') {
+            transitionTo('sleep');
+        } else if (!isSleeping && currentView === 'sleep') {
+            transitionTo('interaction');
+        }
+    }, [isSleeping, currentView, transitionTo]);
+
+    const handleConfirmSleep = useCallback(
+        (wakeAtMs: number) => {
+            setSleepModalVisible(false);
+            setPickedWakeAtMs(wakeAtMs);
+            setPendingStartSleep(true);
+            transitionTo('sleep');
+            startSleep()
+                .then((next) => {
+                    setPendingStartSleep(false);
+                    if (next?.sleepStartedAt) {
+                        scheduleSleepAlarm(
+                            wakeAtMs,
+                            selectedCharacter?.name,
+                        ).then((res) => {
+                            if (!res.ok && res.reason === 'notifications-denied') {
+                                onNotification(
+                                    'Enable notifications for a wake-up alarm.',
+                                    'info',
+                                );
+                            } else if (res.ok && res.reason === 'inexact') {
+                                onNotification(
+                                    'Wake reminder set (may be a few min late).',
+                                    'info',
+                                );
+                            }
+                        });
+                    }
+                })
+                .catch((e: any) => {
+                    setPendingStartSleep(false);
+                    onNotification(
+                        e?.message || 'Failed to start sleep',
+                        'error',
+                    );
+                });
+        },
+        [
+            setSleepModalVisible,
+            transitionTo,
+            startSleep,
+            selectedCharacter?.name,
+            onNotification,
+        ],
+    );
+
+    const handleWake = useCallback(async () => {
+        // Optimistically dismiss sleep the instant the iris starts moving so
+        // the user doesn't watch a blocked UI while endSleep round-trips.
+        setPendingEndSleep(true);
+        setPickedWakeAtMs(null);
+        cancelSleepAlarm();
+        const preWake = gameState ?? null;
+        try {
+            const next = await endSleep(true);
+            setWakeRequested(false);
+            if (preWake) {
+                const energyGained = Math.max(
+                    0,
+                    (next.energy ?? 0) - (preWake.energy ?? 0),
+                );
+                const moodGained = Math.max(
+                    0,
+                    (next.mood ?? 0) - (preWake.mood ?? 0),
+                );
+                const xpGained = Math.max(
+                    0,
+                    (next.experience ?? 0) - (preWake.experience ?? 0),
+                );
+                const sleepItems = (next.foragedItems ?? []).filter(
+                    (f) => f.source === 'sleep',
+                );
+                // Only show the recap on a real full-rest wake — force-wake
+                // without 8h returns no grants and would render an empty
+                // ceremony.
+                if (
+                    energyGained > 0 ||
+                    moodGained > 0 ||
+                    xpGained > 0 ||
+                    sleepItems.length > 0
+                ) {
+                    setRecapState({
+                        deltas: {
+                            energyGained,
+                            moodGained,
+                            xpGained,
+                            totalSleeps: next.totalSleeps ?? 0,
+                        },
+                        items: sleepItems,
+                    });
+                }
+            }
+        } catch (e: any) {
+            // Server is still sleeping: roll back the optimistic dismiss so
+            // the route effect bounces back to 'sleep'. The App iris is
+            // fresh per transition so no remount-key hack is needed.
+            setPendingEndSleep(false);
+            setWakeRequested(false);
+            onNotification(
+                e?.message || 'Failed to end sleep — try again',
+                'error',
+            );
+        }
+    }, [endSleep, gameState, onNotification]);
+
+    return (
+        <>
+            <SleepConfirmationModal
+                visible={sleepModalVisible}
+                character={selectedCharacter}
+                playerName={undefined}
+                defaultWakeAtMs={Date.now() + SLEEP_REQUIRED_MS}
+                onCancel={() => setSleepModalVisible(false)}
+                onSmokeTest={() => {
+                    setSleepModalVisible(false);
+                    scheduleSleepAlarm(
+                        Date.now() + 60_000,
+                        selectedCharacter?.name,
+                    ).then((res) => {
+                        if (!res.ok && res.reason === 'notifications-denied') {
+                            onNotification(
+                                'Enable notifications to test the alarm.',
+                                'info',
+                            );
+                        } else if (res.ok) {
+                            onNotification(
+                                `Test alarm scheduled (${res.reason} · 60s)`,
+                                'success',
+                            );
+                        } else {
+                            onNotification(
+                                `Smoke test failed: ${res.reason}`,
+                                'error',
+                            );
+                        }
+                    });
+                }}
+                onConfirm={handleConfirmSleep}
+            />
+
+            {currentView === 'sleep' && (
+                <View
+                    key="overlay-layer"
+                    style={[
+                        StyleSheet.absoluteFill,
+                        { zIndex: 50, elevation: 50 },
+                    ]}
+                    pointerEvents="box-none"
+                >
+                    <SleepScreen
+                        wakeRequested={wakeRequested}
+                        characterId={selectedCharacter?.id}
+                        sleepStartedAt={gameState?.sleepStartedAt ?? null}
+                        wakeAtMs={pickedWakeAtMs}
+                        onWake={handleWake}
+                    />
+                </View>
+            )}
+
+            {recapState && (
+                <MorningRecapModal
+                    visible={true}
+                    characterId={selectedCharacter?.id}
+                    deltas={recapState.deltas}
+                    overnightItems={recapState.items}
+                    onDismiss={() => {
+                        setRecapState(null);
+                        if ((gameState?.foragedItems ?? []).length > 0) {
+                            drainForaged().catch((e: any) => {
+                                onNotification(
+                                    e?.message ||
+                                        'Failed to collect overnight finds',
+                                    'error',
+                                );
+                            });
+                        }
+                    }}
+                />
+            )}
+        </>
+    );
+}
+
 interface AuthGateProps {
     fontsLoaded: boolean;
 }
@@ -1177,6 +1706,10 @@ function AppWrapper() {
         'PressStart2P': PressStart2P_400Regular,
         'SpaceMono': SpaceMono_400Regular,
         '04b03': require('./assets/fonts/04b03.ttf'),
+        // Primary UI font as of 0.1.16 — replaces PressStart2P everywhere
+        // except the sleep arc (Sleep* + MorningRecapModal), which stays on
+        // 04b03/PressStart2P for the dreamy bedtime palette.
+        'Monaco': require('./assets/fonts/Monaco.ttf'),
     });
 
     return (

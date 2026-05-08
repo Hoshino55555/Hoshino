@@ -4,17 +4,10 @@ import Shop from './Shop';
 import Gallery from './Gallery';
 import InnerScreen from './InnerScreen';
 import Settings from './Settings';
-import Starburst from './Starburst';
-import GamesList from './GamesList';
-import SleepScreen from './SleepScreen';
-import SleepConfirmationModal from './SleepConfirmationModal';
 import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import ForagePopOut from './ForagePopOut';
-import MorningRecapModal, { MorningRecapDeltas } from './MorningRecapModal';
-import type { ForagedItem, GameState } from '../services/GameStateService';
-import { SLEEP_REQUIRED_MS } from '../services/GameStateService';
-import { scheduleSleepAlarm, cancelSleepAlarm } from '../services/AlarmService';
+import type { ForagedItem } from '../services/GameStateService';
 import { pushMoonokoSnapshot } from '../widgets/widgetService';
 import type { PendingWidgetAction } from '../../App';
 import { Backgrounds, Menu, Stars, getCharacterAnim } from '../assets';
@@ -43,9 +36,8 @@ interface Props {
     playerName?: string;
     onRefreshNFTs?: () => void;
     onNotification?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
-    onGame?: () => void;
-    onMemoryGame?: () => void;
-    onStarGame?: () => void;
+    onArcade?: () => void;
+    onSleepRequest?: () => void;
     onShop?: () => void;
     onInventory?: () => void;
     onChat?: () => void;
@@ -74,12 +66,14 @@ const MoonokoInteraction: React.FC<Props> = ({
     onBack,
     onSettings,
     onGallery,
+    onArcade,
+    onSleepRequest,
     shouldFadeIn = false,
     onFadeInComplete,
     pendingWidgetAction = null,
     onWidgetActionConsumed,
 }) => {
-    const { state: gameState, drainForaged, startSleep, endSleep } = useGameStateContext();
+    const { state: gameState, drainForaged } = useGameStateContext();
     // Sizes that used to be hardcoded dp (character sprite, badge offsets,
     // menu icons, row paddings) are derived from the live window dimensions
     // here so the screen survives Android Display-Size scaling. Values are
@@ -108,11 +102,6 @@ const MoonokoInteraction: React.FC<Props> = ({
 
     const [popOutItems, setPopOutItems] = useState<ForagedItem[] | null>(null);
     const drainInFlightRef = useRef(false);
-
-    const [recapState, setRecapState] = useState<{
-        deltas: MorningRecapDeltas;
-        items: ForagedItem[];
-    } | null>(null);
 
     const handleCharacterLongPress = () => {
         if (!__DEV__) return;
@@ -268,70 +257,14 @@ const MoonokoInteraction: React.FC<Props> = ({
         pendingFinds.length,
     ]);
 
-    const [currentGame, setCurrentGame] = useState<string | null>(null);
-    // Arcade hub gates access to individual games. Tapping the games menu
-    // button opens the hub; the hub then launches a specific game.
-    const [arcadeOpen, setArcadeOpen] = useState(false);
-    // `isSleeping` is derived from the server (`gameState.sleepStartedAt`),
-    // not held as independent local state. Earlier impl used `useState(false)`
-    // and got out of sync if the user force-quit mid-sleep: server still had
-    // sleepStartedAt set, local state defaulted to false, home menu rendered
-    // while the server paused all decay → "stats stuck after 48h" bug.
-    //
-    // `pendingStartSleep` covers the brief optimistic window: tapping Sleep
-    // flips the screen instantly while the startSleep callable is in flight.
-    // Cleared in the success/failure paths below.
-    const [pendingStartSleep, setPendingStartSleep] = useState(false);
-    // Symmetric optimistic flag for waking. Without this, opening + closing
-    // sleep quickly left an invisible absoluteFill overlay (zIndex 50)
-    // blocking every touch for the duration of the endSleep round-trip:
-    // the exit animation finished but `serverSleeping` was still true until
-    // the callable resolved, so SleepScreen kept rendering with opacity 0.
-    // pendingEndSleep dismisses the overlay the instant the exit animation
-    // completes; endSleep continues in the background and clears the flag
-    // when it resolves.
-    const [pendingEndSleep, setPendingEndSleep] = useState(false);
-    const serverSleeping = gameState?.sleepStartedAt != null;
-    const isSleeping = (serverSleeping || pendingStartSleep) && !pendingEndSleep;
-    // When true, SleepScreen plays its exit animation and then fires onWake.
-    // Used so a second tap on the sleep menu button reads the same as
-    // tapping the in-screen Wake button (no instant unmount jump).
-    const [wakeRequested, setWakeRequested] = useState(false);
-    // Bumped on endSleep failure to remount SleepScreen with a fresh
-    // ZoomOutOverlay — the in-flight one already animated to its exited
-    // (invisible, scaled-small) state and would otherwise block touches with
-    // no visible UI. Bumping the key gives the user a clean retry surface.
-    const [sleepInstanceKey, setSleepInstanceKey] = useState(0);
-    const [sleepModalVisible, setSleepModalVisible] = useState(false);
-    const [pickedWakeAtMs, setPickedWakeAtMs] = useState<number | null>(null);
-
-    // Clear sleep UI flags when the active character changes. Without this,
-    // a startSleep promise inflight on character A could leave pendingStartSleep
-    // true while the user is now viewing character B, briefly showing
-    // SleepScreen for the wrong moonoko. wakeRequested is reset for the same
-    // reason — its meaning is per-character.
-    useEffect(() => {
-        setPendingStartSleep(false);
-        setPendingEndSleep(false);
-        setWakeRequested(false);
-    }, [selectedCharacter?.id]);
-
-    // Clear the optimistic end-sleep flag only when serverSleeping actually
-    // *transitions* true→false (i.e. endSleep succeeded). Without the
-    // transition guard, the effect fires the moment setPendingEndSleep(true)
-    // runs — if the user wakes before startSleep has resolved, serverSleeping
-    // is still false at that moment, so the bare `!serverSleeping &&
-    // pendingEndSleep` check immediately clears the flag. With pendingStartSleep
-    // still true, isSleeping flips back to true and the SleepScreen remounts
-    // mid-exit, producing a visible "reappear for a beat" flicker.
-    const prevServerSleeping = useRef(false);
-    useEffect(() => {
-        const wasSleeping = prevServerSleeping.current;
-        prevServerSleeping.current = serverSleeping;
-        if (wasSleeping && !serverSleeping && pendingEndSleep) {
-            setPendingEndSleep(false);
-        }
-    }, [serverSleeping, pendingEndSleep]);
+    // Arcade + individual games are App-level views now (see App.tsx
+    // renderContent). Tapping the games menu button calls onArcade which
+    // routes through the App-level iris transition like every other page.
+    // Sleep is also App-level — SleepController in App.tsx owns the
+    // start/end sleep callables, the alarm scheduling, the SleepScreen
+    // overlay, and the morning recap modal. Tapping the sleep menu button
+    // just calls onSleepRequest, which opens the App-owned confirmation
+    // modal.
     const [isTransitioning, setIsTransitioning] = useState(true);
     const [transitionOpacity, setTransitionOpacity] = useState(1);
 
@@ -446,21 +379,12 @@ const MoonokoInteraction: React.FC<Props> = ({
                 break;
 
             case 'sleep':
-                if (isSleeping) {
-                    // Already sleeping; tapping sleep again triggers the same
-                    // wake flow as the in-screen button — SleepScreen plays
-                    // its exit animation then onWake unmounts us. Issuing
-                    // endSleep here would race with onWake's call.
-                    if (!wakeRequested) setWakeRequested(true);
-                } else {
-                    // Flip the overlay on immediately via pendingStartSleep —
-                    // the startSleep callable is a server round-trip and
-                    // awaiting it here makes the tap feel laggy. On success
-                    // the server response sets sleepStartedAt and serverSleeping
-                    // takes over, so we clear the pending flag. On failure we
-                    // clear the flag and toast — caller stays on home menu.
-                    setSleepModalVisible(true);
-                }
+                // SleepController owns the sleep flow. The menu just opens
+                // the App-level confirmation modal; if the moonoko is
+                // already sleeping, SleepController's auto-routing has
+                // already moved us to the 'sleep' route, so this branch
+                // is unreachable while sleeping.
+                onSleepRequest?.();
                 break;
 
             case 'shop':
@@ -472,22 +396,20 @@ const MoonokoInteraction: React.FC<Props> = ({
                 break;
 
             case 'chat':
-                if (onChat) await onChat();
+                onChat?.();
                 break;
 
             case 'games':
-                setArcadeOpen(true);
+                onArcade?.();
                 break;
 
             case 'gallery':
                 onGallery?.();
                 break;
 
-                                    case 'settings':
-                            if (onSettings) {
-                                onSettings();
-                            }
-                            break;
+            case 'settings':
+                onSettings?.();
+                break;
 
             default:
                 onNotification?.(`Unknown action: ${action}`, 'error');
@@ -584,7 +506,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                     </View>
                 </>
             }
-            onLeftButtonPress={onBack}
+            onLeftButtonPress={() => onBack?.()}
             onCenterButtonPress={() => onNotification?.('🎮 Moonoko Interaction: Care for your character!', 'info')}
             onRightButtonPress={() => onNotification?.('🎮 Moonoko Help: Feed, play, sleep, and care for your cosmic companion!', 'info')}
             leftButtonText=""
@@ -670,180 +592,6 @@ const MoonokoInteraction: React.FC<Props> = ({
             )}
 
             </InnerScreen>
-            {/* TEMP: SleepOverlay disabled while sleep UX is being reworked. */}
-
-            {arcadeOpen && (
-                <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
-                    <GamesList
-                        onClose={() => setArcadeOpen(false)}
-                        onSelectGame={(gameId) => setCurrentGame(gameId)}
-                    />
-                </View>
-            )}
-
-            {currentGame === 'starburst' && (
-                <View style={[StyleSheet.absoluteFill, { zIndex: 60, elevation: 60 }]}>
-                    <Starburst onBack={() => setCurrentGame(null)} />
-                </View>
-            )}
-
-            {isSleeping && (
-                <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
-                    <SleepScreen
-                        key={sleepInstanceKey}
-                        wakeRequested={wakeRequested}
-                        characterId={selectedCharacter?.id}
-                        sleepStartedAt={gameState?.sleepStartedAt ?? null}
-                        wakeAtMs={pickedWakeAtMs}
-                        onWake={async () => {
-                            // Optimistically dismiss the overlay the instant
-                            // the exit animation reports complete. Without
-                            // this, the absoluteFill wrapper kept blocking
-                            // taps until endSleep returned (1–3s on slow
-                            // networks) — felt like the UI was frozen.
-                            setPendingEndSleep(true);
-                            setPickedWakeAtMs(null);
-                            cancelSleepAlarm();
-                            const preWake: GameState | null = gameState ?? null;
-                            try {
-                                const next = await endSleep(true);
-                                // Server cleared sleepStartedAt; the
-                                // serverSleeping/pendingEndSleep sync effect
-                                // clears the flag.
-                                setWakeRequested(false);
-                                if (preWake) {
-                                    const energyGained = Math.max(
-                                        0,
-                                        (next.energy ?? 0) - (preWake.energy ?? 0),
-                                    );
-                                    const moodGained = Math.max(
-                                        0,
-                                        (next.mood ?? 0) - (preWake.mood ?? 0),
-                                    );
-                                    const xpGained = Math.max(
-                                        0,
-                                        (next.experience ?? 0) - (preWake.experience ?? 0),
-                                    );
-                                    const sleepItems = (next.foragedItems ?? []).filter(
-                                        (f) => f.source === 'sleep',
-                                    );
-                                    // Only show the recap on a real full-rest
-                                    // wake — force-wake without 8h returns no
-                                    // mood/xp grant, no sleep items, and would
-                                    // render an empty ceremony.
-                                    if (
-                                        energyGained > 0 ||
-                                        moodGained > 0 ||
-                                        xpGained > 0 ||
-                                        sleepItems.length > 0
-                                    ) {
-                                        setRecapState({
-                                            deltas: {
-                                                energyGained,
-                                                moodGained,
-                                                xpGained,
-                                                totalSleeps: next.totalSleeps ?? 0,
-                                            },
-                                            items: sleepItems,
-                                        });
-                                    }
-                                }
-                            } catch (e: any) {
-                                // Roll back: server is still in sleep state,
-                                // so put the user back on SleepScreen with a
-                                // fresh ZoomOutOverlay (the previous one
-                                // already animated to its exited state).
-                                setPendingEndSleep(false);
-                                onNotification?.(e?.message || 'Failed to end sleep — try again', 'error');
-                                setWakeRequested(false);
-                                setSleepInstanceKey((k) => k + 1);
-                            }
-                        }}
-                    />
-                </View>
-            )}
-
-            <SleepConfirmationModal
-                visible={sleepModalVisible}
-                character={selectedCharacter}
-                playerName={undefined}
-                defaultWakeAtMs={Date.now() + SLEEP_REQUIRED_MS}
-                onCancel={() => setSleepModalVisible(false)}
-                onSmokeTest={() => {
-                    setSleepModalVisible(false);
-                    scheduleSleepAlarm(
-                        Date.now() + 60_000,
-                        selectedCharacter?.name,
-                    ).then((res) => {
-                        if (!res.ok && res.reason === 'notifications-denied') {
-                            onNotification?.('Enable notifications to test the alarm.', 'info');
-                        } else if (res.ok) {
-                            onNotification?.(
-                                `Test alarm scheduled (${res.reason} · 60s)`,
-                                'success',
-                            );
-                        } else {
-                            onNotification?.(`Smoke test failed: ${res.reason}`, 'error');
-                        }
-                    });
-                }}
-                onConfirm={(wakeAtMs) => {
-                    setSleepModalVisible(false);
-                    setPickedWakeAtMs(wakeAtMs);
-                    setPendingStartSleep(true);
-                    startSleep()
-                        .then((next) => {
-                            setPendingStartSleep(false);
-                            const startedAt = next?.sleepStartedAt;
-                            if (startedAt) {
-                                scheduleSleepAlarm(
-                                    wakeAtMs,
-                                    selectedCharacter?.name,
-                                ).then((res) => {
-                                    if (!res.ok && res.reason === 'notifications-denied') {
-                                        onNotification?.(
-                                            'Enable notifications for a wake-up alarm.',
-                                            'info',
-                                        );
-                                    } else if (res.ok && res.reason === 'inexact') {
-                                        onNotification?.(
-                                            'Wake reminder set (may be a few min late).',
-                                            'info',
-                                        );
-                                    }
-                                });
-                            }
-                        })
-                        .catch((e: any) => {
-                            setPendingStartSleep(false);
-                            onNotification?.(e?.message || 'Failed to start sleep', 'error');
-                        });
-                }}
-            />
-
-            {recapState && (
-                <MorningRecapModal
-                    visible={true}
-                    characterId={selectedCharacter?.id}
-                    deltas={recapState.deltas}
-                    overnightItems={recapState.items}
-                    onDismiss={() => {
-                        setRecapState(null);
-                        // Drain silently — items already shown in the recap.
-                        // Failure path falls back to a toast; the next character
-                        // tap can still drain via the standard pop-out flow.
-                        if ((gameState?.foragedItems ?? []).length > 0) {
-                            drainForaged().catch((e: any) => {
-                                onNotification?.(
-                                    e?.message || 'Failed to collect overnight finds',
-                                    'error',
-                                );
-                            });
-                        }
-                    }}
-                />
-            )}
-
         </>
     );
 };
@@ -859,9 +607,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     statLabel: {
-        fontSize: 12,
+        fontSize: 17,
         marginBottom: 2,
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         textAlign: 'center',
         width: '100%',
         paddingHorizontal: 2,
@@ -916,7 +664,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     exclamationText: {
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         fontSize: 36,
         color: '#ff2a2a',
         textAlign: 'center',

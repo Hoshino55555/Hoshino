@@ -15,17 +15,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SettingsService, { MenuButton } from '../services/SettingsService';
-import ZoomOutOverlay from './ZoomOutOverlay';
 import { Menu, Backgrounds } from '../assets';
 
 interface Props {
     onBack: () => void;
-    onCloseStart?: () => void;
     onNotification?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
     onSettingsChanged?: () => void;
 }
 
-const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSettingsChanged }) => {
+const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }) => {
     const insets = useSafeAreaInsets();
     const screenHeight = Dimensions.get('window').height;
     const bannerReserve = screenHeight * 0.27;
@@ -36,7 +34,6 @@ const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSet
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [theme, setTheme] = useState('default');
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-    const [isClosing, setIsClosing] = useState(false);
     const panRefs = useRef<{ [key: string]: Animated.Value }>({});
 
     useEffect(() => {
@@ -53,12 +50,6 @@ const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSet
     useEffect(() => {
         loadSettings();
     }, []);
-
-    const handleClose = () => {
-        if (isClosing) return;
-        setIsClosing(true);
-        onCloseStart?.();
-    };
 
     const loadSettings = async () => {
         await settingsService.initialize();
@@ -107,7 +98,7 @@ const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSet
     };
 
     return (
-        <ZoomOutOverlay exiting={isClosing} onExitComplete={onBack} backgroundColor="#1a1033">
+        <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
             <ImageBackground source={Backgrounds.settings} style={styles.bg} resizeMode="cover">
                 <View
                     style={[
@@ -285,14 +276,14 @@ const Settings: React.FC<Props> = ({ onBack, onCloseStart, onNotification, onSet
                 >
                     <TouchableOpacity
                         style={styles.backButton}
-                        onPress={handleClose}
+                        onPress={onBack}
                         hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                     >
                         <Text style={styles.backButtonText}>{'<'} Back</Text>
                     </TouchableOpacity>
                 </View>
             </ImageBackground>
-        </ZoomOutOverlay>
+        </View>
     );
 };
 
@@ -318,9 +309,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
     },
     backButtonText: {
-        fontSize: 12,
+        fontSize: 17,
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     content: {
         flex: 1,
@@ -331,9 +322,9 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     title: {
-        fontSize: 16,
+        fontSize: 22,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         textAlign: 'center',
         marginBottom: 14,
     },
@@ -346,15 +337,15 @@ const styles = StyleSheet.create({
         borderColor: '#2E5A3E',
     },
     sectionTitle: {
-        fontSize: 12,
+        fontSize: 17,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         marginBottom: 6,
     },
     sectionDescription: {
-        fontSize: 9,
+        fontSize: 13,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         marginBottom: 12,
         opacity: 0.75,
         lineHeight: 14,
@@ -372,9 +363,9 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     buttonName: {
-        fontSize: 11,
+        fontSize: 15,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     dragHandle: {
         width: 24,
@@ -387,9 +378,9 @@ const styles = StyleSheet.create({
         borderColor: '#2E5A3E',
     },
     dragHandleText: {
-        fontSize: 11,
+        fontSize: 15,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     buttonIcon: {
         width: 20,
@@ -414,8 +405,8 @@ const styles = StyleSheet.create({
     },
     resetButtonText: {
         color: '#E8F5E8',
-        fontSize: 10,
-        fontFamily: 'PressStart2P',
+        fontSize: 14,
+        fontFamily: 'Monaco',
     },
     settingRow: {
         flexDirection: 'row',
@@ -424,9 +415,9 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     settingLabel: {
-        fontSize: 11,
+        fontSize: 15,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     themeButtons: {
         flexDirection: 'row',
@@ -445,9 +436,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#2E5A3E',
     },
     themeButtonText: {
-        fontSize: 10,
+        fontSize: 14,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     activeThemeButtonText: {
         color: '#E8F5E8',

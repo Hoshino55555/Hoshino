@@ -172,14 +172,28 @@ export const ShopItems = {
     sfPackSmall: require('../../assets/images/ui/shop-items/shards-pack-small.png'),
     sfPackMedium: require('../../assets/images/ui/shop-items/shards-pack-medium.png'),
     sfPackLarge: require('../../assets/images/ui/shop-items/shards-pack-large.png'),
+    starterPack: require('../../assets/images/ui/shop-items/starter-pack.png'),
+    carryCapacity: require('../../assets/images/ui/shop-items/carry-capacity.png'),
+    potSize: require('../../assets/images/ui/shop-items/pot-size.png'),
+    promoPack: require('../../assets/images/ui/shop-items/promo-pack-1.png'),
+    snoozeSeed: require('../../assets/images/ui/shop-items/snooze-seed.png'),
+    starberry: require('../../assets/images/ui/shop-items/starberry.png'),
+    moonokoBall: require('../../assets/images/ui/shop-items/moonoko-ball.png'),
 } as const;
 
 export const Backgrounds = {
     screen: require('../../assets/images/ui/backgrounds/screen-bg.png'),
-    cooking: require('../../assets/images/ui/backgrounds/cooking-bg.png'),
-    arcade: require('../../assets/images/ui/backgrounds/arcade-bg.png'),
+    cooking: require('../../assets/images/ui/backgrounds/cooking-bg-base.png'),
+    cookingBanner: require('../../assets/images/ui/backgrounds/cooking-bg-top.png'),
+    cookingBottom: require('../../assets/images/ui/backgrounds/cooking-bg-bottom.png'),
+    arcade: require('../../assets/images/ui/backgrounds/arcade-bg-base.png'),
+    arcadeBanner: require('../../assets/images/ui/backgrounds/arcade-bg-top.png'),
+    arcadeBottom: require('../../assets/images/ui/backgrounds/arcade-bg-bottom.png'),
     sleep: require('../../assets/images/ui/backgrounds/sleep-bg.png'),
-    shop: require('../../assets/images/ui/backgrounds/shop-bg.gif'),
+    shop: require('../../assets/images/ui/backgrounds/shop-bg-base.png'),
+    shopBanner: require('../../assets/images/ui/backgrounds/shop-bg-v2.gif'),
+    shopBannerShadow: require('../../assets/images/ui/backgrounds/shop-bg-shadow.png'),
+    shopBottom: require('../../assets/images/ui/backgrounds/shop-bg-bottom.png'),
     settings: require('../../assets/images/ui/backgrounds/settings-bg.jpg'),
 } as const;
 

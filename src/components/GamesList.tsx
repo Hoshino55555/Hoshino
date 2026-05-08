@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
     View,
     Text,
@@ -6,10 +6,10 @@ import {
     StyleSheet,
     ScrollView,
     ImageBackground,
+    Image,
     Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ZoomOutOverlay from './ZoomOutOverlay';
 import { Backgrounds } from '../assets';
 
 interface GamesListProps {
@@ -35,18 +35,12 @@ const GAMES: GameTile[] = [
 
 const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
     const insets = useSafeAreaInsets();
-    const [isClosing, setIsClosing] = useState(false);
-    const screenHeight = Dimensions.get('window').height;
-    // The painted ARCADE banner sits at the top of the bg art; reserve roughly
-    // a quarter of the screen so tiles don't crash into it.
-    const bannerReserve = screenHeight * 0.27;
-    // Painted plank at the bottom of the new ARCADE bg — back button lives there.
-    const bottomBarReserve = screenHeight * 0.10;
-
-    const handleClose = () => {
-        if (isClosing) return;
-        setIsClosing(true);
-    };
+    const screenWidth = Dimensions.get('window').width;
+    // Top banner is 1200×805, bottom strip is 1200×284 — reserves derived from
+    // screen width so the layered overlays render at native aspect. Matches
+    // Shop / FeedingPage so all menu screens share the same banner-anchored grid.
+    const bannerReserve = screenWidth * (805 / 1200);
+    const bottomBarReserve = screenWidth * (284 / 1200);
 
     const handleTilePress = (game: GameTile) => {
         if (!game.available) return;
@@ -54,7 +48,7 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
     };
 
     return (
-        <ZoomOutOverlay exiting={isClosing} onExitComplete={onClose} backgroundColor="#1a1033">
+        <View style={StyleSheet.absoluteFill}>
             <ImageBackground
                 source={Backgrounds.arcade}
                 style={styles.bg}
@@ -63,16 +57,16 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
                 <View
                     style={[
                         styles.scrollClipper,
-                        {
-                            marginTop: bannerReserve + insets.top,
-                            marginBottom: bottomBarReserve,
-                        },
+                        { top: 0, bottom: 0 },
                     ]}
                 >
                     <ScrollView
                         contentContainerStyle={[
                             styles.scrollBody,
-                            { paddingBottom: insets.bottom + 16 },
+                            {
+                                paddingTop: bannerReserve + insets.top + 8,
+                                paddingBottom: bottomBarReserve + insets.bottom + 16,
+                            },
                         ]}
                     >
                         <View style={styles.tileGrid}>
@@ -95,6 +89,27 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
                 </View>
 
                 <View
+                    pointerEvents="none"
+                    style={[styles.bottomOverlay, { height: bottomBarReserve }]}
+                >
+                    <Image
+                        source={Backgrounds.arcadeBottom}
+                        style={styles.overlayImage}
+                        resizeMode="contain"
+                    />
+                </View>
+                <View
+                    pointerEvents="none"
+                    style={[styles.bannerOverlay, { top: 0, height: bannerReserve }]}
+                >
+                    <Image
+                        source={Backgrounds.arcadeBanner}
+                        style={styles.overlayImage}
+                        resizeMode="contain"
+                    />
+                </View>
+
+                <View
                     style={[
                         styles.bottomBar,
                         { height: bottomBarReserve, paddingBottom: insets.bottom },
@@ -103,14 +118,14 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
                 >
                     <TouchableOpacity
                         style={styles.backButton}
-                        onPress={handleClose}
+                        onPress={onClose}
                         hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                     >
                         <Text style={styles.backButtonText}>{'<'} Back</Text>
                     </TouchableOpacity>
                 </View>
             </ImageBackground>
-        </ZoomOutOverlay>
+        </View>
     );
 };
 
@@ -139,12 +154,31 @@ const styles = StyleSheet.create({
     },
     backButtonText: {
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: 'Monaco',
+        fontSize: 14,
     },
     scrollClipper: {
-        flex: 1,
+        position: 'absolute',
+        left: 0,
+        right: 0,
         overflow: 'hidden',
+    },
+    bannerOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 1,
+    },
+    bottomOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1,
+    },
+    overlayImage: {
+        width: '100%',
+        height: '100%',
     },
     scrollBody: {
         paddingHorizontal: 16,
@@ -171,23 +205,23 @@ const styles = StyleSheet.create({
     },
     tileName: {
         color: '#FFD700',
-        fontFamily: 'PressStart2P',
-        fontSize: 12,
+        fontFamily: 'Monaco',
+        fontSize: 17,
         marginBottom: 6,
         textAlign: 'center',
     },
     tileDescription: {
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 8,
+        fontFamily: 'Monaco',
+        fontSize: 11,
         textAlign: 'center',
         lineHeight: 12,
     },
     tileLockBadge: {
         marginTop: 6,
         color: '#FFB6C1',
-        fontFamily: 'PressStart2P',
-        fontSize: 8,
+        fontFamily: 'Monaco',
+        fontSize: 11,
     },
 });
 

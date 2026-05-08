@@ -54,17 +54,16 @@ const styles = StyleSheet.create({
     },
     errorTitle: {
         color: '#ff6b9d',
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 25,
         marginBottom: 16,
         textAlign: 'center',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     errorBody: {
         color: '#e5dcf5',
-        fontSize: 13,
+        fontSize: 18,
         textAlign: 'center',
         lineHeight: 20,
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
 });

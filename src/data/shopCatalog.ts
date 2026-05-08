@@ -70,7 +70,7 @@ const dealsItems: ShopItem[] = [
         subcategory: 'Bundles',
         currency: 'usd',
         status: 'iap-pending',
-        image: STUB_IMAGE,
+        image: ShopItems.starterPack,
     },
     {
         id: 'bundle-themed',
@@ -86,7 +86,7 @@ const dealsItems: ShopItem[] = [
         subcategory: 'Bundles',
         currency: 'usd',
         status: 'iap-pending',
-        image: STUB_IMAGE,
+        image: ShopItems.promoPack,
     },
     {
         id: 'bundle-bargain',
@@ -102,7 +102,7 @@ const dealsItems: ShopItem[] = [
         subcategory: 'Bundles',
         currency: 'usd',
         status: 'iap-pending',
-        image: STUB_IMAGE,
+        image: ShopItems.promoPack,
     },
     {
         id: 'star-fragments-small',
@@ -172,7 +172,7 @@ const dealsItems: ShopItem[] = [
         subcategory: 'Shards',
         currency: 'starFragments',
         status: 'asset-pending',
-        image: STUB_IMAGE,
+        image: ShopItems.promoPack,
         summary: '10,000 fragments — free!',
     },
     {
@@ -189,7 +189,7 @@ const dealsItems: ShopItem[] = [
         subcategory: 'Daily Spin',
         currency: 'starFragments',
         status: 'asset-pending',
-        image: STUB_IMAGE,
+        image: ShopItems.moonokoBall,
         durationLabel: '24h cooldown',
         summary: 'Free pull on the Moonoko wheel',
     },
@@ -207,7 +207,7 @@ const dealsItems: ShopItem[] = [
         subcategory: 'Upgrades',
         currency: 'starFragments',
         status: 'available',
-        image: STUB_IMAGE,
+        image: ShopItems.carryCapacity,
         summary: '+5 forage slots',
     },
     {
@@ -224,7 +224,7 @@ const dealsItems: ShopItem[] = [
         subcategory: 'Upgrades',
         currency: 'starFragments',
         status: 'available',
-        image: STUB_IMAGE,
+        image: ShopItems.potSize,
         summary: '+50 pantry slots',
     },
 ];
@@ -295,7 +295,7 @@ const consumablesItems: ShopItem[] = [
         subcategory: 'Gacha',
         currency: 'starFragments',
         status: 'effect-pending',
-        image: STUB_IMAGE,
+        image: ShopItems.moonokoBall,
         summary: 'Roll for a new Moonoko',
     },
     {
@@ -312,7 +312,7 @@ const consumablesItems: ShopItem[] = [
         subcategory: 'Boosters',
         currency: 'starFragments',
         status: 'available',
-        image: STUB_IMAGE,
+        image: ShopItems.starberry,
     },
     {
         id: 'booster-sleep',
@@ -328,7 +328,7 @@ const consumablesItems: ShopItem[] = [
         subcategory: 'Boosters',
         currency: 'starFragments',
         status: 'available',
-        image: STUB_IMAGE,
+        image: ShopItems.snoozeSeed,
     },
     {
         id: 'booster-hunger',
@@ -360,7 +360,7 @@ const consumablesItems: ShopItem[] = [
         subcategory: 'Camps',
         currency: 'starFragments',
         status: 'available',
-        image: STUB_IMAGE,
+        image: ShopItems.satelliteDish,
         durationLabel: '1 week',
         summary: '+50% carry · +20% forage speed',
     },

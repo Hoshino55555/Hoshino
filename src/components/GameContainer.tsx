@@ -120,8 +120,8 @@ const styles = StyleSheet.create({
     },
     navButtonText: {
         fontSize: 14,
-        fontWeight: 'bold',
         color: '#003300',
+        fontFamily: 'Monaco',
     },
     activeNavText: {
         color: '#002200',

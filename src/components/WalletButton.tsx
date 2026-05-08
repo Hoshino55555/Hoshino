@@ -73,8 +73,7 @@ const styles = StyleSheet.create({
     connectText: {
         color: '#E8F5E8',
         fontSize: 10,
-        fontWeight: '600',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         transform: [{ translateY: 3 }],
     },
     connectedPill: {
@@ -94,8 +93,7 @@ const styles = StyleSheet.create({
     connectedText: {
         color: '#2E5A3E',
         fontSize: 10,
-        fontWeight: '600',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         transform: [{ translateY: 3 }],
     },
 });

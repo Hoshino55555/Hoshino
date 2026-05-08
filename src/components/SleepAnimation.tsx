@@ -223,8 +223,8 @@ const styles = StyleSheet.create({
     },
     zText: {
         fontSize: 16,
-        color: '#fbbf24',
         fontWeight: 'bold',
+        color: '#fbbf24',
         marginHorizontal: 2,
     },
     bubble: {

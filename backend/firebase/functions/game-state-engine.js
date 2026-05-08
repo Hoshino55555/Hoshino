@@ -38,6 +38,13 @@ const MOOD_DECAY_SLEEP_DEBT_MAX_BONUS = 1.0; // full add when E=1, scaled down a
 // floored at 1. 5→2→1 in two missed meals.
 const HUNGER_DECAY_PER_MISS = 3;
 
+// Bonding-streak thresholds. Chat / play / win interactions only move stats
+// when the running counter crosses these — so no single message or game can
+// snap a stat. Reset to 0 each time the threshold trips.
+const CHAT_MESSAGES_PER_MOOD = 10;
+const PLAYS_PER_ENERGY_DRAIN = 10;
+const WINS_PER_MOOD = 5;
+
 // Foraging constants. Tuned in docs/GAME_MECHANICS.md — keep in sync.
 //
 // Model: passive forage events scheduled by hunger (cadence), yielding 0–3
@@ -311,6 +318,12 @@ function defaultState(characterId, nowMs, tz) {
     totalFeedings: 0,
     totalPlays: 0,
     totalSleeps: 0,
+    // Bonding streaks: rolling counts that trip a stat change at threshold
+    // (see CHAT_MESSAGES_PER_MOOD etc.) and reset. Backfilled on legacy
+    // states via the `?? 0` reads in applyChat / applyPlay.
+    chatStreak: 0,
+    playStreak: 0,
+    winStreak: 0,
     level: 1,
     experience: 0,
     moodDecayProgressMs: 0,
@@ -558,17 +571,37 @@ function applyFeed(state, nowMs, hungerBoost = 0, moodBoost = 0, opts = {}) {
   };
 }
 
-function applyPlay(state, nowMs, opts = {}) {
+function applyPlay(state, nowMs, opts = {}, { won = false } = {}) {
   // Resolve first — see applyFeed for the rationale (stale-sleep self-heal
   // must run before the sleep guard, otherwise actions perma-reject).
   const resolved = resolve(state, nowMs, opts);
   if (resolved.sleepStartedAt) {
     throw new Error('Cannot play: moonoko is sleeping');
   }
+  // Streak-based: 10 plays drains 1 energy, 5 wins lifts 1 mood. Each meter
+  // trips and resets independently — a single game can advance both.
+  const playStreak = (resolved.playStreak ?? 0) + 1;
+  let energy = resolved.energy;
+  let nextPlayStreak = playStreak;
+  if (playStreak >= PLAYS_PER_ENERGY_DRAIN) {
+    energy = clamp(1, 5, energy - 1);
+    nextPlayStreak = 0;
+  }
+  let mood = resolved.mood;
+  let nextWinStreak = resolved.winStreak ?? 0;
+  if (won) {
+    nextWinStreak += 1;
+    if (nextWinStreak >= WINS_PER_MOOD) {
+      mood = clamp(1, 5, mood + 1);
+      nextWinStreak = 0;
+    }
+  }
   return {
     ...resolved,
-    mood: clamp(1, 5, resolved.mood + 1),
-    energy: clamp(1, 5, resolved.energy - 1),
+    mood,
+    energy,
+    playStreak: nextPlayStreak,
+    winStreak: nextWinStreak,
     totalPlays: (resolved.totalPlays || 0) + 1,
     experience: (resolved.experience || 0) + 15,
     lastResolvedAt: nowMs,
@@ -581,9 +614,17 @@ function applyChat(state, nowMs, opts = {}) {
   if (resolved.sleepStartedAt) {
     throw new Error('Cannot chat: moonoko is sleeping');
   }
+  const chatStreak = (resolved.chatStreak ?? 0) + 1;
+  let mood = resolved.mood;
+  let nextChatStreak = chatStreak;
+  if (chatStreak >= CHAT_MESSAGES_PER_MOOD) {
+    mood = clamp(1, 5, mood + 1);
+    nextChatStreak = 0;
+  }
   return {
     ...resolved,
-    mood: clamp(1, 5, resolved.mood + 1),
+    mood,
+    chatStreak: nextChatStreak,
     lastResolvedAt: nowMs,
   };
 }

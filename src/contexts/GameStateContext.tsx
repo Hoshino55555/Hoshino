@@ -16,7 +16,7 @@ interface GameStateContextType {
     error: string | null;
     refresh: () => Promise<void>;
     feed: (hungerBoost: number, moodBoost: number) => Promise<GameState>;
-    play: () => Promise<GameState>;
+    play: (won: boolean) => Promise<GameState>;
     chat: () => Promise<GameState>;
     startSleep: () => Promise<GameState>;
     endSleep: (force?: boolean) => Promise<GameState>;

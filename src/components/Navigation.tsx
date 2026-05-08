@@ -46,8 +46,8 @@ const styles = StyleSheet.create({
     },
     logo: {
         fontSize: 24,
-        fontWeight: 'bold',
         color: '#ffffff',
+        fontFamily: 'Monaco',
     },
     button: {
         marginLeft: 32,

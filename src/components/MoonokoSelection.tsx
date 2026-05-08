@@ -447,10 +447,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     characterName: {
-        fontSize: 16,
+        fontSize: 22,
         color: '#2E5A3E',
         textAlign: 'center',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     spinControls: {
         marginTop: 20,
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
     spinText: {
         color: '#2E5A3E',
         fontSize: 14,
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         transform: [{ translateX: 1 }, { translateY: 4 }],
     },
 
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
     modalCloseText: {
         fontSize: 18,
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         transform: [{ translateY: -1 }],
     },
     modalCharacterImage: {
@@ -525,27 +525,27 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     } as const,
     modalCharacterName: {
-        fontSize: 22,
+        fontSize: 31,
 
         color: '#2E5A3E',
         marginBottom: 10,
         textAlign: 'center',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     modalDescription: {
-        fontSize: 12,
+        fontSize: 17,
         color: '#2E5A3E',
         textAlign: 'center',
         lineHeight: 20,
         marginBottom: 15,
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     congratulationsTitle: {
-        fontSize: 18,
+        fontSize: 25,
         color: '#2E5A3E',
         textAlign: 'center',
         marginBottom: 15,
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     mintButton: {
         backgroundColor: '#2E5A3E',
@@ -560,9 +560,8 @@ const styles = StyleSheet.create({
     },
     mintButtonText: {
         color: '#E8F5E8',
-        fontSize: 14,
-        fontFamily: 'PressStart2P',
-        fontWeight: 'bold',
+        fontSize: 20,
+        fontFamily: 'Monaco',
     },
 
 });

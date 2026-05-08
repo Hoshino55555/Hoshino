@@ -44,53 +44,38 @@ export const DeviceButtons: React.FC = () => {
     } = active ?? {};
 
     return (
-        <>
-            <View
-                style={[styles.bottomButtonContainer, overlayMode && styles.darkenedButtons]}
-                pointerEvents="box-none"
-            >
-                <TouchableOpacity
-                    style={[styles.bottomButton, styles.left, leftButtonDisabled && styles.disabled]}
-                    onPress={!leftButtonDisabled ? onLeftButtonPress : undefined}
-                >
-                    <Image source={Chrome.button} style={styles.buttonImage} />
-                    <Text style={[styles.buttonText, leftButtonText === 'YES' && styles.yesButtonText]}>
-                        {leftButtonText}
-                    </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.bottomButton, styles.center, centerButtonDisabled && styles.disabled]}
-                    onPress={!centerButtonDisabled ? onCenterButtonPress : undefined}
-                >
-                    <Image source={Chrome.button} style={styles.buttonImage} />
-                    <Text style={styles.buttonText}>{centerButtonText}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.bottomButton, styles.right, rightButtonDisabled && styles.disabled]}
-                    onPress={!rightButtonDisabled ? onRightButtonPress : undefined}
-                >
-                    <Image source={Chrome.button} style={styles.buttonImage} />
-                    <Text style={[styles.buttonText, rightButtonText === 'NO' && styles.noButtonText]}>
-                        {rightButtonText}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
+        <View
+            style={[styles.bottomButtonContainer, overlayMode && styles.darkenedButtons]}
+            pointerEvents="box-none"
+        >
             <TouchableOpacity
-                style={[styles.deviceButton, styles.leftPhysical]}
+                style={[styles.bottomButton, styles.left, leftButtonDisabled && styles.disabled]}
                 onPress={!leftButtonDisabled ? onLeftButtonPress : undefined}
-            />
+            >
+                <Image source={Chrome.button} style={styles.buttonImage} />
+                <Text style={[styles.buttonText, leftButtonText === 'YES' && styles.yesButtonText]}>
+                    {leftButtonText}
+                </Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
-                style={[styles.deviceButton, styles.centerPhysical]}
+                style={[styles.bottomButton, styles.center, centerButtonDisabled && styles.disabled]}
                 onPress={!centerButtonDisabled ? onCenterButtonPress : undefined}
-            />
+            >
+                <Image source={Chrome.button} style={styles.buttonImage} />
+                <Text style={styles.buttonText}>{centerButtonText}</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
-                style={[styles.deviceButton, styles.rightPhysical]}
+                style={[styles.bottomButton, styles.right, rightButtonDisabled && styles.disabled]}
                 onPress={!rightButtonDisabled ? onRightButtonPress : undefined}
-            />
-        </>
+            >
+                <Image source={Chrome.button} style={styles.buttonImage} />
+                <Text style={[styles.buttonText, rightButtonText === 'NO' && styles.noButtonText]}>
+                    {rightButtonText}
+                </Text>
+            </TouchableOpacity>
+        </View>
     );
 };
 
@@ -100,9 +85,6 @@ const styles = StyleSheet.create({
         backgroundColor: 'black',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    buttonsLayer: {
-        ...StyleSheet.absoluteFillObject,
     },
     mainBackground: {
         position: 'absolute',
@@ -151,7 +133,7 @@ const styles = StyleSheet.create({
     buttonText: {
         color: '#2E5A3E',
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
     },
     buttonImage: {
         position: 'absolute',
@@ -164,29 +146,5 @@ const styles = StyleSheet.create({
     },
     noButtonText: {
         color: '#F44336',
-    },
-    deviceButton: {
-        position: 'absolute',
-        width: 50,
-        height: 50,
-        backgroundColor: 'transparent',
-        borderRadius: 25,
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 3,
-        elevation: 20,
-    },
-    leftPhysical: {
-        bottom: 20,
-        left: 20,
-    },
-    centerPhysical: {
-        bottom: 20,
-        left: '50%',
-        transform: [{ translateX: -25 }],
-    },
-    rightPhysical: {
-        bottom: 20,
-        right: 20,
     },
 });

@@ -1,8 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Easing, TouchableOpacity, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useChromeConfig } from '../contexts/ChromeContext';
 import Room from './Room';
+import RoomEditor from './RoomEditor';
+import { type RoomLayout, STARTER_ROOM_LAYOUT } from '../services/RoomLayout';
+
+// Single shared room for the local-only MVP. Switch to per-character keying
+// (`room:layout:${characterId}`) when the editor moves to a per-moonoko home.
+const ROOM_LAYOUT_STORAGE_KEY = 'room:layout:default';
 
 interface Props {
     onBack: () => void;
@@ -22,6 +29,36 @@ const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
     const [isClosing, setIsClosing] = useState(false);
     const scale = useRef(new Animated.Value(0.6)).current;
     const opacity = useRef(new Animated.Value(0)).current;
+    // Editable room layout. Hydrate from AsyncStorage; fall back to the
+    // hand-tuned starter mockup so first-time users see a furnished room.
+    // `hydrated` gates the persistence effect — saving the placeholder layout
+    // before the load resolves would clobber a real saved room.
+    const [layout, setLayout] = useState<RoomLayout>(STARTER_ROOM_LAYOUT);
+    const hydratedRef = useRef(false);
+
+    useEffect(() => {
+        AsyncStorage.getItem(ROOM_LAYOUT_STORAGE_KEY)
+            .then((raw) => {
+                if (raw) {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed)) setLayout(parsed);
+                    } catch {
+                        // Corrupt JSON falls through to STARTER_ROOM_LAYOUT.
+                    }
+                }
+            })
+            .finally(() => {
+                hydratedRef.current = true;
+            });
+    }, []);
+
+    useEffect(() => {
+        if (!hydratedRef.current) return;
+        AsyncStorage.setItem(ROOM_LAYOUT_STORAGE_KEY, JSON.stringify(layout)).catch((e) =>
+            console.warn('room layout save failed', e),
+        );
+    }, [layout]);
 
     useEffect(() => {
         Animated.parallel([
@@ -86,9 +123,18 @@ const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
             ]}
         >
             <View style={StyleSheet.absoluteFill}>
-                <Room />
+                <Room layout={layout} />
             </View>
-            <View style={[styles.topBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+            {/* Editor overlay — its grid + palette only paint in edit mode,
+                but the Edit/Done chip lives inside it always. Sit it above
+                the back button so the chip can't slip behind the safe-area
+                top bar on tall devices. */}
+            <RoomEditor
+                layout={layout}
+                onChange={(next) => setLayout(next)}
+                bottomInset={insets.bottom}
+            />
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]} pointerEvents="box-none">
                 <TouchableOpacity
                     style={styles.backButton}
                     onPress={handleClose}
@@ -105,13 +151,13 @@ const styles = StyleSheet.create({
     fullscreen: {
         backgroundColor: '#000',
     },
-    topBar: {
+    bottomBar: {
         position: 'absolute',
-        top: 0,
+        bottom: 0,
         left: 0,
         right: 0,
         paddingHorizontal: 16,
-        paddingBottom: 4,
+        paddingTop: 4,
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -125,8 +171,8 @@ const styles = StyleSheet.create({
     },
     backButtonText: {
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: 'Monaco',
+        fontSize: 14,
     },
 });
 

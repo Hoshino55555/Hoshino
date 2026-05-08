@@ -60,7 +60,7 @@ const callFeedMoonoko = httpsCallable<
     StateResponse
 >(functions, 'feedMoonoko');
 
-const callRecordPlay = httpsCallable<{ characterId: string }, StateResponse>(
+const callRecordPlay = httpsCallable<{ characterId: string; won: boolean }, StateResponse>(
     functions,
     'recordPlay'
 );
@@ -210,8 +210,8 @@ export const GameStateService = {
         return res.data.state;
     },
 
-    async play(characterId: string): Promise<GameState> {
-        const res = await callRecordPlay({ characterId });
+    async play(characterId: string, won: boolean = false): Promise<GameState> {
+        const res = await callRecordPlay({ characterId, won });
         return res.data.state;
     },
 

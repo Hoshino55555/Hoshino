@@ -196,8 +196,8 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 18,
-        fontWeight: '700',
         color: '#111827',
+        fontFamily: 'Monaco',
     },
     closeButton: {
         backgroundColor: '#111827',
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     },
     closeButtonText: {
         color: '#f9fafb',
-        fontWeight: '700',
+        fontFamily: 'Monaco',
     },
     content: {
         paddingBottom: 32,
@@ -223,8 +223,8 @@ const styles = StyleSheet.create({
     },
     cardTitle: {
         fontSize: 15,
-        fontWeight: '700',
         color: '#111827',
+        fontFamily: 'Monaco',
     },
     cardText: {
         color: '#374151',
@@ -238,8 +238,8 @@ const styles = StyleSheet.create({
     },
     actionButtonText: {
         color: '#f9fafb',
-        fontWeight: '700',
         textAlign: 'center',
+        fontFamily: 'Monaco',
     },
     secondaryButton: {
         backgroundColor: '#e5e7eb',
@@ -249,8 +249,8 @@ const styles = StyleSheet.create({
     },
     secondaryButtonText: {
         color: '#111827',
-        fontWeight: '700',
         textAlign: 'center',
+        fontFamily: 'Monaco',
     },
     resultText: {
         color: '#111827',
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     errorText: {
         color: '#b91c1c',
         fontSize: 13,
-        fontWeight: '600',
+        fontFamily: 'Monaco',
     },
 });
 

@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     },
     tabButtonText: {
         fontSize: 14,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
     },
     ingredientsSection: {
         flex: 1,
@@ -284,9 +284,9 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
         marginBottom: 15,
         textAlign: 'center',
+        fontFamily: 'Monaco',
     },
     ingredientsGrid: {
         flexDirection: 'row',
@@ -314,9 +314,9 @@ const styles = StyleSheet.create({
     },
     ingredientName: {
         fontSize: 14,
-        fontWeight: 'bold',
         textAlign: 'center',
         marginBottom: 5,
+        fontFamily: 'Monaco',
     },
     ingredientDescription: {
         fontSize: 10,
@@ -326,8 +326,8 @@ const styles = StyleSheet.create({
     },
     ingredientRarity: {
         fontSize: 10,
-        fontWeight: 'bold',
         marginBottom: 2,
+        fontFamily: 'Monaco',
     },
     ingredientOwned: {
         fontSize: 10,
@@ -351,11 +351,11 @@ const styles = StyleSheet.create({
     },
     recipeName: {
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
     },
     recipeDifficulty: {
         fontSize: 12,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
     },
     recipeDescription: {
         fontSize: 12,
@@ -367,8 +367,8 @@ const styles = StyleSheet.create({
     },
     recipeIngredientsTitle: {
         fontSize: 12,
-        fontWeight: 'bold',
         marginBottom: 5,
+        fontFamily: 'Monaco',
     },
     recipeIngredient: {
         fontSize: 10,
@@ -377,8 +377,8 @@ const styles = StyleSheet.create({
     },
     recipeResult: {
         fontSize: 12,
-        fontWeight: 'bold',
         color: '#10b981',
+        fontFamily: 'Monaco',
     },
 });
 

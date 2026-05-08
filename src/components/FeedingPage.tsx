@@ -8,10 +8,9 @@ import {
     ScrollView,
     Modal,
     Image,
-    useWindowDimensions,
+    Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ZoomOutOverlay from './ZoomOutOverlay';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import {
     RECIPES,
@@ -34,6 +33,27 @@ function recipeCardArt(recipe: Recipe) {
         return t === 'rare' || t === 'ultra_rare';
     });
     return promoted ? RecipeCards.rare : RecipeCards.common;
+}
+
+// Monaco's charset is 0x20–0x25 + 0x27–0x7d, so '&' (0x26) renders as tofu.
+// Splice in a 04b03 segment for that single glyph, with a size bump so the
+// pixel font reads at roughly the same cap-height as Monaco around it.
+function renderMonacoTitle(text: string, baseFontSize: number) {
+    if (!text.includes('&')) return text;
+    const parts = text.split(/(&)/g);
+    const fallbackSize = Math.round(baseFontSize * 0.7);
+    return parts.map((part, i) =>
+        part === '&' ? (
+            <Text
+                key={i}
+                style={{ fontFamily: '04b03', fontSize: fallbackSize }}
+            >
+                {part}
+            </Text>
+        ) : (
+            part
+        ),
+    );
 }
 
 const TIER_COLOR: Record<IngredientTier, string> = {
@@ -103,14 +123,14 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
         cookRecipe,
     } = useGameStateContext();
     const insets = useSafeAreaInsets();
-    const { height: screenHeight } = useWindowDimensions();
-    // Reserve the top ~27% of the screen so content lands just below the
-    // painted "MENU" banner baked into MENU3.png.
-    const bannerReserve = screenHeight * 0.27;
-    // Bottom beige strip baked into MENU3.png — back button overlays it.
-    const bottomBarReserve = screenHeight * 0.10;
+    const screenWidth = Dimensions.get('window').width;
+    // Top banner is 1200×807, bottom strip is 1200×284 — height scales with
+    // screen width since the overlays render full-bleed (width:'100%') and
+    // resizeMode:contain. Matches Shop's reserve calc so all menu screens
+    // share the same banner-anchored layout grid.
+    const bannerReserve = screenWidth * (807 / 1200);
+    const bottomBarReserve = screenWidth * (284 / 1200);
 
-    const [isClosing, setIsClosing] = useState(false);
     const [manualOpen, setManualOpen] = useState(false);
     const [pendingRecipeId, setPendingRecipeId] = useState<string | null>(null);
     const [pendingManual, setPendingManual] = useState(false);
@@ -146,11 +166,6 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     const hunger = state?.hunger ?? 1;
     const moodMult = 1 + 0.1 * Math.max(0, Math.min(5, mood));
     const hungerMult = 0.5 + 0.1 * Math.max(0, Math.min(5, hunger));
-
-    const handleClose = () => {
-        if (isClosing) return;
-        setIsClosing(true);
-    };
 
     const notifyAlreadyClaimed = () => {
         onNotification?.(
@@ -241,7 +256,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     };
 
     return (
-        <ZoomOutOverlay exiting={isClosing} onExitComplete={onBack} backgroundColor="#1a1033">
+        <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
             <ImageBackground
                 source={Backgrounds.cooking}
                 style={styles.bg}
@@ -251,16 +266,16 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                 <View
                     style={[
                         styles.scrollClipper,
-                        {
-                            marginTop: bannerReserve + insets.top,
-                            marginBottom: bottomBarReserve,
-                        },
+                        { top: 0, bottom: 0 },
                     ]}
                 >
                 <ScrollView
                     contentContainerStyle={[
                         styles.scrollBody,
-                        { paddingBottom: insets.bottom + 16 },
+                        {
+                            paddingTop: bannerReserve + insets.top + 8,
+                            paddingBottom: bottomBarReserve + insets.bottom + 16,
+                        },
                     ]}
                 >
                     <TouchableOpacity
@@ -360,7 +375,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                                                 style={styles.cardTitle}
                                                 numberOfLines={1}
                                             >
-                                                {recipe.name}
+                                                {renderMonacoTitle(recipe.name, 20)}
                                             </Text>
                                             <Image
                                                 source={getRecipeArt(recipe.id)}
@@ -455,6 +470,27 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                 </View>
 
                 <View
+                    pointerEvents="none"
+                    style={[styles.bottomOverlay, { height: bottomBarReserve }]}
+                >
+                    <Image
+                        source={Backgrounds.cookingBottom}
+                        style={styles.overlayImage}
+                        resizeMode="contain"
+                    />
+                </View>
+                <View
+                    pointerEvents="none"
+                    style={[styles.bannerOverlay, { top: 0, height: bannerReserve }]}
+                >
+                    <Image
+                        source={Backgrounds.cookingBanner}
+                        style={styles.overlayImage}
+                        resizeMode="contain"
+                    />
+                </View>
+
+                <View
                     style={[
                         styles.bottomBar,
                         { height: bottomBarReserve, paddingBottom: insets.bottom },
@@ -463,7 +499,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                 >
                     <TouchableOpacity
                         style={styles.backButton}
-                        onPress={handleClose}
+                        onPress={onBack}
                         hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                     >
                         <Text style={styles.backButtonText}>{'<'} Back</Text>
@@ -478,7 +514,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                     onCook={handleManualCook}
                 />
             </ImageBackground>
-        </ZoomOutOverlay>
+        </View>
     );
 };
 
@@ -648,8 +684,27 @@ const styles = StyleSheet.create({
         fontSize: 10,
     },
     scrollClipper: {
-        flex: 1,
+        position: 'absolute',
+        left: 0,
+        right: 0,
         overflow: 'hidden',
+    },
+    bannerOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 1,
+    },
+    bottomOverlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1,
+    },
+    overlayImage: {
+        width: '100%',
+        height: '100%',
     },
     scrollBody: {
         paddingHorizontal: 16,
@@ -718,8 +773,8 @@ const styles = StyleSheet.create({
         left: '7%',
         maxWidth: '88%',
         color: '#ffffff',
-        fontFamily: '04b03',
-        fontSize: 13,
+        fontFamily: 'Monaco',
+        fontSize: 20,
         letterSpacing: 0.5,
         textShadowColor: '#2d1b69',
         textShadowOffset: { width: 1, height: 1 },
@@ -732,8 +787,8 @@ const styles = StyleSheet.create({
         top: '23%',
         left: '5%',
         color: '#ffffff',
-        fontFamily: '04b03',
-        fontSize: 14,
+        fontFamily: 'Monaco',
+        fontSize: 20,
         textShadowColor: '#2d1b69',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
@@ -777,8 +832,8 @@ const styles = StyleSheet.create({
         marginVertical: 2,
     },
     ingredientIcon: {
-        width: 19,
-        height: 19,
+        width: 15,
+        height: 15,
         marginRight: 5,
     },
     ingredientCount: {
@@ -796,8 +851,8 @@ const styles = StyleSheet.create({
         minWidth: '14%',
         textAlign: 'center',
         color: '#ffffff',
-        fontFamily: '04b03',
-        fontSize: 17,
+        fontFamily: 'Monaco',
+        fontSize: 23,
         textShadowColor: '#2d1b69',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,

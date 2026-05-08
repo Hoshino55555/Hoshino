@@ -318,12 +318,13 @@ exports.applyBooster = onCall(COMMON_OPTS, async (request) => {
 exports.recordPlay = onCall(COMMON_OPTS, async (request) => {
   const uid = requireAuth(request);
   const characterId = validateCharacterId(request.data && request.data.characterId);
+  const won = !!(request.data && request.data.won);
   const nowMs = Date.now();
   const state = await loadOrDefault(uid, characterId, nowMs);
   const opts = await getForagingOptsForUser(uid, nowMs);
   let next;
   try {
-    next = engine.applyPlay(state, nowMs, opts);
+    next = engine.applyPlay(state, nowMs, opts, { won });
   } catch (e) {
     throw new HttpsError('failed-precondition', e.message);
   }

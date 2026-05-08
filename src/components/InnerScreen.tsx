@@ -428,8 +428,8 @@ const styles = StyleSheet.create({
     statLabel: {
         color: 'white',
         fontSize: 12,
-        fontWeight: 'bold',
         marginBottom: 2,
+        fontFamily: 'Monaco',
     },
     starRating: {
         color: 'gold',
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     buttonText: {
         color: '#2E5A3E', // Dark green for better contrast
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
     },
     buttonImage: {
         position: 'absolute',
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     closeButtonText: {
         fontSize: 18,
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         transform: [{ translateY: -1 }],
     },
     transitionOverlay: {

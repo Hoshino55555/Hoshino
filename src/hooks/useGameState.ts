@@ -18,7 +18,7 @@ interface UseGameStateResult {
     error: string | null;
     refresh: () => Promise<void>;
     feed: (hungerBoost: number, moodBoost: number) => Promise<GameState>;
-    play: () => Promise<GameState>;
+    play: (won: boolean) => Promise<GameState>;
     chat: () => Promise<GameState>;
     startSleep: () => Promise<GameState>;
     endSleep: (force?: boolean) => Promise<GameState>;
@@ -131,10 +131,10 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         [characterId]
     );
 
-    const play = useCallback(async () => {
+    const play = useCallback(async (won: boolean) => {
         if (!characterId) throw new Error('No character selected');
         const requestedFor = characterId;
-        const next = await GameStateService.play(characterId);
+        const next = await GameStateService.play(characterId, won);
         if (requestedFor !== currentCharacterIdRef.current) return next;
         lastMutationAtRef.current = Date.now();
         setState(next);

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ZoomOutOverlay from './ZoomOutOverlay';
 
 interface Props {
     onBack: () => void;
@@ -36,7 +35,6 @@ const Profile: React.FC<Props> = ({
     onLogout,
 }) => {
     const [nameDraft, setNameDraft] = useState(playerName ?? '');
-    const [isClosing, setIsClosing] = useState(false);
     const insets = useSafeAreaInsets();
 
     useEffect(() => {
@@ -46,11 +44,6 @@ const Profile: React.FC<Props> = ({
     const savedName = (playerName ?? '').trim();
     const draftName = nameDraft.trim();
     const nameDirty = draftName !== savedName;
-
-    const handleClose = () => {
-        if (isClosing) return;
-        setIsClosing(true);
-    };
 
     const handleSaveName = () => {
         if (!onUpdatePlayerName || !nameDirty) return;
@@ -71,10 +64,9 @@ const Profile: React.FC<Props> = ({
     };
 
     return (
-        <ZoomOutOverlay exiting={isClosing} onExitComplete={onBack} backgroundColor="#E8F5E8">
-            <View style={styles.safeArea}>
+        <View style={[styles.safeArea, { backgroundColor: '#E8F5E8' }]}>
                 <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-                    <TouchableOpacity style={styles.backButton} onPress={handleClose} hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}>
+                    <TouchableOpacity style={styles.backButton} onPress={onBack} hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}>
                         <Text style={styles.backButtonText}>{'<'} Back</Text>
                     </TouchableOpacity>
                 </View>
@@ -128,8 +120,7 @@ const Profile: React.FC<Props> = ({
                         </TouchableOpacity>
                     )}
                 </ScrollView>
-            </View>
-        </ZoomOutOverlay>
+        </View>
     );
 };
 
@@ -150,8 +141,8 @@ const styles = StyleSheet.create({
     },
     backButtonText: {
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
-        fontSize: 11,
+        fontFamily: 'Monaco',
+        fontSize: 15,
     },
     content: {
         flex: 1,
@@ -162,9 +153,9 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     title: {
-        fontSize: 18,
+        fontSize: 25,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         textAlign: 'center',
         marginBottom: 18,
     },
@@ -177,15 +168,15 @@ const styles = StyleSheet.create({
         borderColor: '#2E5A3E',
     },
     sectionTitle: {
-        fontSize: 12,
+        fontSize: 17,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         marginBottom: 10,
     },
     fieldLabel: {
-        fontSize: 9,
+        fontSize: 13,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         opacity: 0.75,
         marginBottom: 4,
     },
@@ -193,9 +184,9 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     valueText: {
-        fontSize: 11,
+        fontSize: 15,
         color: '#2E5A3E',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         lineHeight: 15,
     },
     addressText: {
@@ -217,8 +208,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 8,
         color: '#2E5A3E',
-        fontSize: 11,
-        fontFamily: 'PressStart2P',
+        fontSize: 15,
+        fontFamily: 'Monaco',
         marginRight: 8,
     },
     saveButton: {
@@ -232,8 +223,8 @@ const styles = StyleSheet.create({
     },
     saveButtonText: {
         color: '#E8F5E8',
-        fontSize: 10,
-        fontFamily: 'PressStart2P',
+        fontSize: 14,
+        fontFamily: 'Monaco',
     },
     logoutButton: {
         backgroundColor: '#8B2E2E',
@@ -246,8 +237,8 @@ const styles = StyleSheet.create({
     },
     logoutButtonText: {
         color: '#E8F5E8',
-        fontSize: 11,
-        fontFamily: 'PressStart2P',
+        fontSize: 15,
+        fontFamily: 'Monaco',
     },
 });
 

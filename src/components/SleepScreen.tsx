@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -9,7 +9,6 @@ import {
     Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ZoomOutOverlay from './ZoomOutOverlay';
 import { Backgrounds, Sleep, getCharacterSleep } from '../assets';
 
 const SLEEP_REQUIRED_MS = 8 * 60 * 60 * 1000;
@@ -62,14 +61,17 @@ const SleepScreen: React.FC<Props> = ({
     wakeAtMs,
 }) => {
     const insets = useSafeAreaInsets();
-    const [isClosing, setIsClosing] = useState(false);
     const [now, setNow] = useState(Date.now());
 
+    // Parent (SleepController) sets wakeRequested when something other than
+    // the in-screen Wake button initiates the wake (menu sleep tap while
+    // already sleeping, alarm-driven foreground, etc.). Both paths converge
+    // on the same onWake call so the App-level iris runs once.
     useEffect(() => {
-        if (wakeRequested && !isClosing) {
-            setIsClosing(true);
+        if (wakeRequested) {
+            onWake();
         }
-    }, [wakeRequested, isClosing]);
+    }, [wakeRequested, onWake]);
 
     // Tick the clock once a minute. setInterval rather than every second to
     // avoid pointless re-renders — the displayed time only has minute
@@ -80,8 +82,7 @@ const SleepScreen: React.FC<Props> = ({
     }, []);
 
     const handleWake = () => {
-        if (isClosing) return;
-        setIsClosing(true);
+        onWake();
     };
 
     const displayName = (characterId || 'MOONOKO').toUpperCase();
@@ -93,11 +94,7 @@ const SleepScreen: React.FC<Props> = ({
             : '7:00 AM';
 
     return (
-        <ZoomOutOverlay
-            exiting={isClosing}
-            onExitComplete={onWake}
-            backgroundColor="#1a2547"
-        >
+        <View style={StyleSheet.absoluteFill}>
             <ImageBackground
                 source={Backgrounds.sleep}
                 style={styles.bg}
@@ -153,7 +150,7 @@ const SleepScreen: React.FC<Props> = ({
                     </TouchableOpacity>
                 </View>
             </ImageBackground>
-        </ZoomOutOverlay>
+        </View>
     );
 };
 

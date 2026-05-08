@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
     View,
     Text,
@@ -10,7 +10,6 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ZoomOutOverlay from './ZoomOutOverlay';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import {
     INGREDIENT_TIER,
@@ -39,8 +38,6 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
     const bannerReserve = screenHeight * 0.27;
     const bottomBarReserve = screenHeight * 0.10;
 
-    const [isClosing, setIsClosing] = useState(false);
-
     // Sort owned ingredients by tier (rarest first) then alphabetically.
     const owned = useMemo(() => {
         return Object.entries(inventory)
@@ -61,13 +58,8 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
 
     const totalCount = owned.reduce((s, e) => s + e.count, 0);
 
-    const handleClose = () => {
-        if (isClosing) return;
-        setIsClosing(true);
-    };
-
     return (
-        <ZoomOutOverlay exiting={isClosing} onExitComplete={onBack} backgroundColor="#1a1033">
+        <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
             <ImageBackground
                 source={Backgrounds.cooking}
                 style={styles.bg}
@@ -140,14 +132,14 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                 >
                     <TouchableOpacity
                         style={styles.backButton}
-                        onPress={handleClose}
+                        onPress={onBack}
                         hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                     >
                         <Text style={styles.backButtonText}>{'<'} Back</Text>
                     </TouchableOpacity>
                 </View>
             </ImageBackground>
-        </ZoomOutOverlay>
+        </View>
     );
 };
 
@@ -165,11 +157,15 @@ const styles = StyleSheet.create({
     backButton: {
         paddingVertical: 6,
         paddingHorizontal: 10,
+        backgroundColor: 'rgba(46, 90, 62, 0.85)',
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#E8F5E8',
     },
     backButtonText: {
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 12,
+        fontFamily: 'Monaco',
+        fontSize: 14,
     },
     scrollClipper: {
         flex: 1,
@@ -181,8 +177,8 @@ const styles = StyleSheet.create({
     },
     sectionHeading: {
         color: '#E8F5E8',
-        fontFamily: 'PressStart2P',
-        fontSize: 10,
+        fontFamily: 'Monaco',
+        fontSize: 14,
         marginBottom: 10,
     },
     emptyText: {
@@ -215,8 +211,8 @@ const styles = StyleSheet.create({
     },
     itemName: {
         color: '#3a2a1a',
-        fontFamily: '04b03',
-        fontSize: 11,
+        fontFamily: 'Monaco',
+        fontSize: 15,
         textAlign: 'center',
         marginBottom: 4,
     },
@@ -228,8 +224,8 @@ const styles = StyleSheet.create({
     },
     countText: {
         color: '#3a2a1a',
-        fontFamily: '04b03',
-        fontSize: 12,
+        fontFamily: 'Monaco',
+        fontSize: 17,
     },
 });
 

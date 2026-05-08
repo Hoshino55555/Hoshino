@@ -770,21 +770,21 @@ const styles = StyleSheet.create({
         overflow: 'visible', // Allow pixelated borders to show
     },
     storySpeakerLarge: {
-        fontWeight: 'bold',
         fontSize: 16,
         color: '#2E5A3E', // Dark green text
         marginBottom: 5,
+        fontFamily: 'Monaco',
     },
     storyTextLarge: {
-        fontSize: 11,
+        fontSize: 15,
         color: '#2E5A3E', // Dark green text
         lineHeight: 18,
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         letterSpacing: -1, // Reduce space between characters
     },
     boldText: {
-        fontSize: 16,
-        fontFamily: 'PressStart2P',
+        fontSize: 22,
+        fontFamily: 'Monaco',
     },
     storyTextContainer: {
         width: '100%',
@@ -800,11 +800,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     storyPromptLarge: {
-        fontSize: 12,
+        fontSize: 17,
         color: '#4A7A5A', // Medium green for subtle text
         marginTop: 5,
         fontStyle: 'italic',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     starCharacterSection: {
         height: isTablet ? 450 : 350,
@@ -846,7 +846,7 @@ const styles = StyleSheet.create({
         marginBottom: 2,
         textAlign: 'center',
         color: '#2E5A3E', // Same dark green as the input text
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     nameDisplayContainer: {
         flexDirection: 'row',
@@ -865,7 +865,7 @@ const styles = StyleSheet.create({
         lineHeight: isTablet ? 28 : 24,
         includeFontPadding: false,
         textAlignVertical: 'center',
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         flexWrap: 'nowrap',
     },
     hiddenInput: {
@@ -889,11 +889,11 @@ const styles = StyleSheet.create({
     welcomePlayer: {
         fontSize: isTablet ? 28 : 24,
         marginBottom: 10,
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     transitionText: {
         fontSize: isTablet ? 18 : 16,
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
     },
     nameInputOuterBox: {
         width: '80%',
@@ -928,15 +928,15 @@ const styles = StyleSheet.create({
         right: 0,
     },
     choiceText: {
-        fontSize: 13,
+        fontSize: 18,
         color: '#4A7A5A', // Medium green for choice text
         marginHorizontal: 30, // Increased horizontal spacing instead of gap
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         opacity: 0.5, // Make non-underlined options transparent
     },
     selectedChoice: {
         color: '#2E5A3E', // Dark green for selected choice
-        fontFamily: 'PressStart2P',
+        fontFamily: 'Monaco',
         opacity: 1, // Make selected option fully opaque
     },
     continueArrow: {

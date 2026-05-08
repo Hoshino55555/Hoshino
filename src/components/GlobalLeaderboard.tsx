@@ -193,13 +193,13 @@ const styles = StyleSheet.create({
     leaderboardHeaderH2: {
         marginBottom: 8,
         color: '#4f46e5',
-        fontSize: 14,
-        fontFamily: 'PressStart2P',
+        fontSize: 20,
+        fontFamily: 'Monaco',
     },
     leaderboardHeaderP: {
         color: '#6b7280',
-        fontSize: 8,
-        fontFamily: 'PressStart2P',
+        fontSize: 11,
+        fontFamily: 'Monaco',
     },
     closeBtn: {
         position: 'absolute',
@@ -250,8 +250,8 @@ const styles = StyleSheet.create({
     },
     potentialValue: {
         fontSize: 9,
-        fontWeight: 'bold',
         color: '#0c4a6e',
+        fontFamily: 'Monaco',
     },
     breakdown: {
         backgroundColor: 'rgba(255, 255, 255, 0.5)',
@@ -277,8 +277,8 @@ const styles = StyleSheet.create({
     },
     tableHeaderText: {
         fontSize: 8,
-        fontWeight: 'bold',
         color: '#374151',
+        fontFamily: 'Monaco',
     },
     tableRow: {
         flexDirection: 'row',
@@ -309,24 +309,24 @@ const styles = StyleSheet.create({
     },
     rank: {
         textAlign: 'center',
-        fontWeight: 'bold',
         fontSize: 8,
+        fontFamily: 'Monaco',
     },
     wallet: {
-        fontFamily: 'PressStart2P',
-        fontSize: 7,
+        fontFamily: 'Monaco',
+        fontSize: 10,
     },
     moonokos: {
         textAlign: 'center',
         color: '#059669',
-        fontWeight: 'bold',
         fontSize: 8,
+        fontFamily: 'Monaco',
     },
     points: {
         textAlign: 'right',
         color: '#dc2626',
-        fontWeight: 'bold',
         fontSize: 8,
+        fontFamily: 'Monaco',
     },
     advantages: {
         backgroundColor: '#ecfdf5',
@@ -377,8 +377,8 @@ const styles = StyleSheet.create({
     },
     mintCtaText: {
         color: 'white',
-        fontFamily: 'PressStart2P',
-        fontSize: 8,
+        fontFamily: 'Monaco',
+        fontSize: 11,
     },
     bottomButtonLeft: {
         position: 'absolute',

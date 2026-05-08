@@ -400,8 +400,8 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 20,
-        fontWeight: 'bold',
         color: '#ffffff',
+        fontFamily: 'Monaco',
     },
     closeText: {
         fontSize: 24,
@@ -430,13 +430,13 @@ const styles = StyleSheet.create({
     },
     activeTabText: {
         fontSize: 14,
-        fontWeight: '500',
         color: '#93c5fd',
+        fontFamily: 'Monaco',
     },
     inactiveTabText: {
         fontSize: 14,
-        fontWeight: '500',
         color: '#9ca3af',
+        fontFamily: 'Monaco',
     },
     tabCount: {
         marginLeft: 4,
@@ -464,9 +464,9 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
         color: '#ffffff',
         marginBottom: 16,
+        fontFamily: 'Monaco',
     },
     missionCard: {
         backgroundColor: 'rgba(31,41,55,0.5)',
@@ -491,8 +491,8 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     missionName: {
-        fontWeight: 'bold',
         color: '#ffffff',
+        fontFamily: 'Monaco',
     },
     missionDifficulty: {
         fontSize: 12,
@@ -576,8 +576,8 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: '#ffffff',
-        fontWeight: 'bold',
         fontSize: 14,
+        fontFamily: 'Monaco',
     },
     inProgressStatus: {
         alignItems: 'center',
@@ -604,8 +604,8 @@ const styles = StyleSheet.create({
     },
     balanceAmount: {
         fontSize: 24,
-        fontWeight: 'bold',
         color: '#fde047',
+        fontFamily: 'Monaco',
     },
     balanceLabel: {
         fontSize: 14,
@@ -635,7 +635,7 @@ const styles = StyleSheet.create({
     },
     statValue: {
         fontSize: 18,
-        fontWeight: 'bold',
+        fontFamily: 'Monaco',
     },
     statLabel: {
         fontSize: 12,
@@ -654,9 +654,9 @@ const styles = StyleSheet.create({
     },
     seasonTitle: {
         fontSize: 16,
-        fontWeight: 'bold',
         color: '#ffffff',
         marginBottom: 12,
+        fontFamily: 'Monaco',
     },
     seasonPointsRow: {
         flexDirection: 'row',
