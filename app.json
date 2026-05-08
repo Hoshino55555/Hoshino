@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hoshino",
     "slug": "hoshino",
-    "version": "0.1.15-preview",
+    "version": "0.1.16-preview",
     "orientation": "portrait",
     "icon": "./assets/icons/icon.png",
     "userInterfaceStyle": "light",
