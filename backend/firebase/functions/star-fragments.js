@@ -100,6 +100,13 @@ async function loadWallet(uid) {
             ? camp
             : null;
     const rawReadBalance = data.balance;
+    const rawBoosters = data && typeof data.boosters === 'object' ? data.boosters : null;
+    const boosters = {};
+    if (rawBoosters) {
+        for (const [k, v] of Object.entries(rawBoosters)) {
+            if (Number.isSafeInteger(v) && v > 0) boosters[k] = v;
+        }
+    }
     return {
         balance:
             Number.isSafeInteger(rawReadBalance) && rawReadBalance >= 0
@@ -111,6 +118,7 @@ async function loadWallet(uid) {
         },
         caps: readCaps(data),
         activeCamp,
+        boosters,
     };
 }
 
@@ -137,6 +145,7 @@ exports.getStarFragments = onCall(COMMON_OPTS, async (request) => {
             upgradeInventoryPriceSF: UPGRADE_INVENTORY_PRICE_SF,
         },
         activeCamp: w.activeCamp,
+        boosters: w.boosters || {},
     };
 });
 

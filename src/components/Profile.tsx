@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     addressText: {
         fontSize: 10,
         color: '#2E5A3E',
-        fontFamily: 'SpaceMono',
+        fontFamily: 'Monaco',
         lineHeight: 14,
     },
     nameRow: {

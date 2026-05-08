@@ -12,9 +12,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import {
     PressStart2P_400Regular,
 } from '@expo-google-fonts/press-start-2p';
-import {
-    SpaceMono_400Regular,
-} from '@expo-google-fonts/space-mono';
 
 // Hold the native splash up until the auth handshake + fonts have all
 // resolved. Without this, the user sees: native splash → brief "Loading…"
@@ -1704,7 +1701,6 @@ function AuthGate({ fontsLoaded }: AuthGateProps) {
 function AppWrapper() {
     const [fontsLoaded] = useFonts({
         'PressStart2P': PressStart2P_400Regular,
-        'SpaceMono': SpaceMono_400Regular,
         '04b03': require('./assets/fonts/04b03.ttf'),
         // Primary UI font as of 0.1.16 — replaces PressStart2P everywhere
         // except the sleep arc (Sleep* + MorningRecapModal), which stays on

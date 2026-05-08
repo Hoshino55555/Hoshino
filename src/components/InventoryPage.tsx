@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     View,
     Text,
@@ -7,16 +7,54 @@ import {
     ImageBackground,
     ScrollView,
     Image,
+    Alert,
     useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../config/firebase';
 import { useGameStateContext } from '../contexts/GameStateContext';
+import { useFirebaseAuth } from '../contexts/FirebaseAuthContext';
 import {
     INGREDIENT_TIER,
     ingredientLabel,
     type IngredientTier,
 } from '../services/RecipeCatalog';
+import type { BoosterSkuId } from '../services/GameStateService';
+import { SHOP_CATALOG } from '../data/shopCatalog';
 import { Backgrounds, getIngredientArt } from '../assets';
+
+const BOOSTER_SKU_IDS: BoosterSkuId[] = [
+    'booster-mood',
+    'booster-sleep',
+    'booster-hunger',
+];
+
+// Pull catalog metadata once — boosters are static so this is a build-time
+// projection. Falls back to a sensible label if the catalog is missing the
+// SKU (shouldn't happen, but keeps the UI from crashing on a stale build).
+const BOOSTER_META: Record<BoosterSkuId, { name: string; image: any; description: string }> = (() => {
+    const out: any = {};
+    for (const id of BOOSTER_SKU_IDS) {
+        const item = SHOP_CATALOG.find((s) => s.id === id);
+        out[id] = {
+            name: item?.name ?? id,
+            image: item?.image,
+            description: item?.description ?? '',
+        };
+    }
+    return out;
+})();
+
+const callGetStarFragments = httpsCallable<
+    Record<string, never>,
+    { boosters?: Record<string, number> }
+>(functions, 'getStarFragments');
+
+const newRequestId = (prefix: string) =>
+    `${prefix}-${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 10)}`;
 
 const TIER_COLOR: Record<IngredientTier, string> = {
     common: '#cfd8c4',
@@ -32,11 +70,58 @@ interface Props {
 }
 
 const InventoryPage: React.FC<Props> = ({ onBack }) => {
-    const { inventory } = useGameStateContext();
+    const { inventory, consumeBooster } = useGameStateContext();
+    const { ready, firebaseUid } = useFirebaseAuth();
     const insets = useSafeAreaInsets();
     const { height: screenHeight } = useWindowDimensions();
     const bannerReserve = screenHeight * 0.27;
     const bottomBarReserve = screenHeight * 0.10;
+
+    const [boosters, setBoosters] = useState<Record<string, number>>({});
+    const [consumingId, setConsumingId] = useState<BoosterSkuId | null>(null);
+
+    // Pull booster charges from the wallet on mount. Boosters live in
+    // wallet.boosters (server-authoritative); the consumeBooster response
+    // returns the updated map, so we only fetch once.
+    useEffect(() => {
+        if (!ready || !firebaseUid) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await callGetStarFragments({});
+                if (cancelled) return;
+                setBoosters(res.data.boosters || {});
+            } catch {
+                // Silent — empty boosters map renders an empty section.
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [ready, firebaseUid]);
+
+    const ownedBoosters = useMemo(
+        () =>
+            BOOSTER_SKU_IDS.map((id) => ({
+                id,
+                count: boosters[id] || 0,
+                meta: BOOSTER_META[id],
+            })).filter((b) => b.count > 0),
+        [boosters]
+    );
+
+    const handleConsumeBooster = async (skuId: BoosterSkuId) => {
+        if (consumingId) return;
+        setConsumingId(skuId);
+        try {
+            const res = await consumeBooster(skuId, newRequestId('consumebooster'));
+            setBoosters(res.boosters || {});
+        } catch (err: any) {
+            Alert.alert('Booster failed', err?.message || 'Could not use booster.');
+        } finally {
+            setConsumingId(null);
+        }
+    };
 
     // Sort owned ingredients by tier (rarest first) then alphabetically.
     const owned = useMemo(() => {
@@ -82,6 +167,56 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                         ]}
                         showsVerticalScrollIndicator={false}
                     >
+                        {ownedBoosters.length > 0 && (
+                            <>
+                                <Text style={styles.sectionHeading}>BOOSTERS</Text>
+                                <View style={styles.grid}>
+                                    {ownedBoosters.map(({ id, count, meta }) => {
+                                        const busy = consumingId === id;
+                                        return (
+                                            <TouchableOpacity
+                                                key={id}
+                                                style={[
+                                                    styles.card,
+                                                    styles.boosterCard,
+                                                    busy && { opacity: 0.6 },
+                                                ]}
+                                                disabled={!!consumingId}
+                                                onPress={() => handleConsumeBooster(id)}
+                                                activeOpacity={0.7}
+                                            >
+                                                {meta.image ? (
+                                                    <Image
+                                                        source={meta.image}
+                                                        style={styles.itemImage}
+                                                        resizeMode="contain"
+                                                    />
+                                                ) : (
+                                                    <View style={styles.itemImage} />
+                                                )}
+                                                <Text style={styles.itemName} numberOfLines={2}>
+                                                    {meta.name}
+                                                </Text>
+                                                <View style={styles.boosterUseRow}>
+                                                    <Text style={styles.boosterUseLabel}>
+                                                        {busy ? '…' : 'TAP TO USE'}
+                                                    </Text>
+                                                    <View
+                                                        style={[
+                                                            styles.countPill,
+                                                            { backgroundColor: '#7ecf7a' },
+                                                        ]}
+                                                    >
+                                                        <Text style={styles.countText}>×{count}</Text>
+                                                    </View>
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </>
+                        )}
+
                         <Text style={styles.sectionHeading}>
                             INGREDIENTS · {totalCount}
                         </Text>
@@ -226,6 +361,21 @@ const styles = StyleSheet.create({
         color: '#3a2a1a',
         fontFamily: 'Monaco',
         fontSize: 17,
+    },
+    boosterCard: {
+        borderColor: '#7ecf7a',
+    },
+    boosterUseRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        marginTop: 4,
+    },
+    boosterUseLabel: {
+        color: '#3a2a1a',
+        fontFamily: 'Monaco',
+        fontSize: 11,
     },
 });
 

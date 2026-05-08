@@ -200,11 +200,101 @@ exports.feedMoonoko = onCall(COMMON_OPTS, async (request) => {
   return { state: next };
 });
 
-// applyBooster — server-authoritative consumable purchase + immediate stat
-// bump. SF deduction and stat write happen in a single Firestore transaction
-// so a crash mid-flow can't deduct without applying or vice versa. Optional
-// requestId provides cross-device/retry idempotency via idempotency.js.
+// applyBooster — server-authoritative booster purchase. Deducts SF × qty
+// and grants `wallet.boosters[skuId] += qty` so the player owns booster
+// charges as inventory items. Stat bump is deferred to consumeBooster, called
+// when the player taps "use" from the inventory page. Optional requestId
+// gives cross-device/retry idempotency via idempotency.js.
 exports.applyBooster = onCall(COMMON_OPTS, async (request) => {
+  const uid = requireAuth(request);
+  const skuId = String((request.data && request.data.skuId) || '');
+  const sku = BOOSTER_SKUS[skuId];
+  if (!sku) {
+    throw new HttpsError('invalid-argument', `Unknown booster SKU: ${skuId}`);
+  }
+  const rawQty = request.data && request.data.qty;
+  const qty = rawQty == null ? 1 : Number(rawQty);
+  if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
+    throw new HttpsError('invalid-argument', 'qty must be an integer in [1, 99]');
+  }
+  const requestId = idem.validateRequestId(request.data && request.data.requestId);
+  const nowMs = Date.now();
+
+  const wRef = admin
+    .firestore()
+    .collection('users')
+    .doc(uid)
+    .collection('wallet')
+    .doc('main');
+  const lRef = requestId
+    ? idem.ledgerRef({ uid, collection: 'boosterPurchases', requestId })
+    : null;
+
+  const totalCost = sku.priceSF * qty;
+
+  const result = await admin.firestore().runTransaction(async (tx) => {
+    if (lRef) {
+      const replay = await idem.checkIdempotency(tx, lRef, { skuId, qty });
+      if (replay.hit) {
+        return {
+          newBalance: replay.cached.newBalance,
+          boosters: replay.cached.boosters,
+          replayed: true,
+        };
+      }
+    }
+
+    const wSnap = await tx.get(wRef);
+    const wData = wSnap.exists ? wSnap.data() : {};
+    const rawBalance = wData.balance;
+    const balance = Number.isSafeInteger(rawBalance) && rawBalance >= 0 ? rawBalance : 0;
+    if (balance < totalCost) {
+      throw new HttpsError(
+        'failed-precondition',
+        `Not enough Star Fragments — need ${totalCost}, have ${balance}.`
+      );
+    }
+    const curBoosters = (wData && typeof wData.boosters === 'object' && wData.boosters) || {};
+    const nextBoosters = { ...curBoosters };
+    const cur = Number.isSafeInteger(curBoosters[skuId]) && curBoosters[skuId] >= 0
+      ? curBoosters[skuId]
+      : 0;
+    nextBoosters[skuId] = cur + qty;
+    const newBalance = balance - totalCost;
+    tx.set(
+      wRef,
+      { balance: newBalance, boosters: nextBoosters, updatedAt: nowMs },
+      { merge: true }
+    );
+    if (lRef) {
+      idem.writeLedger(tx, lRef, {
+        uid,
+        skuId,
+        qty,
+        priceSF: sku.priceSF,
+        totalCost,
+        newBalance,
+        boosters: nextBoosters,
+      });
+    }
+    return { newBalance, boosters: nextBoosters, replayed: false };
+  });
+
+  return {
+    ...result,
+    skuId,
+    qty,
+    totalCost,
+    priceSF: sku.priceSF,
+  };
+});
+
+// consumeBooster — decrement wallet.boosters[skuId] by 1 and apply the stat
+// bump in a single Firestore transaction. Refuses when the player has zero
+// charges or the moonoko is sleeping (engine.applyBooster throws). Optional
+// requestId gives idempotency for the consume itself (separate ledger from
+// purchases — same requestId across both wouldn't collide).
+exports.consumeBooster = onCall(COMMON_OPTS, async (request) => {
   const uid = requireAuth(request);
   const characterId = validateCharacterId(request.data && request.data.characterId);
   const skuId = String((request.data && request.data.skuId) || '');
@@ -214,11 +304,9 @@ exports.applyBooster = onCall(COMMON_OPTS, async (request) => {
   }
   const requestId = idem.validateRequestId(request.data && request.data.requestId);
   const nowMs = Date.now();
-  // RNG seed is wallet-independent (HMAC of uid+window or VRF lookup), so it
-  // can be prepared outside the transaction. Carry/interval opts are derived
-  // from the wallet doc *inside* the tx below to avoid a race where a
-  // concurrent camp purchase/expiry mutates activeCamp between this read and
-  // the tx commit.
+  // RNG seed prep outside the tx — same rationale as applyBooster used to
+  // have. Carry/interval opts come from inside the tx so a concurrent camp
+  // purchase/expiry can't desync.
   const rng = await makeForagingRngForUser({ uid, nowMs, firestore: admin.firestore() });
 
   const wRef = admin
@@ -229,7 +317,7 @@ exports.applyBooster = onCall(COMMON_OPTS, async (request) => {
     .doc('main');
   const sRef = stateRef(uid, characterId);
   const lRef = requestId
-    ? idem.ledgerRef({ uid, collection: 'boosterPurchases', requestId })
+    ? idem.ledgerRef({ uid, collection: 'boosterConsumes', requestId })
     : null;
 
   const result = await admin.firestore().runTransaction(async (tx) => {
@@ -237,7 +325,7 @@ exports.applyBooster = onCall(COMMON_OPTS, async (request) => {
       const replay = await idem.checkIdempotency(tx, lRef, { skuId, characterId });
       if (replay.hit) {
         return {
-          newBalance: replay.cached.newBalance,
+          boosters: replay.cached.boosters,
           state: replay.cached.state,
           replayed: true,
         };
@@ -245,9 +333,6 @@ exports.applyBooster = onCall(COMMON_OPTS, async (request) => {
     }
 
     const [wSnap, sSnap] = await Promise.all([tx.get(wRef), tx.get(sRef)]);
-    // Don't auto-create a moonoko doc here — that would let an authenticated
-    // user fabricate ownership records for 40 SF. The character must already
-    // exist (created via the normal mint/onboarding flow).
     if (!sSnap.exists) {
       throw new HttpsError(
         'not-found',
@@ -255,17 +340,16 @@ exports.applyBooster = onCall(COMMON_OPTS, async (request) => {
       );
     }
     const wData = wSnap.exists ? wSnap.data() : {};
-    const rawBalance = wData.balance;
-    const balance = Number.isSafeInteger(rawBalance) && rawBalance >= 0 ? rawBalance : 0;
-    if (balance < sku.priceSF) {
+    const curBoosters = (wData && typeof wData.boosters === 'object' && wData.boosters) || {};
+    const owned = Number.isSafeInteger(curBoosters[skuId]) && curBoosters[skuId] > 0
+      ? curBoosters[skuId]
+      : 0;
+    if (owned <= 0) {
       throw new HttpsError(
         'failed-precondition',
-        `Not enough Star Fragments — need ${sku.priceSF}, have ${balance}.`
+        `No ${skuId} in inventory — buy one from the shop.`
       );
     }
-    // Build foraging opts from the same wallet snapshot we already read
-    // inside this tx — keeps carry/interval consistent with whatever
-    // concurrent camp purchase / expiry committed before us.
     const camp = readActiveCamp(wData, nowMs);
     const caps = readCaps(wData);
     const carryMult = camp ? CAMP_CARRY_MULT : 1;
@@ -287,10 +371,10 @@ exports.applyBooster = onCall(COMMON_OPTS, async (request) => {
     } catch (e) {
       throw new HttpsError('failed-precondition', e.message);
     }
-    const newBalance = balance - sku.priceSF;
+    const nextBoosters = { ...curBoosters, [skuId]: owned - 1 };
     tx.set(
       wRef,
-      { balance: newBalance, updatedAt: nowMs },
+      { boosters: nextBoosters, updatedAt: nowMs },
       { merge: true }
     );
     tx.set(sRef, next, { merge: false });
@@ -299,19 +383,18 @@ exports.applyBooster = onCall(COMMON_OPTS, async (request) => {
         uid,
         characterId,
         skuId,
-        priceSF: sku.priceSF,
         stat: sku.stat,
-        newBalance,
+        boosters: nextBoosters,
         state: next,
       });
     }
-    return { newBalance, state: next, replayed: false };
+    return { boosters: nextBoosters, state: next, replayed: false };
   });
 
   return {
     ...result,
     stat: sku.stat,
-    priceSF: sku.priceSF,
+    skuId,
   };
 });
 

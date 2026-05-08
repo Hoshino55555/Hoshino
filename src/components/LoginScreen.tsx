@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
         paddingVertical: Platform.OS === 'ios' ? 14 : 12,
         fontSize: 15,
         color: '#103142',
-        fontFamily: 'SpaceMono',
+        fontFamily: 'Monaco',
     },
     emailPreview: {
         paddingHorizontal: 14,
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
         color: '#4c7e90',
     },
     emailPreviewValue: {
-        fontFamily: 'SpaceMono',
+        fontFamily: 'Monaco',
         fontSize: 14,
         color: '#14394b',
     },

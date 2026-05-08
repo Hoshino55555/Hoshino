@@ -63,20 +63,13 @@ const BOOSTER_SKU_IDS = new Set<BoosterSkuId>([
     'booster-sleep',
     'booster-hunger',
 ]);
-const STAT_LABEL: Record<string, string> = {
-    mood: 'Mood',
-    energy: 'Energy',
-    hunger: 'Hunger',
-};
-
-// Cart qty rule. Phase 1A: only items whose grant repeats cleanly through
-// existing batched/loopable callables can stack — ingredient boxes (loop the
-// per-box callable) and loose ingredients (one batched purchase). Boosters
-// become qty>=N in Phase 1B (after the inventory-consumable refactor); SF
-// packs and IAP bundles become qty>=N in Phase 3 (cart-shaped IAP intents).
+// Cart qty rule. Stackable SKUs go through a single qty-aware callable
+// (boosters, ingredients) or loop a per-unit callable (ingredient boxes).
+// SF packs and IAP bundles become qty>=N in Phase 3 (cart-shaped IAP intents).
 const isStackableSku = (item: ShopItem): boolean => {
     if (item.id.startsWith('box-ingredients-')) return true;
     if (item.id in INGREDIENT_TIER) return true;
+    if (BOOSTER_SKU_IDS.has(item.id as BoosterSkuId)) return true;
     return false;
 };
 
@@ -154,7 +147,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 
     const walletKey = publicKey ?? FALLBACK_WALLET;
     const starFragmentService = useMemo(() => new StarFragmentService(connection), [connection]);
-    const { refreshPantry, applyBooster: applyBoosterCtx, refresh: refreshGameState } = useGameStateContext();
+    const { refreshPantry, applyBooster: applyBoosterCtx } = useGameStateContext();
 
     const [selectedTab, setSelectedTab] = useState<ShopTab>('consumables');
     const [balance, setBalance] = useState<number>(0);
@@ -173,10 +166,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     const [purchasing, setPurchasing] = useState(false);
     const [caps, setCaps] = useState<ServerCaps | null>(null);
     const [capLimits, setCapLimits] = useState<ServerCapLimits | null>(null);
-    const [upgradingField, setUpgradingField] = useState<'carryCap' | 'inventoryCap' | null>(null);
     const [activeCamp, setActiveCamp] = useState<ActiveCamp | null>(null);
-    const [purchasingCampId, setPurchasingCampId] = useState<string | null>(null);
-    const campInFlightRef = useRef(false);
     // IAP modal state — opened when checkout reaches an iap-pending line
     // (SF packs, season pass, bundles). One modal per item; iapQueue holds
     // the pending ones so we walk them sequentially once SF dispatch is done.
@@ -196,11 +186,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     } | null>(null);
     const [iapToken, setIapToken] = useState<IAPPaymentToken>('USDC');
     const [iapPurchasing, setIapPurchasing] = useState(false);
-    const [boosterPurchasingId, setBoosterPurchasingId] = useState<string | null>(null);
-    // Synchronous double-tap guard — React state updates are async, so two
-    // taps inside the same frame both saw boosterPurchasingId === null and
-    // could each fire applyBooster, draining 2x SF for one stat bump.
-    const boosterInFlightRef = useRef(false);
     const { fundWallet } = useFundSolanaWallet();
     // 1s tick for spin cooldown countdown — only when locked + visible.
     const [, setNowTick] = useState(0);
@@ -378,131 +363,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         runNextReveal();
     }, [runNextReveal]);
 
-    const [claimingHackathon, setClaimingHackathon] = useState(false);
-    const handleHackathonSpecial = useCallback(async () => {
-        if (claimingHackathon) return;
-        setClaimingHackathon(true);
-        try {
-            const res = await starFragmentService.claimHackathonSpecial();
-            setBalance(res.newBalance);
-            onNotification?.(
-                `Hackathon Special claimed — +${res.granted.toLocaleString()} Shards!`,
-                'success'
-            );
-        } catch (err: any) {
-            onNotification?.(err?.message || 'Hackathon claim failed', 'error');
-        } finally {
-            setClaimingHackathon(false);
-        }
-    }, [claimingHackathon, starFragmentService, onNotification]);
-
-    // Tracks which box is mid-purchase so we can disable just that card.
-    const [openingBoxId, setOpeningBoxId] = useState<string | null>(null);
-    const handleBoxPurchase = useCallback(async (item: ShopItem) => {
-        if (openingBoxId) return;
-        if (balance < item.priceStarFragments) {
-            onNotification?.(
-                `Not enough Shards — need ${item.priceStarFragments}, have ${balance}.`,
-                'error'
-            );
-            return;
-        }
-        setOpeningBoxId(item.id);
-        try {
-            const res = await starFragmentService.purchaseIngredientBox(
-                item.id as 'box-ingredients-common' | 'box-ingredients-uncommon' | 'box-ingredients-rare',
-                newRequestId('box')
-            );
-            setBalance(res.newBalance);
-            await refreshPantry();
-            const summary = Object.entries(res.granted)
-                .map(([id, n]) => `${ingredientLabel(id)} ×${n}`)
-                .join(', ');
-            onNotification?.(`Opened ${item.name} — ${summary}`, 'success');
-        } catch (err: any) {
-            onNotification?.(err?.message || 'Box open failed', 'error');
-        } finally {
-            setOpeningBoxId(null);
-        }
-    }, [openingBoxId, balance, starFragmentService, refreshPantry, onNotification]);
-
-    const handleUpgrade = useCallback(async (
-        item: ShopItem,
-        kind: 'carryCap' | 'inventoryCap'
-    ) => {
-        if (upgradingField) return;
-        if (balance < item.priceStarFragments) {
-            onNotification?.(
-                `Not enough Shards — need ${item.priceStarFragments}, have ${balance}.`,
-                'error'
-            );
-            return;
-        }
-        setUpgradingField(kind);
-        try {
-            const upgradeReqId = newRequestId('up');
-            const res =
-                kind === 'carryCap'
-                    ? await starFragmentService.upgradeCarryCapacity(upgradeReqId)
-                    : await starFragmentService.upgradeInventorySize(upgradeReqId);
-            setBalance(res.newBalance);
-            setCaps((prev) => ({
-                carryCap:
-                    kind === 'carryCap'
-                        ? (res as { carryCap: number }).carryCap
-                        : prev?.carryCap ?? 0,
-                inventoryCap:
-                    kind === 'inventoryCap'
-                        ? (res as { inventoryCap: number }).inventoryCap
-                        : prev?.inventoryCap ?? 0,
-            }));
-            const newValue =
-                kind === 'carryCap'
-                    ? (res as { carryCap: number }).carryCap
-                    : (res as { inventoryCap: number }).inventoryCap;
-            onNotification?.(
-                `${item.name} upgraded — now ${newValue}`,
-                'success'
-            );
-        } catch (err: any) {
-            onNotification?.(err?.message || 'Upgrade failed', 'error');
-        } finally {
-            setUpgradingField(null);
-        }
-    }, [upgradingField, balance, starFragmentService, onNotification]);
-
-    const handleCampPurchase = useCallback(async (item: ShopItem, campId: CampId) => {
-        if (campInFlightRef.current) return;
-        if (activeCamp && activeCamp.expiresAtMs > Date.now()) {
-            onNotification?.('A camp is already active.', 'info');
-            return;
-        }
-        if (balance < item.priceStarFragments) {
-            onNotification?.(
-                `Not enough Shards — need ${item.priceStarFragments}, have ${balance}.`,
-                'error'
-            );
-            return;
-        }
-        campInFlightRef.current = true;
-        setPurchasingCampId(item.id);
-        try {
-            const res = await starFragmentService.purchaseCamp(
-                campId,
-                newRequestId('camp')
-            );
-            setBalance(res.newBalance);
-            setActiveCamp(res.activeCamp);
-            onNotification?.(`${item.name} active — boost engaged!`, 'success');
-        } catch (err: any) {
-            onNotification?.(err?.message || 'Camp purchase failed.', 'error');
-            await refreshBalance();
-        } finally {
-            setPurchasingCampId(null);
-            campInFlightRef.current = false;
-        }
-    }, [activeCamp, balance, starFragmentService, onNotification, refreshBalance]);
-
     // Default rail: external wallets (MWA/Phantom/Backpack) lean on SKR/SOL,
     // embedded (Privy) defaults to USDC since fiat onramp lands as USDC.
     useEffect(() => {
@@ -626,39 +486,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         }
     };
 
-    const handleBoosterPurchase = useCallback(
-        async (item: ShopItem) => {
-            if (boosterInFlightRef.current) return;
-            if (!BOOSTER_SKU_IDS.has(item.id as BoosterSkuId)) return;
-            if (balance < item.priceStarFragments) {
-                onNotification?.(
-                    `Not enough Shards — need ${item.priceStarFragments}, have ${balance}.`,
-                    'error'
-                );
-                return;
-            }
-            boosterInFlightRef.current = true;
-            setBoosterPurchasingId(item.id);
-            const requestId = newRequestId('b');
-            try {
-                const res = await applyBoosterCtx(item.id as BoosterSkuId, requestId);
-                setBalance(res.newBalance);
-                const label = STAT_LABEL[res.stat] || res.stat;
-                const newVal = res.state[res.stat as 'mood' | 'energy' | 'hunger'];
-                onNotification?.(`${label} restored — now ${newVal}/5.`, 'success');
-            } catch (err: any) {
-                onNotification?.(err?.message || 'Booster failed.', 'error');
-                // Server may have committed before throwing on retry/timeout —
-                // refresh both wallet and game state so the UI matches truth.
-                await Promise.all([refreshBalance(), refreshGameState()]);
-            } finally {
-                setBoosterPurchasingId(null);
-                boosterInFlightRef.current = false;
-            }
-        },
-        [balance, applyBoosterCtx, onNotification, refreshBalance, refreshGameState]
-    );
-
     const addToCart = (item: ShopItem) => {
         if (item.status === 'effect-pending') {
             onNotification?.("Coming soon — this item's effect is being wired up.", 'info');
@@ -770,15 +597,18 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             return results;
         }
         if (BOOSTER_SKU_IDS.has(id as BoosterSkuId)) {
-            const lines: string[] = [];
-            for (let i = 0; i < qty; i++) {
-                const res = await applyBoosterCtx(id as BoosterSkuId, newRequestId('b'));
-                setBalance(res.newBalance);
-                const label = STAT_LABEL[res.stat] || res.stat;
-                const newVal = res.state[res.stat as 'mood' | 'energy' | 'hunger'];
-                lines.push(`${label} → ${newVal}/5`);
-            }
-            return [{ kind: 'instant', line: lines.join(' · ') }];
+            // Boosters are now inventory consumables: purchase grants charges
+            // to wallet.boosters[skuId]; the stat bump fires later when the
+            // player taps "use" from the inventory page.
+            const res = await applyBoosterCtx(id as BoosterSkuId, qty, newRequestId('b'));
+            setBalance(res.newBalance);
+            const noun = qty === 1 ? 'charge' : 'charges';
+            return [
+                {
+                    kind: 'instant',
+                    line: `${item.name} ×${qty} ${noun} — use from inventory`,
+                },
+            ];
         }
         if (id === 'upgrade-carry') {
             const res = await starFragmentService.upgradeCarryCapacity(newRequestId('up'));
@@ -964,9 +794,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             style={[styles.itemCard, { borderColor: getRarityBorderColor(item.rarity) }]}
         >
             <TouchableOpacity
-                style={[styles.itemClickArea, claimingHackathon && styles.disabledItem]}
+                style={styles.itemClickArea}
                 onPress={() => addToCart(item)}
-                disabled={claimingHackathon}
             >
                 <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
                 <Text style={styles.itemName} numberOfLines={2}>
@@ -976,27 +805,23 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     {item.summary}
                 </Text>
                 <View style={styles.priceContainer}>
-                    <Text style={[styles.itemPrice, { color: '#2e5a3e' }]}>
-                        {claimingHackathon ? 'CLAIMING…' : 'FREE'}
-                    </Text>
+                    <Text style={[styles.itemPrice, { color: '#2e5a3e' }]}>FREE</Text>
                 </View>
             </TouchableOpacity>
         </View>
     );
 
     const renderBoxCard = (item: ShopItem) => {
-        const opening = openingBoxId === item.id;
-        const insufficient = balance < item.priceStarFragments;
-        const disabled = opening || (openingBoxId !== null && !opening) || insufficient;
+        const insufficient = balance - cartTotal < item.priceStarFragments;
         return (
             <View
                 key={item.id}
                 style={[styles.itemCard, { borderColor: getRarityBorderColor(item.rarity) }]}
             >
                 <TouchableOpacity
-                    style={[styles.itemClickArea, disabled && styles.disabledItem]}
+                    style={[styles.itemClickArea, insufficient && styles.disabledItem]}
                     onPress={() => addToCart(item)}
-                    disabled={disabled}
+                    disabled={insufficient}
                 >
                     <Image
                         source={item.image}
@@ -1016,10 +841,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     <View style={styles.priceContainer}>
                         <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
                         <Text style={[styles.itemPrice, insufficient && styles.disabledText]}>
-                            {opening ? 'OPENING…' : item.priceStarFragments}
+                            {item.priceStarFragments}
                         </Text>
                     </View>
-                    {insufficient && !opening && (
+                    {insufficient && (
                         <Text style={styles.insufficientText}>INSUFFICIENT</Text>
                     )}
                 </TouchableOpacity>
@@ -1037,10 +862,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 ? capLimits?.carryCapMax ?? null
                 : capLimits?.inventoryCapMax ?? null;
         const atMax = current != null && max != null && current >= max;
-        const upgrading = upgradingField === kind;
-        const otherUpgrading = upgradingField !== null && !upgrading;
-        const insufficient = balance < item.priceStarFragments;
-        const disabled = atMax || upgrading || otherUpgrading || insufficient;
+        const insufficient = balance - cartTotal < item.priceStarFragments;
+        const disabled = atMax || insufficient;
         const summary =
             current != null && max != null
                 ? `Now ${current}${atMax ? ' (max)' : ` · max ${max}`}`
@@ -1065,10 +888,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     <View style={styles.priceContainer}>
                         <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
                         <Text style={[styles.itemPrice, (insufficient || atMax) && styles.disabledText]}>
-                            {upgrading ? '…' : atMax ? 'MAX' : item.priceStarFragments}
+                            {atMax ? 'MAX' : item.priceStarFragments}
                         </Text>
                     </View>
-                    {insufficient && !atMax && !upgrading && (
+                    {insufficient && !atMax && (
                         <Text style={styles.insufficientText}>INSUFFICIENT</Text>
                     )}
                 </TouchableOpacity>
@@ -1079,9 +902,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     const renderCampCard = (item: ShopItem, campId: CampId) => {
         const nowMs = Date.now();
         const isActive = !!activeCamp && activeCamp.id === campId && activeCamp.expiresAtMs > nowMs;
-        const purchasing = purchasingCampId === item.id;
-        const insufficient = !isActive && balance < item.priceStarFragments;
-        const disabled = isActive || purchasing || insufficient;
+        const insufficient = !isActive && balance - cartTotal < item.priceStarFragments;
+        const disabled = isActive || insufficient;
         let summary = item.summary || item.description;
         if (isActive) {
             const remainingMs = activeCamp!.expiresAtMs - nowMs;
@@ -1105,10 +927,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     <View style={styles.priceContainer}>
                         <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
                         <Text style={[styles.itemPrice, (insufficient || isActive) && styles.disabledText]}>
-                            {purchasing ? '…' : isActive ? 'ACTIVE' : item.priceStarFragments}
+                            {isActive ? 'ACTIVE' : item.priceStarFragments}
                         </Text>
                     </View>
-                    {insufficient && !isActive && !purchasing && (
+                    {insufficient && !isActive && (
                         <Text style={styles.insufficientText}>INSUFFICIENT</Text>
                     )}
                 </TouchableOpacity>
@@ -1127,13 +949,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         // effect-pending stays as a hard "Coming Soon" lock.
         const isIap = item.status === 'iap-pending';
         const locked = item.status === 'effect-pending';
-        const isBooster = BOOSTER_SKU_IDS.has(item.id as BoosterSkuId);
-        const boosterBusy = boosterPurchasingId === item.id;
-        const otherBoosterBusy = !!boosterPurchasingId && !boosterBusy;
-        const projected = isBooster ? item.priceStarFragments : cartTotal + item.priceStarFragments;
+        const projected = cartTotal + item.priceStarFragments;
         const insufficient =
             !locked && item.currency === 'starFragments' && projected > balance;
-        const disabled = locked || insufficient || boosterBusy || otherBoosterBusy;
+        const disabled = locked || insufficient;
 
         return (
             <View
@@ -1147,7 +966,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 <TouchableOpacity
                     style={[styles.itemClickArea, disabled && styles.disabledItem]}
                     onPress={() => addToCart(item)}
-                    disabled={(insufficient && !locked) || boosterBusy || otherBoosterBusy}
+                    disabled={insufficient && !locked}
                 >
                     <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
 
@@ -1171,7 +990,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                         <View style={styles.priceContainer}>
                             <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
                             <Text style={[styles.itemPrice, insufficient && styles.disabledText]}>
-                                {boosterBusy ? '…' : item.priceStarFragments}
+                                {item.priceStarFragments}
                             </Text>
                         </View>
                     )}

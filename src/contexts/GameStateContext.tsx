@@ -8,6 +8,7 @@ import type {
     RecipeProgressMap,
     BoosterSkuId,
     BoosterStat,
+    BoosterCounts,
 } from '../services/GameStateService';
 
 interface GameStateContextType {
@@ -30,8 +31,27 @@ interface GameStateContextType {
     cookRecipe: (recipeId: string) => Promise<CookResponse>;
     applyBooster: (
         skuId: BoosterSkuId,
+        qty?: number,
         requestId?: string
-    ) => Promise<{ newBalance: number; state: GameState; stat: BoosterStat; priceSF: number; replayed: boolean }>;
+    ) => Promise<{
+        newBalance: number;
+        boosters: BoosterCounts;
+        skuId: BoosterSkuId;
+        qty: number;
+        priceSF: number;
+        totalCost: number;
+        replayed: boolean;
+    }>;
+    consumeBooster: (
+        skuId: BoosterSkuId,
+        requestId?: string
+    ) => Promise<{
+        boosters: BoosterCounts;
+        state: GameState;
+        stat: BoosterStat;
+        skuId: BoosterSkuId;
+        replayed: boolean;
+    }>;
 }
 
 const GameStateContext = createContext<GameStateContextType | undefined>(undefined);

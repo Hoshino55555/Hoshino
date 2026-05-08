@@ -596,7 +596,7 @@ const styles = StyleSheet.create({
     },
     rowText: {
         color: '#1a1a1a',
-        fontFamily: 'SpaceMono',
+        fontFamily: 'Monaco',
         fontSize: 13,
         lineHeight: 18,
     },
@@ -618,7 +618,7 @@ const styles = StyleSheet.create({
     textInput: {
         flex: 1,
         color: '#2a2a2a',
-        fontFamily: 'SpaceMono',
+        fontFamily: 'Monaco',
         fontSize: 13,
         paddingHorizontal: 8,
         paddingVertical: 6,

@@ -88,10 +88,33 @@ const callDrainForaged = httpsCallable<
 export type BoosterStat = 'mood' | 'energy' | 'hunger';
 export type BoosterSkuId = 'booster-mood' | 'booster-sleep' | 'booster-hunger';
 
+export interface BoosterCounts {
+    [skuId: string]: number;
+}
+
 const callApplyBooster = httpsCallable<
-    { characterId: string; skuId: BoosterSkuId; requestId?: string; timezone?: string },
-    { newBalance: number; state: GameState; stat: BoosterStat; priceSF: number; replayed: boolean }
+    { skuId: BoosterSkuId; qty?: number; requestId?: string },
+    {
+        newBalance: number;
+        boosters: BoosterCounts;
+        skuId: BoosterSkuId;
+        qty: number;
+        priceSF: number;
+        totalCost: number;
+        replayed: boolean;
+    }
 >(functions, 'applyBooster');
+
+const callConsumeBooster = httpsCallable<
+    { characterId: string; skuId: BoosterSkuId; requestId?: string },
+    {
+        boosters: BoosterCounts;
+        state: GameState;
+        stat: BoosterStat;
+        skuId: BoosterSkuId;
+        replayed: boolean;
+    }
+>(functions, 'consumeBooster');
 
 const callExchangePrivyToken = httpsCallable<
     { privyAccessToken: string },
@@ -238,16 +261,34 @@ export const GameStateService = {
     },
 
     async applyBooster(
+        skuId: BoosterSkuId,
+        qty: number = 1,
+        requestId?: string
+    ): Promise<{
+        newBalance: number;
+        boosters: BoosterCounts;
+        skuId: BoosterSkuId;
+        qty: number;
+        priceSF: number;
+        totalCost: number;
+        replayed: boolean;
+    }> {
+        const res = await callApplyBooster({ skuId, qty, requestId });
+        return res.data;
+    },
+
+    async consumeBooster(
         characterId: string,
         skuId: BoosterSkuId,
         requestId?: string
-    ): Promise<{ newBalance: number; state: GameState; stat: BoosterStat; priceSF: number; replayed: boolean }> {
-        const res = await callApplyBooster({
-            characterId,
-            skuId,
-            requestId,
-            timezone: localTimezone(),
-        });
+    ): Promise<{
+        boosters: BoosterCounts;
+        state: GameState;
+        stat: BoosterStat;
+        skuId: BoosterSkuId;
+        replayed: boolean;
+    }> {
+        const res = await callConsumeBooster({ characterId, skuId, requestId });
         return res.data;
     },
 

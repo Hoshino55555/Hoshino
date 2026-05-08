@@ -39,6 +39,7 @@ exports.startSleep = gameState.startSleep;
 exports.endSleep = gameState.endSleep;
 exports.drainForaged = gameState.drainForaged;
 exports.applyBooster = gameState.applyBooster;
+exports.consumeBooster = gameState.consumeBooster;
 
 // Cooking
 exports.cook = cooking.cook;
@@ -88,6 +89,7 @@ exports.health = onRequest({ cors: ['*'], invoker: 'public' }, async (req, res) 
       'endSleep',
       'drainForaged',
       'applyBooster',
+      'consumeBooster',
       'purchaseCamp',
       'cook',
       'getInventory',

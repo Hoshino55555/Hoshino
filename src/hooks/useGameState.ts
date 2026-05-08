@@ -8,6 +8,7 @@ import {
     type RecipeProgressMap,
     type BoosterSkuId,
     type BoosterStat,
+    type BoosterCounts,
     SLEEP_REQUIRED_MS,
 } from '../services/GameStateService';
 import { useFirebaseAuth } from '../contexts/FirebaseAuthContext';
@@ -33,8 +34,27 @@ interface UseGameStateResult {
     cookRecipe: (recipeId: string) => Promise<CookResponse>;
     applyBooster: (
         skuId: BoosterSkuId,
+        qty?: number,
         requestId?: string
-    ) => Promise<{ newBalance: number; state: GameState; stat: BoosterStat; priceSF: number; replayed: boolean }>;
+    ) => Promise<{
+        newBalance: number;
+        boosters: BoosterCounts;
+        skuId: BoosterSkuId;
+        qty: number;
+        priceSF: number;
+        totalCost: number;
+        replayed: boolean;
+    }>;
+    consumeBooster: (
+        skuId: BoosterSkuId,
+        requestId?: string
+    ) => Promise<{
+        boosters: BoosterCounts;
+        state: GameState;
+        stat: BoosterStat;
+        skuId: BoosterSkuId;
+        replayed: boolean;
+    }>;
 }
 
 export function useGameState(characterId: string | null | undefined): UseGameStateResult {
@@ -271,10 +291,25 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     );
 
     const applyBooster = useCallback(
+        async (skuId: BoosterSkuId, qty: number = 1, requestId?: string) => {
+            // Booster purchase no longer mutates moonoko state — it just adds
+            // charges to the wallet. characterId is irrelevant; kept here only
+            // so callers don't have to thread a character ref through the
+            // shop's checkout dispatch.
+            return GameStateService.applyBooster(skuId, qty, requestId);
+        },
+        []
+    );
+
+    const consumeBooster = useCallback(
         async (skuId: BoosterSkuId, requestId?: string) => {
             if (!characterId) throw new Error('No character selected');
             const requestedFor = characterId;
-            const res = await GameStateService.applyBooster(characterId, skuId, requestId);
+            const res = await GameStateService.consumeBooster(
+                characterId,
+                skuId,
+                requestId
+            );
             if (requestedFor !== currentCharacterIdRef.current) return res;
             lastMutationAtRef.current = Date.now();
             setState(res.state);
@@ -310,5 +345,6 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         cookManual,
         cookRecipe,
         applyBooster,
+        consumeBooster,
     };
 }

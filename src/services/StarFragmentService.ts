@@ -25,6 +25,7 @@ type ServerBalance = {
     caps?: ServerCaps;
     capLimits?: ServerCapLimits;
     activeCamp?: ActiveCamp | null;
+    boosters?: Record<string, number>;
 };
 export type { ServerCaps, ServerCapLimits, ServerBalance };
 export type CampId = 'sleeping-camp';
