@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     backButtonText: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
     },
     scrollClipper: {
         position: 'absolute',
@@ -208,14 +208,14 @@ const styles = StyleSheet.create({
     tileName: {
         color: '#FFD700',
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 26,
         marginBottom: 6,
         textAlign: 'center',
     },
     tileDescription: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 11,
+        fontSize: 17,
         textAlign: 'center',
         lineHeight: 12,
     },
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
         marginTop: 6,
         color: '#FFB6C1',
         fontFamily: 'Monaco',
-        fontSize: 11,
+        fontSize: 17,
     },
 });
 

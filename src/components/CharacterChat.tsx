@@ -460,14 +460,14 @@ const styles = StyleSheet.create({
     headerSideText: {
         color: '#f5d65f',
         fontFamily: 'Monaco',
-        fontSize: 20,
+        fontSize: 30,
     },
     headerTitle: {
         flex: 1,
         textAlign: 'center',
         color: '#f5d65f',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         letterSpacing: 0.5,
     },
     body: {
@@ -493,14 +493,14 @@ const styles = StyleSheet.create({
     capacityPct: {
         color: '#ffffff',
         fontFamily: 'Monaco',
-        fontSize: 13,
+        fontSize: 20,
         marginBottom: 2,
         textAlign: 'center',
     },
     capacityLabel: {
         color: '#f5d65f',
         fontFamily: 'Monaco',
-        fontSize: 7,
+        fontSize: 11,
         marginBottom: 1,
         textAlign: 'center',
     },
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: '#5a4a2a',
         fontFamily: 'Monaco',
-        fontSize: 15,
+        fontSize: 23,
         marginTop: 32,
         paddingHorizontal: 24,
         lineHeight: 19,
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
     namePillText: {
         color: '#1a1a1a',
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 26,
         letterSpacing: 0.5,
     },
     messageBox: {
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     rowText: {
         color: '#1a1a1a',
         fontFamily: 'Monaco',
-        fontSize: 16,
+        fontSize: 24,
         lineHeight: 21,
     },
     inputContainer: {
@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
         flex: 1,
         color: '#2a2a2a',
         fontFamily: 'Monaco',
-        fontSize: 16,
+        fontSize: 24,
         paddingHorizontal: 8,
         paddingVertical: 6,
         maxHeight: 120,
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
     sendButtonText: {
         color: '#f5d65f',
         fontFamily: 'Monaco',
-        fontSize: 15,
+        fontSize: 23,
     },
 });
 

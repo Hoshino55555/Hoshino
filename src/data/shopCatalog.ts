@@ -292,7 +292,7 @@ const consumablesItems: ShopItem[] = [
         priceStarFragments: 200,
         inStock: true,
         tab: 'consumables',
-        subcategory: 'Gacha',
+        subcategory: 'Spin',
         currency: 'starFragments',
         status: 'effect-pending',
         image: ShopItems.moonokoBall,
@@ -300,7 +300,7 @@ const consumablesItems: ShopItem[] = [
     },
     {
         id: 'booster-mood',
-        name: 'Mood Booster',
+        name: 'Mood',
         description: 'Instantly +2 mood',
         imageUrl: '',
         category: ItemCategory.POWERUP,
@@ -316,7 +316,7 @@ const consumablesItems: ShopItem[] = [
     },
     {
         id: 'booster-sleep',
-        name: 'Sleep Booster',
+        name: 'Sleep',
         description: 'Instantly +2 energy',
         imageUrl: '',
         category: ItemCategory.POWERUP,
@@ -332,7 +332,7 @@ const consumablesItems: ShopItem[] = [
     },
     {
         id: 'booster-hunger',
-        name: 'Hunger Booster',
+        name: 'Hunger',
         description: 'Instantly +2 hunger',
         imageUrl: '',
         category: ItemCategory.POWERUP,

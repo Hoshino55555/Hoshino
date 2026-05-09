@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
         shadowOffset: { width: -1, height: -1 },
     },
     navButtonText: {
-        fontSize: 14,
+        fontSize: 21,
         color: '#003300',
         fontFamily: 'Monaco',
     },

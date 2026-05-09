@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     backButtonText: {
         color: '#2E5A3E',
         fontFamily: 'Monaco',
-        fontSize: 15,
+        fontSize: 23,
     },
     content: {
         flex: 1,
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     title: {
-        fontSize: 25,
+        fontSize: 38,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         textAlign: 'center',
@@ -168,13 +168,13 @@ const styles = StyleSheet.create({
         borderColor: '#2E5A3E',
     },
     sectionTitle: {
-        fontSize: 17,
+        fontSize: 26,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         marginBottom: 10,
     },
     fieldLabel: {
-        fontSize: 13,
+        fontSize: 20,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         opacity: 0.75,
@@ -184,13 +184,13 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     valueText: {
-        fontSize: 15,
+        fontSize: 23,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         lineHeight: 15,
     },
     addressText: {
-        fontSize: 10,
+        fontSize: 15,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         lineHeight: 14,
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 8,
         color: '#2E5A3E',
-        fontSize: 15,
+        fontSize: 23,
         fontFamily: 'Monaco',
         marginRight: 8,
     },
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     },
     saveButtonText: {
         color: '#E8F5E8',
-        fontSize: 14,
+        fontSize: 21,
         fontFamily: 'Monaco',
     },
     logoutButton: {
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     },
     logoutButtonText: {
         color: '#E8F5E8',
-        fontSize: 15,
+        fontSize: 23,
         fontFamily: 'Monaco',
     },
 });

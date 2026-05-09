@@ -231,9 +231,76 @@ export const Menu = {
     sleep: require('../../assets/images/ui/menu/sleepzzzz.png'),
 } as const;
 
+// 54-frame button-strip animation. Frames 1–18 are the left-button press
+// cycle, 19–36 center, 37–54 right; frame 1 == frame 54 == idle. Each frame
+// is a 674×1500 PNG matching the casing's dimensions, with everything except
+// the bottom button row alpha-cleared — overlaying it on the casing with the
+// same `cover` resize gives pixel-perfect alignment regardless of screen
+// aspect.
+const ButtonStrips = [
+    require('../../assets/images/ui/chrome/buttons/strip_01.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_02.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_03.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_04.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_05.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_06.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_07.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_08.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_09.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_10.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_11.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_12.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_13.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_14.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_15.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_16.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_17.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_18.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_19.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_20.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_21.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_22.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_23.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_24.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_25.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_26.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_27.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_28.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_29.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_30.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_31.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_32.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_33.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_34.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_35.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_36.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_37.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_38.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_39.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_40.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_41.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_42.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_43.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_44.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_45.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_46.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_47.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_48.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_49.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_50.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_51.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_52.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_53.png'),
+    require('../../assets/images/ui/chrome/buttons/strip_54.png'),
+] as const;
+
 export const Chrome = {
     casing: require('../../assets/images/ui/chrome/casing.png'),
-    button: require('../../assets/images/ui/chrome/button.png'),
+    buttonStrips: ButtonStrips,
+} as const;
+
+export const Forage = {
+    bag: require('../../assets/images/ui/forage/forage-bag.png'),
 } as const;
 
 export const Frames = {

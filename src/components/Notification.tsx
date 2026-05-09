@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     },
     glyphText: {
         fontFamily: 'Monaco',
-        fontSize: 15,
+        fontSize: 23,
         lineHeight: 13,
     },
     messageWrap: {
@@ -247,14 +247,14 @@ const styles = StyleSheet.create({
     message: {
         color: '#f0f7ff',
         fontFamily: 'Monaco',
-        fontSize: 13,
+        fontSize: 20,
         lineHeight: 14,
     },
     statusText: {
         marginTop: 4,
         color: '#9bb4c7',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
     },
     closeButton: {
         marginLeft: 6,
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     },
     closeText: {
         color: '#9bb4c7',
-        fontSize: 18,
+        fontSize: 27,
         lineHeight: 18,
         fontFamily: 'Monaco',
     },
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     bannerTitle: {
-        fontSize: 18,
+        fontSize: 27,
         color: 'white',
         fontFamily: 'Monaco',
     },

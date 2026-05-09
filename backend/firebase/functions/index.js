@@ -64,6 +64,14 @@ exports.purchaseCamp = starFragments.purchaseCamp;
 exports.claimHackathonSpecial = starFragments.claimHackathonSpecial;
 exports.checkoutStarFragments = starFragments.checkoutStarFragments;
 
+// VRF daily-spin path is paused while we evaluate MagicBlock cost. Stub kept
+// deployed so the Cloud Function isn't garbage-collected — re-enabling later
+// is a single re-export when star-fragments.js gets the implementation back.
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+exports.claimDailySpinVrf = onCall({ cors: true, region: 'us-central1' }, async () => {
+    throw new HttpsError('failed-precondition', 'VRF claim path is paused — use claimDailySpin');
+});
+
 // IAP (dual-rail: crypto SOL/USDC/SKR + fiat onramp via Privy useFundWallet)
 exports.createPurchaseIntent = iap.createPurchaseIntent;
 exports.confirmPurchase = iap.confirmPurchase;

@@ -441,7 +441,7 @@ function App() {
 
     const addNotification = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning', duration?: number) => {
         const id = Date.now().toString();
-        setNotifications(prev => [...prev, { id, message, type, duration }]);
+        setNotifications([{ id, message, type, duration }]);
     }, []);
 
     const removeNotification = useCallback((id: string) => {
@@ -1761,6 +1761,9 @@ function AppWrapper() {
         // except the sleep arc (Sleep* + MorningRecapModal), which stays on
         // 04b03/PressStart2P for the dreamy bedtime palette.
         'Monaco': require('./assets/fonts/Monaco.ttf'),
+        'Minecraft': require('./assets/fonts/Minecraft.ttf'),
+        'MacMinecraft': require('./assets/fonts/MacMinecraft.ttf'),
+        'MacMinecraftTweaked': require('./assets/fonts/MacMinecraftTweaked.ttf'),
     });
 
     return (

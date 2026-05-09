@@ -54,14 +54,14 @@ const styles = StyleSheet.create({
     },
     errorTitle: {
         color: '#ff6b9d',
-        fontSize: 25,
+        fontSize: 38,
         marginBottom: 16,
         textAlign: 'center',
         fontFamily: 'Monaco',
     },
     errorBody: {
         color: '#e5dcf5',
-        fontSize: 18,
+        fontSize: 27,
         textAlign: 'center',
         lineHeight: 20,
         fontFamily: 'Monaco',

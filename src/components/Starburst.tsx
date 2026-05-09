@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
     topButtonText: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
     },
     content: {
         flex: 1,
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
     },
     title: {
-        fontSize: 22,
+        fontSize: 33,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         marginBottom: 8,
@@ -414,13 +414,13 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     scoreLabel: {
-        fontSize: 14,
+        fontSize: 21,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         marginRight: 8,
     },
     scoreValue: {
-        fontSize: 20,
+        fontSize: 30,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
     },
@@ -433,12 +433,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     winMessage: {
-        fontSize: 17,
+        fontSize: 26,
         color: '#E8F5E8',
         fontFamily: 'Monaco',
     },
     loseMessage: {
-        fontSize: 17,
+        fontSize: 26,
         color: '#E8F5E8',
         fontFamily: 'Monaco',
     },
@@ -470,12 +470,12 @@ const styles = StyleSheet.create({
         marginHorizontal: 2,
     },
     hintSum: {
-        fontSize: 14,
+        fontSize: 21,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
     },
     hintStar: {
-        fontSize: 11,
+        fontSize: 17,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
     },
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FF6B6B',
     },
     cellText: {
-        fontSize: 20,
+        fontSize: 30,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
     },
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     noteText: {
-        fontSize: 11,
+        fontSize: 17,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         textAlign: 'center',
@@ -543,13 +543,13 @@ const styles = StyleSheet.create({
     modeButtonText: {
         color: '#2E5A3E',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
     },
     modeButtonTextActive: {
         color: '#E8F5E8',
     },
     instructionText: {
-        fontSize: 11,
+        fontSize: 17,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         textAlign: 'center',
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
     newGameButtonText: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 20,
+        fontSize: 30,
         textAlign: 'center',
     },
 });

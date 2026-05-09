@@ -323,13 +323,13 @@ const styles = StyleSheet.create({
     title: {
         color: '#E8B84A',
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 26,
         flexShrink: 1,
     },
     counter: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 12,
+        fontSize: 18,
         opacity: 0.7,
         marginLeft: 8,
     },
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     tapHint: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 13,
+        fontSize: 20,
         marginTop: 14,
         textAlign: 'center',
         opacity: 0.8,
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     cardBack: {
         color: '#666',
         fontFamily: 'Monaco',
-        fontSize: 36,
+        fontSize: 54,
     },
     cardImage: {
         width: 56,
@@ -390,14 +390,14 @@ const styles = StyleSheet.create({
     cardName: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 11,
+        fontSize: 17,
         marginTop: 4,
         textAlign: 'center',
     },
     cardCount: {
         color: '#FFD700',
         fontFamily: 'Monaco',
-        fontSize: 13,
+        fontSize: 20,
         marginTop: 2,
     },
     footer: {
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     skipText: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 12,
+        fontSize: 18,
     },
 });
 

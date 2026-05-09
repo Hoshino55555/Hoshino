@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     characterName: {
-        fontSize: 22,
+        fontSize: 33,
         color: '#2E5A3E',
         textAlign: 'center',
         fontFamily: 'Monaco',
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     } as const,
     modalCharacterName: {
-        fontSize: 31,
+        fontSize: 47,
 
         color: '#2E5A3E',
         marginBottom: 10,
@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
         fontFamily: 'Monaco',
     },
     modalDescription: {
-        fontSize: 17,
+        fontSize: 26,
         color: '#2E5A3E',
         textAlign: 'center',
         lineHeight: 20,
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
         fontFamily: 'Monaco',
     },
     congratulationsTitle: {
-        fontSize: 25,
+        fontSize: 38,
         color: '#2E5A3E',
         textAlign: 'center',
         marginBottom: 15,
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
     },
     mintButtonText: {
         color: '#E8F5E8',
-        fontSize: 20,
+        fontSize: 30,
         fontFamily: 'Monaco',
     },
 

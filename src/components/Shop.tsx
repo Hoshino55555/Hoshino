@@ -499,8 +499,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         }
     };
 
-    const stripRaritySuffix = (name: string): string => name.split(' · ')[0];
-
     const renderCardShell = (params: {
         item: ShopItem;
         title: string;
@@ -542,7 +540,9 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 >
                     <View style={[styles.cardInner, disabled && styles.disabledItem]}>
                         <View style={styles.cardHeader}>
-                            <Text style={styles.itemName} numberOfLines={1}>{title}</Text>
+                            {title ? (
+                                <Text style={styles.itemName} numberOfLines={1}>{title}</Text>
+                            ) : null}
                             <Text style={styles.itemRank} numberOfLines={1}>
                                 {rarityLabel(item.rarity)}
                             </Text>
@@ -898,7 +898,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         const insufficient = balance - cartTotal < item.priceStarFragments;
         return renderCardShell({
             item,
-            title: stripRaritySuffix(item.name),
+            title: '',
             description: item.summary,
             disabled: insufficient,
             onPress: () => addToCart(item),
@@ -1459,13 +1459,13 @@ const styles = StyleSheet.create({
     },
     spinTitle: {
         fontFamily: 'Monaco',
-        fontSize: 20,
+        fontSize: 30,
         color: '#3a2a1a',
         marginBottom: 12,
     },
     spinPoolLabel: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#5a4a3a',
         marginBottom: 6,
     },
@@ -1491,7 +1491,7 @@ const styles = StyleSheet.create({
     },
     spinPoolText: {
         fontFamily: 'Monaco',
-        fontSize: 11,
+        fontSize: 17,
         color: '#3a2a1a',
         marginTop: -2,
     },
@@ -1535,13 +1535,13 @@ const styles = StyleSheet.create({
     },
     reelTileText: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#3a2a1a',
         marginTop: 2,
     },
     spinStatus: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#3a2a1a',
         marginBottom: 10,
     },
@@ -1564,7 +1564,7 @@ const styles = StyleSheet.create({
     },
     revealText: {
         fontFamily: 'Monaco',
-        fontSize: 16,
+        fontSize: 24,
         color: '#3a2a1a',
         marginTop: 6,
         textAlign: 'center',
@@ -1582,7 +1582,7 @@ const styles = StyleSheet.create({
     },
     spinRewardText: {
         fontFamily: 'Monaco',
-        fontSize: 18,
+        fontSize: 27,
         color: '#3a2a1a',
     },
     spinCloseButton: {
@@ -1595,7 +1595,7 @@ const styles = StyleSheet.create({
     },
     spinCloseText: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#3a2a1a',
     },
     backButton: {
@@ -1609,7 +1609,7 @@ const styles = StyleSheet.create({
     backButtonText: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
     },
     scrollClipper: {
         position: 'absolute',
@@ -1668,20 +1668,20 @@ const styles = StyleSheet.create({
     },
     dustAmount: {
         fontFamily: 'Monaco',
-        fontSize: 20,
+        fontSize: 30,
         color: '#003300',
         textAlign: 'right',
     },
     walletLabel: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#666',
         textAlign: 'right',
         marginBottom: 2,
     },
     walletSubLabel: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#a85d00',
         textAlign: 'right',
         marginTop: 2,
@@ -1713,7 +1713,7 @@ const styles = StyleSheet.create({
     },
     tabButtonText: {
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 26,
         color: '#003300',
     },
     itemsContainer: {
@@ -1731,7 +1731,7 @@ const styles = StyleSheet.create({
     },
     sectionHeader: {
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 26,
         color: '#003300',
         marginBottom: 6,
         paddingBottom: 2,
@@ -1787,14 +1787,14 @@ const styles = StyleSheet.create({
     },
     itemName: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         lineHeight: 14,
         textAlign: 'center',
         color: '#2e2014',
     },
     itemRank: {
         fontFamily: 'Monaco',
-        fontSize: 11,
+        fontSize: 17,
         lineHeight: 8,
         textAlign: 'center',
         color: '#2e2014',
@@ -1802,7 +1802,7 @@ const styles = StyleSheet.create({
     },
     itemSummary: {
         fontFamily: 'Monaco',
-        fontSize: 11,
+        fontSize: 17,
         lineHeight: 13,
         color: '#3a2a1a',
         textAlign: 'center',
@@ -1822,7 +1822,7 @@ const styles = StyleSheet.create({
         right: 0,
         textAlign: 'center',
         fontFamily: 'Monaco',
-        fontSize: 9,
+        fontSize: 14,
         color: '#cc0000',
     },
     priceContainer: {
@@ -1842,7 +1842,7 @@ const styles = StyleSheet.create({
     },
     itemPrice: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#003300',
     },
     comingSoonBadge: {
@@ -1858,7 +1858,7 @@ const styles = StyleSheet.create({
     comingSoonText: {
         fontFamily: 'Monaco',
         color: 'white',
-        fontSize: 10,
+        fontSize: 15,
     },
     flashingCard: {
         backgroundColor: '#e6ffe6',
@@ -1894,7 +1894,7 @@ const styles = StyleSheet.create({
     },
     cartTitle: {
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 26,
         color: '#003300',
     },
     cartTotal: {
@@ -1903,7 +1903,7 @@ const styles = StyleSheet.create({
     },
     cartTotalText: {
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 26,
         color: '#003300',
     },
     clearCartButton: {
@@ -1915,7 +1915,7 @@ const styles = StyleSheet.create({
     },
     clearCartText: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: 'white',
     },
     cartItems: {
@@ -1942,7 +1942,7 @@ const styles = StyleSheet.create({
     },
     cartItemQuantity: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#003300',
         marginTop: 2,
         textAlign: 'center',
@@ -1964,7 +1964,7 @@ const styles = StyleSheet.create({
     removeButtonText: {
         fontFamily: 'Monaco',
         color: 'white',
-        fontSize: 14,
+        fontSize: 21,
         lineHeight: 10,
     },
     emptyCart: {
@@ -1973,7 +1973,7 @@ const styles = StyleSheet.create({
     },
     emptyCartText: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#666',
     },
     checkoutButton: {
@@ -1991,7 +1991,7 @@ const styles = StyleSheet.create({
     checkoutButtonText: {
         fontFamily: 'Monaco',
         color: 'white',
-        fontSize: 17,
+        fontSize: 26,
     },
     iapModalBackdrop: {
         flex: 1,
@@ -2012,28 +2012,28 @@ const styles = StyleSheet.create({
     iapTitle: {
         fontFamily: 'Monaco',
         color: '#fff',
-        fontSize: 22,
+        fontSize: 33,
         textAlign: 'center',
         marginBottom: 4,
     },
     iapSummary: {
         fontFamily: 'Monaco',
         color: '#cfc4e6',
-        fontSize: 16,
+        fontSize: 24,
         textAlign: 'center',
         marginBottom: 8,
     },
     iapPrice: {
         fontFamily: 'Monaco',
         color: '#FFD54F',
-        fontSize: 26,
+        fontSize: 39,
         textAlign: 'center',
         marginBottom: 16,
     },
     iapSectionLabel: {
         fontFamily: 'Monaco',
         color: '#bba8d6',
-        fontSize: 14,
+        fontSize: 21,
         marginBottom: 6,
         textTransform: 'uppercase',
     },
@@ -2059,7 +2059,7 @@ const styles = StyleSheet.create({
     iapNote: {
         fontFamily: 'Monaco',
         color: '#a99fc4',
-        fontSize: 14,
+        fontSize: 21,
         textAlign: 'center',
         marginVertical: 10,
     },
@@ -2086,7 +2086,7 @@ const styles = StyleSheet.create({
         borderColor: '#FFD54F',
         alignItems: 'center',
     },
-    iapTopUpText: { color: '#FFD54F', fontFamily: 'Monaco', fontSize: 17 },
+    iapTopUpText: { color: '#FFD54F', fontFamily: 'Monaco', fontSize: 26 },
 });
 
 export default Shop;

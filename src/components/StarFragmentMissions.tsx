@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
         borderBottomColor: '#374151',
     },
     title: {
-        fontSize: 20,
+        fontSize: 30,
         color: '#ffffff',
         fontFamily: 'Monaco',
     },
@@ -429,12 +429,12 @@ const styles = StyleSheet.create({
         borderBottomColor: 'transparent',
     },
     activeTabText: {
-        fontSize: 14,
+        fontSize: 21,
         color: '#93c5fd',
         fontFamily: 'Monaco',
     },
     inactiveTabText: {
-        fontSize: 14,
+        fontSize: 21,
         color: '#9ca3af',
         fontFamily: 'Monaco',
     },
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: 27,
         color: '#ffffff',
         marginBottom: 16,
         fontFamily: 'Monaco',
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: '#ffffff',
-        fontSize: 14,
+        fontSize: 21,
         fontFamily: 'Monaco',
     },
     inProgressStatus: {
@@ -603,7 +603,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     balanceAmount: {
-        fontSize: 24,
+        fontSize: 36,
         color: '#fde047',
         fontFamily: 'Monaco',
     },
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     statValue: {
-        fontSize: 18,
+        fontSize: 27,
         fontFamily: 'Monaco',
     },
     statLabel: {
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
         borderColor: '#374151',
     },
     seasonTitle: {
-        fontSize: 16,
+        fontSize: 24,
         color: '#ffffff',
         marginBottom: 12,
         fontFamily: 'Monaco',

@@ -144,6 +144,17 @@ interface Props {
      * and the menu sits on top of its lower portion.
      */
     bottomInset?: number;
+    /**
+     * Spawn position in dp relative to the pile center. `launchOffsetX` is
+     * left/right of the pile's horizontal center (negative = left).
+     * `launchOffsetY` is dp ABOVE the pile baseline (positive = higher).
+     * Used to make items appear to fly out of an on-screen object — e.g.
+     * the moonoko's forage bag — instead of from the moonoko's feet. The arc
+     * peak still rises `peak` dp above the launch height so the throw shape
+     * stays consistent regardless of where the launch point is.
+     */
+    launchOffsetX?: number;
+    launchOffsetY?: number;
 }
 
 // Snappier pile-at-feet feel:
@@ -166,7 +177,7 @@ const ITEM_SIZE_REF = 40;
 const PILE_BASE_SPREAD_REF = 52; // ±dp at the base of the pile
 const PILE_LIFT_PER_ITEM_REF = 12;
 const PILE_LIFT_CAP_REF = 72;
-const PILE_BASE_GAP_REF = 12; // dp above bottom chrome where the pile sits
+const PILE_BASE_GAP_REF = -28; // dp above bottom chrome where the pile sits (negative pushes pile down toward/into menu bar)
 const ARC_PEAK_BASE_REF = 110; // dp the arc rises above the launch point
 const ARC_PEAK_JITTER_REF = 18;
 
@@ -188,7 +199,13 @@ export const FORAGE_FLIGHT_MS = ARC_HALF_MS * 2;
 // feet. Each item is tappable for a quick pop-dismiss. Leftovers fade on a
 // global timer. Inventory was already credited by the parent's drain call —
 // this overlay is the reward flourish, not the source of truth.
-const ForagePopOut: React.FC<Props> = ({ items, onComplete, bottomInset = 0 }) => {
+const ForagePopOut: React.FC<Props> = ({
+    items,
+    onComplete,
+    bottomInset = 0,
+    launchOffsetX = 0,
+    launchOffsetY = 0,
+}) => {
     // All pile/arc dimensions are derived from the live screen width relative
     // to REFERENCE_WIDTH (400dp). The item sprite, pile spread, lift per row,
     // arc peak, and base gap all scale together so the silhouette stays the
@@ -354,14 +371,17 @@ const ForagePopOut: React.FC<Props> = ({ items, onComplete, bottomInset = 0 }) =
 
                 const translateX = xRefs[i].interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, landingX],
+                    outputRange: [launchOffsetX, landingX],
                 });
                 // yRefs[i] is a 0→1 progress driven natively over the full
                 // flight; interpolation here turns it into the up-then-down
                 // pixel arc. Single timing = no JS sequence handoff at apex.
+                // launchOffsetY shifts the spawn point up by that many dp so
+                // items emerge from an on-screen object (e.g. the forage bag)
+                // — the arc apex stays `peak` dp above the launch height.
                 const translateY = yRefs[i].interpolate({
                     inputRange: [0, 0.5, 1],
-                    outputRange: [0, -peak, landingY],
+                    outputRange: [-launchOffsetY, -(launchOffsetY + peak), landingY],
                 });
                 const opacity = fadeRefs[i];
 

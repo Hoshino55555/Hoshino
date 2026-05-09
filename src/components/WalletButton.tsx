@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     },
     connectedText: {
         color: '#2E5A3E',
-        fontSize: 17,
+        fontSize: 26,
         lineHeight: 17,
         fontFamily: 'Monaco',
         textAlign: 'center',

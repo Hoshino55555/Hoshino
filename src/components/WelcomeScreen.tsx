@@ -770,20 +770,20 @@ const styles = StyleSheet.create({
         overflow: 'visible', // Allow pixelated borders to show
     },
     storySpeakerLarge: {
-        fontSize: 16,
+        fontSize: 24,
         color: '#2E5A3E', // Dark green text
         marginBottom: 5,
         fontFamily: 'Monaco',
     },
     storyTextLarge: {
-        fontSize: 15,
+        fontSize: 23,
         color: '#2E5A3E', // Dark green text
         lineHeight: 18,
         fontFamily: 'Monaco',
         letterSpacing: -1, // Reduce space between characters
     },
     boldText: {
-        fontSize: 22,
+        fontSize: 33,
         fontFamily: 'Monaco',
     },
     storyTextContainer: {
@@ -800,7 +800,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     storyPromptLarge: {
-        fontSize: 17,
+        fontSize: 26,
         color: '#4A7A5A', // Medium green for subtle text
         marginTop: 5,
         fontStyle: 'italic',
@@ -928,7 +928,7 @@ const styles = StyleSheet.create({
         right: 0,
     },
     choiceText: {
-        fontSize: 18,
+        fontSize: 27,
         color: '#4A7A5A', // Medium green for choice text
         marginHorizontal: 30, // Increased horizontal spacing instead of gap
         fontFamily: 'Monaco',

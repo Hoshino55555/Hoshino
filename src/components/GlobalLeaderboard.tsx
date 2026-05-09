@@ -193,12 +193,12 @@ const styles = StyleSheet.create({
     leaderboardHeaderH2: {
         marginBottom: 8,
         color: '#4f46e5',
-        fontSize: 20,
+        fontSize: 30,
         fontFamily: 'Monaco',
     },
     leaderboardHeaderP: {
         color: '#6b7280',
-        fontSize: 11,
+        fontSize: 17,
         fontFamily: 'Monaco',
     },
     closeBtn: {
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     potentialValue: {
-        fontSize: 9,
+        fontSize: 14,
         color: '#0c4a6e',
         fontFamily: 'Monaco',
     },
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     tableHeaderText: {
-        fontSize: 8,
+        fontSize: 12,
         color: '#374151',
         fontFamily: 'Monaco',
     },
@@ -309,23 +309,23 @@ const styles = StyleSheet.create({
     },
     rank: {
         textAlign: 'center',
-        fontSize: 8,
+        fontSize: 12,
         fontFamily: 'Monaco',
     },
     wallet: {
         fontFamily: 'Monaco',
-        fontSize: 10,
+        fontSize: 15,
     },
     moonokos: {
         textAlign: 'center',
         color: '#059669',
-        fontSize: 8,
+        fontSize: 12,
         fontFamily: 'Monaco',
     },
     points: {
         textAlign: 'right',
         color: '#dc2626',
-        fontSize: 8,
+        fontSize: 12,
         fontFamily: 'Monaco',
     },
     advantages: {
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     mintCtaText: {
         color: 'white',
         fontFamily: 'Monaco',
-        fontSize: 11,
+        fontSize: 17,
     },
     bottomButtonLeft: {
         position: 'absolute',

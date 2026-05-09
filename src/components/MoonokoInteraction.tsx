@@ -10,7 +10,7 @@ import ForagePopOut from './ForagePopOut';
 import type { ForagedItem } from '../services/GameStateService';
 import { pushMoonokoSnapshot } from '../widgets/widgetService';
 import type { PendingWidgetAction } from '../../App';
-import { Backgrounds, Menu, Stars, Frames, getCharacterAnim } from '../assets';
+import { Backgrounds, Menu, Stars, Frames, Forage, getCharacterAnim } from '../assets';
 
 const WIDGET_ACTION_TTL_MS = 60_000;
 
@@ -83,9 +83,9 @@ const MoonokoInteraction: React.FC<Props> = ({
     //     cartoonishly large icons
     const { width: winW, height: winH } = useWindowDimensions();
     const characterSize = Math.min(winW * 0.62, winH * 0.42);
-    const characterMarginTop = -characterSize * 0.32;
+    const characterMarginTop = -characterSize * 0.48;
     const badgeOffset = -characterSize * 0.4;
-    const badgeFontSize = Math.max(28, Math.min(44, winW * 0.09));
+    const badgeFontSize = Math.max(40, Math.min(64, winW * 0.13));
     const menuIconSize = Math.min(winW * 0.10, 44);
     const currentStats = {
         mood: gameState?.mood ?? 3,
@@ -597,8 +597,60 @@ const MoonokoInteraction: React.FC<Props> = ({
                     <ForagePopOut
                         items={popOutItems}
                         bottomInset={menuBarLayout.height}
+                        // Spawn from the forage bag's approximate position so
+                        // items look like they're tossed out of it. Bag center
+                        // (in characterTouch coords) is left=0.18 + width/2 =
+                        // 0.28 of characterSize, which is -0.22 of characterSize
+                        // from the touch's horizontal center.
+                        launchOffsetX={-characterSize * 0.22}
+                        launchOffsetY={characterSize * 0.30}
                         onComplete={() => setPopOutItems(null)}
                     />
+                )}
+                {/* Bag rendered AFTER ForagePopOut so it sits in the
+                   foreground while items spill out of it. The wrapper
+                   mirrors characterTouch's flex-centered layout (size +
+                   negative marginTop) so the bag's `left`/`bottom`
+                   offsets read off the same anchor as before. */}
+                {selectedCharacter && (hasPendingFinds || popOutItems) && (
+                    <View
+                        pointerEvents="none"
+                        style={[
+                            StyleSheet.absoluteFill,
+                            { alignItems: 'center', justifyContent: 'center' },
+                        ]}
+                    >
+                        <View
+                            style={{
+                                width: characterSize,
+                                height: characterSize,
+                                marginTop: characterMarginTop,
+                            }}
+                        >
+                            <Animated.View
+                                style={{
+                                    position: 'absolute',
+                                    width: characterSize * 0.20,
+                                    height: characterSize * 0.20,
+                                    left: characterSize * 0.18,
+                                    bottom: characterSize * 0.08,
+                                    transform: [
+                                        {
+                                            translateY: bobAnim.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [0, -8],
+                                            }),
+                                        },
+                                    ],
+                                }}
+                            >
+                                <Image
+                                    source={Forage.bag}
+                                    style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
+                                />
+                            </Animated.View>
+                        </View>
+                    </View>
                 )}
             </View>
 
@@ -645,14 +697,16 @@ const styles = StyleSheet.create({
     },
     statBackImage: {
         borderRadius: 8,
+        opacity: 0.55,
     },
     statLabel: {
-        fontSize: 17,
+        fontSize: 16,
         marginBottom: 2,
-        fontFamily: 'Monaco',
+        fontFamily: 'MacMinecraft',
         textAlign: 'center',
         width: '100%',
         paddingHorizontal: 2,
+        transform: [{ translateY: -7 }, { translateX: 1 }],
     },
     starRating: {
         fontSize: 16,
@@ -662,6 +716,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        transform: [{ translateY: -5 }],
     },
     starImage: {
         width: 16,

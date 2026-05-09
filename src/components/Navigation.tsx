@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     logo: {
-        fontSize: 24,
+        fontSize: 36,
         color: '#ffffff',
         fontFamily: 'Monaco',
     },

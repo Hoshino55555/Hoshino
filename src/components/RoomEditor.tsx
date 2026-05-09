@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     trashLabel: {
         color: '#E8B5B5',
         fontFamily: 'Monaco',
-        fontSize: 10,
+        fontSize: 15,
         textAlign: 'center',
     },
     trashLabelHover: {
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     editButtonText: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
     },
     paletteWrap: {
         position: 'absolute',
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
     paletteLabel: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 10,
+        fontSize: 15,
         marginTop: 2,
     },
 });

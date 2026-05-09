@@ -456,7 +456,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         paddingHorizontal: 6,
-        paddingVertical: 6,
+        paddingTop: 11,
+        paddingBottom: 6,
         backgroundColor: 'transparent',
         zIndex: 2,
     },
@@ -466,9 +467,9 @@ const styles = StyleSheet.create({
     },
     statLabel: {
         color: 'white',
-        fontSize: 12,
+        fontSize: 18,
         marginBottom: 2,
-        fontFamily: 'Monaco',
+        fontFamily: 'Minecraft',
     },
     starRating: {
         color: 'gold',
@@ -513,7 +514,7 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: '#2E5A3E', // Dark green for better contrast
-        fontSize: 16,
+        fontSize: 24,
         fontFamily: 'Monaco',
     },
     buttonImage: {

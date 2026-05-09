@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     backButtonText: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
     },
 });
 

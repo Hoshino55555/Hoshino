@@ -240,42 +240,29 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
 
                     <View style={styles.settingRow}>
                         <Text style={styles.settingLabel}>Volume</Text>
-                        <View style={styles.volumeRow}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.volumeMute,
-                                    soundLevel === 0 && styles.volumeMuteActive,
-                                ]}
-                                onPress={() => updateSoundLevel(0)}
-                                activeOpacity={0.7}
-                            >
-                                <Text
-                                    style={[
-                                        styles.volumeMuteText,
-                                        soundLevel === 0 && styles.volumeMuteTextActive,
-                                    ]}
-                                >
-                                    OFF
-                                </Text>
-                            </TouchableOpacity>
-                            <View style={styles.volumeBarTrack}>
-                                {[1, 2, 3, 4].map((level) => {
-                                    const filled = soundLevel >= level;
+                        <View style={styles.volumeSlider}>
+                            <View style={styles.volumeTrack} />
+                            <View style={styles.volumeDotsRow}>
+                                {[0, 1, 2, 3, 4].map((level) => {
+                                    const active = soundLevel === level;
                                     return (
                                         <TouchableOpacity
                                             key={level}
                                             onPress={() => updateSoundLevel(level as SoundLevel)}
                                             activeOpacity={0.6}
-                                            style={styles.volumeBarHit}
-                                            hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
+                                            style={styles.volumeDotCol}
+                                            hitSlop={{ top: 14, bottom: 14, left: 4, right: 4 }}
                                         >
-                                            <View
-                                                style={[
-                                                    styles.volumeBar,
-                                                    { height: 8 + level * 5 },
-                                                    filled && styles.volumeBarFilled,
-                                                ]}
-                                            />
+                                            {active && (
+                                                <View style={styles.volumeTooltipWrap} pointerEvents="none">
+                                                    <View style={styles.volumeTooltip}>
+                                                        <Text style={styles.volumeTooltipText} numberOfLines={1}>{level * 25}%</Text>
+                                                    </View>
+                                                    <View style={styles.volumeTooltipArrow} />
+                                                </View>
+                                            )}
+                                            <View style={[styles.volumeDot, active && styles.volumeDotActive]} />
+                                            <View style={styles.volumeTick} />
                                         </TouchableOpacity>
                                     );
                                 })}
@@ -360,7 +347,7 @@ const styles = StyleSheet.create({
         borderColor: '#E8F5E8',
     },
     backButtonText: {
-        fontSize: 14,
+        fontSize: 21,
         color: '#E8F5E8',
         fontFamily: 'Monaco',
     },
@@ -373,7 +360,7 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     title: {
-        fontSize: 22,
+        fontSize: 33,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         textAlign: 'center',
@@ -388,7 +375,7 @@ const styles = StyleSheet.create({
         borderColor: '#2E5A3E',
     },
     sectionTitle: {
-        fontSize: 17,
+        fontSize: 26,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         marginBottom: 6,
@@ -400,62 +387,84 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     collapseChevron: {
-        fontSize: 22,
+        fontSize: 33,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         marginBottom: 6,
         paddingHorizontal: 6,
     },
-    volumeRow: {
+    volumeSlider: {
+        width: 220,
+        position: 'relative',
+        paddingTop: 4,
+    },
+    volumeTrack: {
+        position: 'absolute',
+        left: 10,
+        right: 10,
+        top: 4 + 38 + 6,
+        height: 2,
+        backgroundColor: '#2E5A3E',
+    },
+    volumeDotsRow: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    volumeDotCol: {
+        alignItems: 'center',
+        width: 28,
+        paddingTop: 38,
+    },
+    volumeTooltipWrap: {
+        position: 'absolute',
+        top: 0,
+        left: -20,
+        right: -20,
         alignItems: 'center',
     },
-    volumeMute: {
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderWidth: 2,
-        borderColor: '#2E5A3E',
-        backgroundColor: '#f0fff0',
-        marginRight: 8,
+    volumeTooltip: {
+        backgroundColor: '#1a1a1a',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
     },
-    volumeMuteActive: {
-        backgroundColor: '#2E5A3E',
-    },
-    volumeMuteText: {
-        color: '#2E5A3E',
+    volumeTooltipText: {
+        color: '#ffffff',
         fontFamily: 'Monaco',
-        fontSize: 12,
-        letterSpacing: 1,
+        fontSize: 14,
+        lineHeight: 14,
     },
-    volumeMuteTextActive: {
-        color: '#f0fff0',
+    volumeTooltipArrow: {
+        width: 0,
+        height: 0,
+        borderLeftWidth: 4,
+        borderRightWidth: 4,
+        borderTopWidth: 4,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderTopColor: '#1a1a1a',
+        marginTop: -1,
     },
-    volumeBarTrack: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        height: 36,
-        paddingHorizontal: 4,
-        paddingBottom: 4,
+    volumeDot: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
         borderWidth: 2,
         borderColor: '#2E5A3E',
         backgroundColor: '#f0fff0',
     },
-    volumeBarHit: {
-        justifyContent: 'flex-end',
-        alignSelf: 'stretch',
-        paddingHorizontal: 3,
+    volumeDotActive: {
+        backgroundColor: '#FF8A2B',
+        borderColor: '#FF8A2B',
     },
-    volumeBar: {
-        width: 8,
-        backgroundColor: '#d4ead4',
-        borderWidth: 1,
-        borderColor: '#2E5A3E',
-    },
-    volumeBarFilled: {
+    volumeTick: {
+        width: 2,
+        height: 6,
         backgroundColor: '#2E5A3E',
+        marginTop: 4,
     },
     sectionDescription: {
-        fontSize: 13,
+        fontSize: 20,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
         marginBottom: 12,
@@ -475,7 +484,7 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     buttonName: {
-        fontSize: 15,
+        fontSize: 23,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
     },
@@ -490,7 +499,7 @@ const styles = StyleSheet.create({
         borderColor: '#2E5A3E',
     },
     dragHandleText: {
-        fontSize: 15,
+        fontSize: 23,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
     },
@@ -517,7 +526,7 @@ const styles = StyleSheet.create({
     },
     resetButtonText: {
         color: '#E8F5E8',
-        fontSize: 14,
+        fontSize: 21,
         fontFamily: 'Monaco',
     },
     settingRow: {
@@ -527,7 +536,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     settingLabel: {
-        fontSize: 15,
+        fontSize: 23,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
     },
@@ -548,7 +557,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#2E5A3E',
     },
     themeButtonText: {
-        fontSize: 14,
+        fontSize: 21,
         color: '#2E5A3E',
         fontFamily: 'Monaco',
     },

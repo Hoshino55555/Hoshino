@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
     backButtonText: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
     },
     scrollClipper: {
         position: 'absolute',
@@ -483,13 +483,13 @@ const styles = StyleSheet.create({
     },
     tabButtonText: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#003300',
     },
     sectionHeading: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         marginBottom: 10,
     },
     emptyText: {
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
     itemName: {
         color: '#3a2a1a',
         fontFamily: 'Monaco',
-        fontSize: 15,
+        fontSize: 23,
         textAlign: 'center',
         marginBottom: 4,
     },
@@ -536,7 +536,7 @@ const styles = StyleSheet.create({
     countText: {
         color: '#3a2a1a',
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 26,
     },
     boosterCard: {
         borderColor: '#7ecf7a',
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
     boosterUseLabel: {
         color: '#3a2a1a',
         fontFamily: 'Monaco',
-        fontSize: 11,
+        fontSize: 17,
     },
 });
 

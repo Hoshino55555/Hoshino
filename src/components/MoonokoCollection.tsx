@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     },
     starRating: {
         color: '#8B4513', // Dark brown for contrast
-        fontSize: 14,
+        fontSize: 21,
         fontFamily: 'Monaco',
     },
     mainDisplayArea: {
@@ -592,11 +592,11 @@ const styles = StyleSheet.create({
     },
     badgeText: {
         color: '#f0fff0',
-        fontSize: 11,
+        fontSize: 17,
         fontFamily: 'Monaco',
     },
     emptySlotIcon: {
-        fontSize: 28,
+        fontSize: 42,
         color: '#2e4630',
         opacity: 0.5,
         fontFamily: 'Monaco',

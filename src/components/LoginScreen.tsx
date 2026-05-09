@@ -543,14 +543,14 @@ const styles = StyleSheet.create({
     },
     title: {
         fontFamily: 'Monaco',
-        fontSize: 31,
+        fontSize: 47,
         lineHeight: 32,
         color: '#f7fdff',
         textAlign: 'center',
     },
     subtitle: {
         fontFamily: 'Monaco',
-        fontSize: 20,
+        fontSize: 30,
         lineHeight: 20,
         color: '#bdd7e0',
         textAlign: 'center',
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         paddingHorizontal: 14,
         paddingVertical: Platform.OS === 'ios' ? 14 : 12,
-        fontSize: 15,
+        fontSize: 23,
         color: '#103142',
         fontFamily: 'Monaco',
     },
@@ -585,12 +585,12 @@ const styles = StyleSheet.create({
     },
     emailPreviewLabel: {
         fontFamily: 'Monaco',
-        fontSize: 10,
+        fontSize: 15,
         color: '#4c7e90',
     },
     emailPreviewValue: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#14394b',
     },
     primaryButton: {
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: {
         fontFamily: 'Monaco',
-        fontSize: 15,
+        fontSize: 23,
         color: '#071019',
         letterSpacing: 0.6,
         textAlign: 'center',
@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     },
     dividerText: {
         fontFamily: 'Monaco',
-        fontSize: 10,
+        fontSize: 15,
         color: '#648797',
     },
     secondaryButton: {
@@ -652,12 +652,12 @@ const styles = StyleSheet.create({
     },
     googleMarkText: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#13384b',
     },
     secondaryButtonText: {
         fontFamily: 'Monaco',
-        fontSize: 14,
+        fontSize: 21,
         color: '#f1fbff',
         letterSpacing: 0.6,
         textAlign: 'center',
@@ -696,13 +696,13 @@ const styles = StyleSheet.create({
     },
     walletButtonEyebrow: {
         fontFamily: 'Monaco',
-        fontSize: 8,
+        fontSize: 12,
         color: '#8be2ff',
         marginBottom: 8,
     },
     walletButtonText: {
         fontFamily: 'Monaco',
-        fontSize: 13,
+        fontSize: 20,
         color: '#f5fdff',
     },
     buttonDisabled: {
@@ -720,12 +720,12 @@ const styles = StyleSheet.create({
     },
     errorLabel: {
         fontFamily: 'Monaco',
-        fontSize: 10,
+        fontSize: 15,
         color: '#9d3e36',
     },
     errorText: {
         fontFamily: 'Monaco',
-        fontSize: 18,
+        fontSize: 27,
         lineHeight: 18,
         color: '#7b2e27',
     },
