@@ -236,6 +236,18 @@ export const Chrome = {
     button: require('../../assets/images/ui/chrome/button.png'),
 } as const;
 
+export const Frames = {
+    statBack: require('../../assets/images/ui/frames/stat-back.png'),
+    username: require('../../assets/images/ui/frames/username.png'),
+    iconSelect: require('../../assets/images/ui/frames/icon-select.png'),
+    iconSelectDim: require('../../assets/images/ui/frames/icon-select-dim.png'),
+    casingCommon: require('../../assets/images/ui/frames/casing-common.png'),
+    casingUncommon: require('../../assets/images/ui/frames/casing-mint.png'),
+    casingRare: require('../../assets/images/ui/frames/casing-blue.png'),
+    casingEpic: require('../../assets/images/ui/frames/casing-pink.png'),
+    casingLegendary: require('../../assets/images/ui/frames/casing-yellow.png'),
+} as const;
+
 export const Logos = {
     clean: require('../../assets/images/logos/logo-clean.png'),
     final: require('../../assets/images/logos/logo-final.png'),

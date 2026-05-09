@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ImageBackground, StyleSheet } from 'react-native';
+import { Frames } from '../assets';
 
 interface WalletButtonProps {
     connected: boolean;
@@ -40,12 +41,19 @@ const WalletButton: React.FC<WalletButtonProps> = ({
     return (
         <View style={styles.container}>
             <TouchableOpacity
-                style={styles.connectedPill}
                 onPress={onOpenProfile}
                 disabled={!onOpenProfile}
                 testID="wallet-pill"
+                activeOpacity={0.85}
             >
-                <Text style={styles.connectedText} numberOfLines={1}>{label}</Text>
+                <ImageBackground
+                    source={Frames.username}
+                    style={styles.connectedPill}
+                    imageStyle={styles.connectedPillImage}
+                    resizeMode="stretch"
+                >
+                    <Text style={styles.connectedText} numberOfLines={1}>{label}</Text>
+                </ImageBackground>
             </TouchableOpacity>
         </View>
     );
@@ -78,28 +86,24 @@ const styles = StyleSheet.create({
         transform: [{ translateY: 3 }],
     },
     connectedPill: {
-        backgroundColor: 'rgba(232, 245, 232, 0.65)',
-        paddingVertical: 8,
-        paddingHorizontal: 18,
-        borderRadius: 22,
-        borderWidth: 1,
-        borderColor: 'rgba(46, 90, 62, 0.4)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 3,
-        elevation: 3,
+        paddingTop: 7,
+        paddingBottom: 9,
+        paddingHorizontal: 14,
         maxWidth: 200,
         alignItems: 'center',
         justifyContent: 'center',
     },
+    connectedPillImage: {
+        borderRadius: 0,
+    },
     connectedText: {
         color: '#2E5A3E',
         fontSize: 17,
+        lineHeight: 17,
         fontFamily: 'Monaco',
         textAlign: 'center',
+        textAlignVertical: 'center',
         includeFontPadding: false,
-        transform: [{ translateY: 2 }],
     },
 });
 

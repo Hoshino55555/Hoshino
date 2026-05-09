@@ -32,7 +32,7 @@ import IAPService, {
     type IAPSkuId,
 } from '../services/IAPService';
 import { useFundSolanaWallet } from '@privy-io/expo/ui';
-import { Backgrounds, Stars } from '../assets';
+import { Backgrounds, Stars, Frames } from '../assets';
 import {
     SHOP_TABS,
     type ShopTab,
@@ -477,15 +477,94 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         [selectedTab]
     );
 
-    const getRarityBorderColor = (rarity: ItemRarity): string => {
+    const getRarityCasing = (rarity: ItemRarity) => {
         switch (rarity) {
-            case ItemRarity.COMMON: return '#8B8B8B';
-            case ItemRarity.UNCOMMON: return '#4CAF50';
-            case ItemRarity.RARE: return '#2196F3';
-            case ItemRarity.EPIC: return '#9C27B0';
-            case ItemRarity.LEGENDARY: return '#FF9800';
-            default: return '#003300';
+            case ItemRarity.COMMON: return Frames.casingCommon;
+            case ItemRarity.UNCOMMON: return Frames.casingUncommon;
+            case ItemRarity.RARE: return Frames.casingRare;
+            case ItemRarity.EPIC: return Frames.casingEpic;
+            case ItemRarity.LEGENDARY: return Frames.casingLegendary;
+            default: return Frames.casingCommon;
         }
+    };
+
+    const rarityLabel = (rarity: ItemRarity): string => {
+        switch (rarity) {
+            case ItemRarity.COMMON: return 'Common';
+            case ItemRarity.UNCOMMON: return 'Uncommon';
+            case ItemRarity.RARE: return 'Rare';
+            case ItemRarity.EPIC: return 'Epic';
+            case ItemRarity.LEGENDARY: return 'Legendary';
+            default: return '';
+        }
+    };
+
+    const stripRaritySuffix = (name: string): string => name.split(' · ')[0];
+
+    const renderCardShell = (params: {
+        item: ShopItem;
+        title: string;
+        description?: string | null;
+        priceNode: React.ReactNode;
+        onPress?: () => void;
+        disabled?: boolean;
+        imageStyle?: any;
+        overlay?: React.ReactNode;
+        flashing?: boolean;
+        testID?: string;
+    }) => {
+        const {
+            item,
+            title,
+            description,
+            priceNode,
+            onPress,
+            disabled,
+            imageStyle,
+            overlay,
+            flashing,
+            testID,
+        } = params;
+        return (
+            <TouchableOpacity
+                key={item.id}
+                style={[styles.itemCard, flashing && styles.flashingCard]}
+                onPress={onPress}
+                disabled={!onPress || disabled}
+                activeOpacity={0.85}
+                testID={testID}
+            >
+                <ImageBackground
+                    source={getRarityCasing(item.rarity)}
+                    style={styles.cardCasing}
+                    imageStyle={styles.cardCasingImage}
+                    resizeMode="stretch"
+                >
+                    <View style={[styles.cardInner, disabled && styles.disabledItem]}>
+                        <View style={styles.cardHeader}>
+                            <Text style={styles.itemName} numberOfLines={1}>{title}</Text>
+                            <Text style={styles.itemRank} numberOfLines={1}>
+                                {rarityLabel(item.rarity)}
+                            </Text>
+                        </View>
+                        <View style={styles.cardMiddle}>
+                            <Image
+                                source={item.image}
+                                style={imageStyle ?? styles.itemImage}
+                                resizeMode="contain"
+                            />
+                            {description ? (
+                                <Text style={styles.itemSummary} numberOfLines={2}>
+                                    {description}
+                                </Text>
+                            ) : null}
+                        </View>
+                        <View style={styles.cardFooter}>{priceNode}</View>
+                    </View>
+                    {overlay}
+                </ImageBackground>
+            </TouchableOpacity>
+        );
     };
 
     const addToCart = (item: ShopItem) => {
@@ -790,95 +869,52 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     const renderDailySpinCard = (item: ShopItem) => {
         const remainingMs = Math.max(0, spinNextAtMs - Date.now());
         const ready = spinAvailable || remainingMs === 0;
-        return (
-            <View
-                key={item.id}
-                style={[styles.itemCard, { borderColor: getRarityBorderColor(item.rarity) }]}
-            >
-                <TouchableOpacity
-                    style={[styles.itemClickArea, !ready && styles.disabledItem]}
-                    onPress={() => addToCart(item)}
-                    disabled={!ready || spinning}
-                >
-                    <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
-                    <Text style={styles.itemName} numberOfLines={2}>
-                        {item.name}
-                    </Text>
-                    <Text style={styles.itemSummary} numberOfLines={2}>
-                        {ready ? 'Tap to spin!' : `Next: ${formatCooldown(remainingMs)}`}
-                    </Text>
-                    <View style={styles.priceContainer}>
-                        <Text style={[styles.itemPrice, { color: ready ? '#2e5a3e' : '#888' }]}>
-                            {ready ? 'FREE' : 'COOLDOWN'}
-                        </Text>
-                    </View>
-                </TouchableOpacity>
-            </View>
-        );
+        return renderCardShell({
+            item,
+            title: item.name,
+            description: ready ? 'Tap to spin!' : `Next: ${formatCooldown(remainingMs)}`,
+            disabled: !ready || spinning,
+            onPress: () => addToCart(item),
+            priceNode: (
+                <Text style={[styles.itemPrice, { color: ready ? '#2e5a3e' : '#888' }]}>
+                    {ready ? 'FREE' : 'COOLDOWN'}
+                </Text>
+            ),
+        });
     };
 
-    const renderHackathonCard = (item: ShopItem) => (
-        <View
-            key={item.id}
-            style={[styles.itemCard, { borderColor: getRarityBorderColor(item.rarity) }]}
-        >
-            <TouchableOpacity
-                style={styles.itemClickArea}
-                onPress={() => addToCart(item)}
-            >
-                <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
-                <Text style={styles.itemName} numberOfLines={2}>
-                    {item.name}
-                </Text>
-                <Text style={styles.itemSummary} numberOfLines={2}>
-                    {item.summary}
-                </Text>
-                <View style={styles.priceContainer}>
-                    <Text style={[styles.itemPrice, { color: '#2e5a3e' }]}>FREE</Text>
-                </View>
-            </TouchableOpacity>
-        </View>
-    );
+    const renderHackathonCard = (item: ShopItem) =>
+        renderCardShell({
+            item,
+            title: item.name,
+            description: item.summary,
+            onPress: () => addToCart(item),
+            priceNode: (
+                <Text style={[styles.itemPrice, { color: '#2e5a3e' }]}>FREE</Text>
+            ),
+        });
 
     const renderBoxCard = (item: ShopItem) => {
         const insufficient = balance - cartTotal < item.priceStarFragments;
-        return (
-            <View
-                key={item.id}
-                style={[styles.itemCard, { borderColor: getRarityBorderColor(item.rarity) }]}
-            >
-                <TouchableOpacity
-                    style={[styles.itemClickArea, insufficient && styles.disabledItem]}
-                    onPress={() => addToCart(item)}
-                    disabled={insufficient}
-                >
-                    <Image
-                        source={item.image}
-                        style={styles.boxImage}
-                        resizeMode="contain"
-                    />
-
-                    <Text style={styles.itemName} numberOfLines={2}>
-                        {/* Force the rarity word onto its own line so Common,
-                            Uncommon, and Rare all wrap identically — keeps
-                            the box cards visually consistent in a row. */}
-                        {item.name.replace(' · ', '\n')}
+        return renderCardShell({
+            item,
+            title: stripRaritySuffix(item.name),
+            description: item.summary,
+            disabled: insufficient,
+            onPress: () => addToCart(item),
+            imageStyle: styles.boxImage,
+            priceNode: (
+                <View style={styles.priceContainer}>
+                    <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
+                    <Text style={[styles.itemPrice, insufficient && styles.disabledText]}>
+                        {item.priceStarFragments}
                     </Text>
-                    <Text style={styles.itemSummary} numberOfLines={2}>
-                        {item.summary}
-                    </Text>
-                    <View style={styles.priceContainer}>
-                        <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
-                        <Text style={[styles.itemPrice, insufficient && styles.disabledText]}>
-                            {item.priceStarFragments}
-                        </Text>
-                    </View>
-                    {insufficient && (
-                        <Text style={styles.insufficientText}>INSUFFICIENT</Text>
-                    )}
-                </TouchableOpacity>
-            </View>
-        );
+                </View>
+            ),
+            overlay: insufficient ? (
+                <Text style={styles.insufficientOverlay}>INSUFFICIENT</Text>
+            ) : null,
+        });
     };
 
     const renderUpgradeCard = (
@@ -897,35 +933,24 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             current != null && max != null
                 ? `Now ${current}${atMax ? ' (max)' : ` · max ${max}`}`
                 : item.summary || '';
-        return (
-            <View
-                key={item.id}
-                style={[styles.itemCard, { borderColor: getRarityBorderColor(item.rarity) }]}
-            >
-                <TouchableOpacity
-                    style={[styles.itemClickArea, disabled && styles.disabledItem]}
-                    onPress={() => addToCart(item)}
-                    disabled={disabled}
-                >
-                    <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
-                    <Text style={styles.itemName} numberOfLines={2}>
-                        {item.name}
+        return renderCardShell({
+            item,
+            title: item.name,
+            description: summary,
+            disabled,
+            onPress: () => addToCart(item),
+            priceNode: (
+                <View style={styles.priceContainer}>
+                    <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
+                    <Text style={[styles.itemPrice, (insufficient || atMax) && styles.disabledText]}>
+                        {atMax ? 'MAX' : item.priceStarFragments}
                     </Text>
-                    <Text style={styles.itemSummary} numberOfLines={2}>
-                        {summary}
-                    </Text>
-                    <View style={styles.priceContainer}>
-                        <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
-                        <Text style={[styles.itemPrice, (insufficient || atMax) && styles.disabledText]}>
-                            {atMax ? 'MAX' : item.priceStarFragments}
-                        </Text>
-                    </View>
-                    {insufficient && !atMax && (
-                        <Text style={styles.insufficientText}>INSUFFICIENT</Text>
-                    )}
-                </TouchableOpacity>
-            </View>
-        );
+                </View>
+            ),
+            overlay: insufficient && !atMax ? (
+                <Text style={styles.insufficientOverlay}>INSUFFICIENT</Text>
+            ) : null,
+        });
     };
 
     const renderCampCard = (item: ShopItem, campId: CampId) => {
@@ -940,31 +965,24 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             const hours = Math.floor((remainingMs % 86_400_000) / 3_600_000);
             summary = days > 0 ? `Active · ${days}d ${hours}h left` : `Active · ${hours}h left`;
         }
-        return (
-            <View
-                key={item.id}
-                style={[styles.itemCard, { borderColor: getRarityBorderColor(item.rarity) }]}
-            >
-                <TouchableOpacity
-                    style={[styles.itemClickArea, disabled && styles.disabledItem]}
-                    onPress={() => addToCart(item)}
-                    disabled={disabled}
-                >
-                    <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
-                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                    <Text style={styles.itemSummary} numberOfLines={2}>{summary}</Text>
-                    <View style={styles.priceContainer}>
-                        <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
-                        <Text style={[styles.itemPrice, (insufficient || isActive) && styles.disabledText]}>
-                            {isActive ? 'ACTIVE' : item.priceStarFragments}
-                        </Text>
-                    </View>
-                    {insufficient && !isActive && (
-                        <Text style={styles.insufficientText}>INSUFFICIENT</Text>
-                    )}
-                </TouchableOpacity>
-            </View>
-        );
+        return renderCardShell({
+            item,
+            title: item.name,
+            description: summary,
+            disabled,
+            onPress: () => addToCart(item),
+            priceNode: (
+                <View style={styles.priceContainer}>
+                    <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
+                    <Text style={[styles.itemPrice, (insufficient || isActive) && styles.disabledText]}>
+                        {isActive ? 'ACTIVE' : item.priceStarFragments}
+                    </Text>
+                </View>
+            ),
+            overlay: insufficient && !isActive ? (
+                <Text style={styles.insufficientOverlay}>INSUFFICIENT</Text>
+            ) : null,
+        });
     };
 
     const renderItemCard = (item: ShopItem) => {
@@ -983,58 +1001,43 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             !locked && item.currency === 'starFragments' && projected > balance;
         const disabled = locked || insufficient;
 
-        return (
-            <View
-                key={item.id}
-                style={[
-                    styles.itemCard,
-                    { borderColor: getRarityBorderColor(item.rarity) },
-                    flashingItem === item.id && styles.flashingCard,
-                ]}
-            >
-                <TouchableOpacity
-                    style={[styles.itemClickArea, disabled && styles.disabledItem]}
-                    onPress={() => addToCart(item)}
-                    disabled={insufficient && !locked}
-                >
-                    <Image source={item.image} style={styles.itemImage} resizeMode="contain" />
-
-                    <Text style={[styles.itemName, disabled && styles.disabledText]} numberOfLines={2}>
-                        {item.name}
-                    </Text>
-                    {item.durationLabel ? (
-                        <Text style={styles.itemDuration}>{item.durationLabel}</Text>
-                    ) : null}
-                    {item.summary ? (
-                        <Text style={styles.itemSummary} numberOfLines={2}>{item.summary}</Text>
-                    ) : null}
-
-                    {locked || isIap ? (
-                        <View style={styles.priceContainer}>
-                            <Text style={styles.itemPrice}>
-                                {item.priceUsd != null ? `$${item.priceUsd.toFixed(2)}` : 'Coming Soon'}
-                            </Text>
-                        </View>
-                    ) : (
-                        <View style={styles.priceContainer}>
-                            <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
-                            <Text style={[styles.itemPrice, insufficient && styles.disabledText]}>
-                                {item.priceStarFragments}
-                            </Text>
-                        </View>
-                    )}
-
-                    {locked && (
-                        <View style={styles.comingSoonBadge}>
-                            <Text style={styles.comingSoonText}>COMING SOON</Text>
-                        </View>
-                    )}
-                    {insufficient && (
-                        <Text style={styles.insufficientText}>INSUFFICIENT</Text>
-                    )}
-                </TouchableOpacity>
+        const description = item.durationLabel
+            ? `${item.durationLabel}${item.summary ? ` · ${item.summary}` : ''}`
+            : item.summary ?? null;
+        const priceNode = locked || isIap ? (
+            <Text style={styles.itemPrice}>
+                {item.priceUsd != null ? `$${item.priceUsd.toFixed(2)}` : 'Coming Soon'}
+            </Text>
+        ) : (
+            <View style={styles.priceContainer}>
+                <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
+                <Text style={[styles.itemPrice, insufficient && styles.disabledText]}>
+                    {item.priceStarFragments}
+                </Text>
             </View>
         );
+        const overlay = (
+            <>
+                {locked ? (
+                    <View style={styles.comingSoonBadge}>
+                        <Text style={styles.comingSoonText}>COMING SOON</Text>
+                    </View>
+                ) : null}
+                {insufficient ? (
+                    <Text style={styles.insufficientOverlay}>INSUFFICIENT</Text>
+                ) : null}
+            </>
+        );
+        return renderCardShell({
+            item,
+            title: item.name,
+            description,
+            disabled,
+            onPress: () => addToCart(item),
+            priceNode,
+            overlay,
+            flashing: flashingItem === item.id,
+        });
     };
 
     return (
@@ -1635,9 +1638,9 @@ const styles = StyleSheet.create({
     // (title + summary + price below) lines up identically whether we're
     // showing real box art or the rare-tier bundle fallback.
     boxImage: {
-        width: 56,
-        height: 56,
-        marginBottom: 4,
+        width: 48,
+        height: 48,
+        marginBottom: 2,
     },
     scrollBody: {
         paddingHorizontal: 16,
@@ -1743,50 +1746,68 @@ const styles = StyleSheet.create({
     itemCard: {
         width: '31%',
         marginRight: '2.33%',
-        height: 140,
-        borderWidth: 3,
-        borderColor: '#003300',
-        backgroundColor: '#f0fff0',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 6,
+        height: 170,
         marginBottom: 8,
     },
-    itemClickArea: {
+    cardCasing: {
         flex: 1,
         width: '100%',
+        height: '100%',
+    },
+    cardCasingImage: {
+        borderRadius: 0,
+    },
+    cardInner: {
+        flex: 1,
+        paddingHorizontal: 6,
+        paddingTop: 2,
+        paddingBottom: 10,
+    },
+    cardHeader: {
+        height: 38,
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        paddingTop: 4,
+    },
+    cardMiddle: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 2,
+    },
+    cardFooter: {
+        height: 26,
         alignItems: 'center',
         justifyContent: 'center',
     },
     itemImage: {
         width: 44,
         height: 44,
-        marginBottom: 4,
+        marginBottom: 2,
     },
     itemName: {
         fontFamily: 'Monaco',
         fontSize: 14,
-        lineHeight: 16,
-        // Reserve 2 lines so titles that wrap (e.g. "Common Ingredient Box")
-        // line up vertically with shorter titles (e.g. "Rare Ingredient Box")
-        // — keeps the price row at the same Y across every card in a row.
-        minHeight: 32,
-        marginBottom: 2,
+        lineHeight: 14,
         textAlign: 'center',
-        color: '#003300',
+        color: '#2e2014',
     },
-    itemDuration: {
+    itemRank: {
         fontFamily: 'Monaco',
-        fontSize: 12,
-        color: '#7a3b00',
-        marginBottom: 2,
+        fontSize: 11,
+        lineHeight: 8,
+        textAlign: 'center',
+        color: '#2e2014',
+        marginTop: -1,
     },
     itemSummary: {
         fontFamily: 'Monaco',
-        fontSize: 12,
-        color: '#406040',
+        fontSize: 11,
+        lineHeight: 13,
+        color: '#3a2a1a',
         textAlign: 'center',
-        marginBottom: 4,
+        marginTop: 2,
+        paddingHorizontal: 2,
     },
     disabledItem: {
         opacity: 0.55,
@@ -1794,21 +1815,20 @@ const styles = StyleSheet.create({
     disabledText: {
         color: '#999999',
     },
-    insufficientText: {
-        fontFamily: 'Monaco',
-        fontSize: 11,
-        color: '#ff6b6b',
-        marginTop: 2,
+    insufficientOverlay: {
+        position: 'absolute',
+        bottom: 4,
+        left: 0,
+        right: 0,
         textAlign: 'center',
+        fontFamily: 'Monaco',
+        fontSize: 9,
+        color: '#cc0000',
     },
     priceContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 51, 0, 0.1)',
-        borderWidth: 1,
-        borderColor: '#003300',
-        paddingHorizontal: 6,
-        paddingVertical: 3,
+        justifyContent: 'center',
     },
     priceIcon: {
         width: 12,

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hoshino",
     "slug": "hoshino",
-    "version": "0.1.17-preview",
+    "version": "0.1.18-preview",
     "orientation": "portrait",
     "icon": "./assets/icons/icon.png",
     "userInterfaceStyle": "light",
@@ -22,7 +22,7 @@
       "backgroundColor": "#211F37",
       "package": "com.socks.hoshino",
       "softwareKeyboardLayoutMode": "resize",
-      "versionCode": 25
+      "versionCode": 26
     },
     "extra": {
       "eas": {

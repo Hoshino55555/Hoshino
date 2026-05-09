@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, Modal, StyleSheet, Dimensions, Animated, Easing, useWindowDimensions } from 'react-native';
+import { View, Text, Image, ImageBackground, TouchableOpacity, Modal, StyleSheet, Dimensions, Animated, Easing, useWindowDimensions } from 'react-native';
 import Shop from './Shop';
 import Gallery from './Gallery';
 import InnerScreen from './InnerScreen';
@@ -10,7 +10,7 @@ import ForagePopOut from './ForagePopOut';
 import type { ForagedItem } from '../services/GameStateService';
 import { pushMoonokoSnapshot } from '../widgets/widgetService';
 import type { PendingWidgetAction } from '../../App';
-import { Backgrounds, Menu, Stars, getCharacterAnim } from '../assets';
+import { Backgrounds, Menu, Stars, Frames, getCharacterAnim } from '../assets';
 
 const WIDGET_ACTION_TTL_MS = 60_000;
 
@@ -459,9 +459,18 @@ const MoonokoInteraction: React.FC<Props> = ({
         return (
             <View
                 key={button.id}
-                style={[styles.menuIcon, isSelected && styles.menuIconSelected]}
+                style={styles.menuIcon}
                 testID={`menu-${button.action}`}
             >
+                <Image
+                    source={isSelected ? Frames.iconSelect : Frames.iconSelectDim}
+                    style={[
+                        styles.menuIconSelectImage,
+                        { width: menuIconSize + 16, height: menuIconSize + 16 },
+                    ]}
+                    resizeMode="stretch"
+                />
+
                 <Image
                     source={getImageSource(button.icon)}
                     style={[styles.menuImage, { width: menuIconSize, height: menuIconSize }]}
@@ -478,7 +487,12 @@ const MoonokoInteraction: React.FC<Props> = ({
             transitionOpacity={transitionOpacity}
             statsBarContent={
                 <>
-                    <View style={styles.statItem}>
+                    <ImageBackground
+                        source={Frames.statBack}
+                        style={styles.statItem}
+                        imageStyle={styles.statBackImage}
+                        resizeMode="stretch"
+                    >
                         <Text style={styles.statLabel}>Mood</Text>
                         <View style={styles.starContainer}>
                             {[...Array(5)].map((_, index) => (
@@ -489,8 +503,13 @@ const MoonokoInteraction: React.FC<Props> = ({
                                 />
                             ))}
                         </View>
-                    </View>
-                    <View style={styles.statItem}>
+                    </ImageBackground>
+                    <ImageBackground
+                        source={Frames.statBack}
+                        style={styles.statItem}
+                        imageStyle={styles.statBackImage}
+                        resizeMode="stretch"
+                    >
                         <Text style={styles.statLabel}>Hunger</Text>
                         <View style={styles.starContainer}>
                             {[...Array(5)].map((_, index) => (
@@ -501,8 +520,13 @@ const MoonokoInteraction: React.FC<Props> = ({
                                 />
                             ))}
                         </View>
-                    </View>
-                    <View style={styles.statItem}>
+                    </ImageBackground>
+                    <ImageBackground
+                        source={Frames.statBack}
+                        style={styles.statItem}
+                        imageStyle={styles.statBackImage}
+                        resizeMode="stretch"
+                    >
                         <Text style={styles.statLabel}>Energy</Text>
                         <View style={styles.starContainer}>
                             {[...Array(5)].map((_, index) => (
@@ -513,7 +537,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                                 />
                             ))}
                         </View>
-                    </View>
+                    </ImageBackground>
                 </>
             }
             onLeftButtonPress={() => moveSelection(-1)}
@@ -615,6 +639,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         flex: 1,
+        paddingVertical: 6,
+        marginHorizontal: 3,
+        overflow: 'hidden',
+    },
+    statBackImage: {
+        borderRadius: 8,
     },
     statLabel: {
         fontSize: 17,
@@ -704,27 +734,24 @@ const styles = StyleSheet.create({
         marginHorizontal: 3,
         marginTop: 4,
         marginBottom: 3,
-        paddingTop: 15,
-        paddingBottom: 15,
+        paddingTop: 30,
+        paddingBottom: 4,
     },
     menuRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginVertical: 1,
+        marginVertical: 4,
         paddingHorizontal: '5%',
     },
     menuIcon: {
         padding: 6,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: 'transparent',
-        backgroundColor: 'transparent',
     },
-    menuIconSelected: {
-        borderColor: 'rgba(46, 90, 62, 0.85)',
-        backgroundColor: 'rgba(232, 245, 232, 0.55)',
+    menuIconSelectImage: {
+        position: 'absolute',
+        top: -2,
+        left: -2,
     },
     menuImage: {
         width: 48,

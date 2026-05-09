@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image, Keyboard, Animated, Easing } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { useChromeConfig } from '../contexts/ChromeContext';
 import { Backgrounds } from '../assets';
 
@@ -205,16 +206,35 @@ const InnerScreen: React.FC<InnerScreenProps> = ({
                     )}
 
                     {/* Inset shadow overlays — casing lip casts shadow into
-                        the cavity along the top and left edges. Stepped for
-                        a pixel-art feel and to avoid native gradient deps. */}
-                    <View pointerEvents="none" style={[styles.insetShadowTop, { top: 0, height: 5, backgroundColor: 'rgba(0,0,0,0.38)' }]} />
-                    <View pointerEvents="none" style={[styles.insetShadowTop, { top: 5, height: 6, backgroundColor: 'rgba(0,0,0,0.22)' }]} />
-                    <View pointerEvents="none" style={[styles.insetShadowTop, { top: 11, height: 8, backgroundColor: 'rgba(0,0,0,0.10)' }]} />
-                    <View pointerEvents="none" style={[styles.insetShadowLeft, { left: 0, width: 4, backgroundColor: 'rgba(0,0,0,0.30)' }]} />
-                    <View pointerEvents="none" style={[styles.insetShadowLeft, { left: 4, width: 5, backgroundColor: 'rgba(0,0,0,0.16)' }]} />
-                    <View pointerEvents="none" style={[styles.insetShadowLeft, { left: 9, width: 6, backgroundColor: 'rgba(0,0,0,0.07)' }]} />
+                        the cavity along the top and left edges. Smooth
+                        gradients tinted slightly blue to match the casing
+                        ambiance instead of pure black. */}
+                    <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(22,32,62,0.42)', 'rgba(22,32,62,0)']}
+                        style={styles.vignetteTop}
+                    />
+                    <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(22,32,62,0.32)', 'rgba(22,32,62,0)']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.vignetteLeft}
+                    />
+                    <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(22,32,62,0)', 'rgba(22,32,62,0.18)']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.vignetteRight}
+                    />
+                    <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(22,32,62,0)', 'rgba(22,32,62,0.22)']}
+                        style={styles.vignetteBottom}
+                    />
                     {/* Subtle light catches the far edge. */}
-                    <View pointerEvents="none" style={[styles.insetHighlightBottom, { backgroundColor: 'rgba(255,255,255,0.14)' }]} />
+                    <View pointerEvents="none" style={[styles.insetHighlightBottom, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
                 </View>
             </ShadowWrapper>
         </View>
@@ -278,16 +298,36 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 0 },
         elevation: 0,
     },
-    insetShadowTop: {
+    vignetteTop: {
         position: 'absolute',
+        top: 0,
         left: 0,
         right: 0,
+        height: 32,
         zIndex: 50,
     },
-    insetShadowLeft: {
+    vignetteLeft: {
         position: 'absolute',
         top: 0,
         bottom: 0,
+        left: 0,
+        width: 22,
+        zIndex: 50,
+    },
+    vignetteRight: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        right: 0,
+        width: 18,
+        zIndex: 50,
+    },
+    vignetteBottom: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 22,
         zIndex: 50,
     },
     insetHighlightBottom: {
@@ -415,11 +455,10 @@ const styles = StyleSheet.create({
     statsBar: {
         flexDirection: 'row',
         justifyContent: 'space-around',
-        padding: 10,
-        backgroundColor: 'darkgray',
+        paddingHorizontal: 6,
+        paddingVertical: 6,
+        backgroundColor: 'transparent',
         zIndex: 2,
-        borderBottomWidth: 2,
-        borderBottomColor: 'rgba(0, 0, 0, 0.55)',
     },
     statItem: {
         alignItems: 'center',
