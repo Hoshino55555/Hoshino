@@ -116,6 +116,14 @@ const callConsumeBooster = httpsCallable<
     }
 >(functions, 'consumeBooster');
 
+// Dev-only: clears mealBonusClaimed flags so feeding flow can be retested
+// without waiting for the next game-day rollover. Server gates against
+// production; client-side gate is __DEV__ at the call site.
+const callDevResetMealClaims = httpsCallable<
+    { characterId: string },
+    StateResponse
+>(functions, 'devResetMealClaims');
+
 const callExchangePrivyToken = httpsCallable<
     { privyAccessToken: string },
     { firebaseToken: string; uid: string }
@@ -292,6 +300,11 @@ export const GameStateService = {
         return res.data;
     },
 
+    async devResetMealClaims(characterId: string): Promise<GameState> {
+        const res = await callDevResetMealClaims({ characterId });
+        return res.data.state;
+    },
+
     async getInventory(): Promise<IngredientCounts> {
         const res = await callGetInventory({});
         return res.data.counts || {};
@@ -315,11 +328,16 @@ export const GameStateService = {
         return res.data;
     },
 
-    async cookRecipe(characterId: string, recipeId: string): Promise<CookResponse> {
+    async cookRecipe(
+        characterId: string,
+        recipeId: string,
+        ingredients?: string[]
+    ): Promise<CookResponse> {
         const res = await callCook({
             characterId,
             mode: 'recipe',
             recipeId,
+            ingredients,
             timezone: localTimezone(),
         });
         return res.data;

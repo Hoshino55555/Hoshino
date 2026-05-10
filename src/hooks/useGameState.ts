@@ -31,7 +31,7 @@ interface UseGameStateResult {
     recipeProgress: RecipeProgressMap;
     refreshPantry: () => Promise<void>;
     cookManual: (ingredients: string[]) => Promise<CookResponse>;
-    cookRecipe: (recipeId: string) => Promise<CookResponse>;
+    cookRecipe: (recipeId: string, ingredients?: string[]) => Promise<CookResponse>;
     applyBooster: (
         skuId: BoosterSkuId,
         qty?: number,
@@ -55,6 +55,7 @@ interface UseGameStateResult {
         skuId: BoosterSkuId;
         replayed: boolean;
     }>;
+    devResetMealClaims: () => Promise<GameState>;
 }
 
 export function useGameState(characterId: string | null | undefined): UseGameStateResult {
@@ -275,10 +276,10 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     );
 
     const cookRecipe = useCallback(
-        async (recipeId: string) => {
+        async (recipeId: string, ingredients?: string[]) => {
             if (!characterId) throw new Error('No character selected');
             const requestedFor = characterId;
-            const res = await GameStateService.cookRecipe(characterId, recipeId);
+            const res = await GameStateService.cookRecipe(characterId, recipeId, ingredients);
             if (requestedFor !== currentCharacterIdRef.current) return res;
             lastMutationAtRef.current = Date.now();
             setState(res.state);
@@ -318,6 +319,16 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         [characterId]
     );
 
+    const devResetMealClaims = useCallback(async () => {
+        if (!characterId) throw new Error('No character selected');
+        const requestedFor = characterId;
+        const next = await GameStateService.devResetMealClaims(characterId);
+        if (requestedFor !== currentCharacterIdRef.current) return next;
+        lastMutationAtRef.current = Date.now();
+        setState(next);
+        return next;
+    }, [characterId]);
+
     let sleepRemainingMs = 0;
     if (state?.sleepStartedAt) {
         const elapsed = Date.now() - state.sleepStartedAt;
@@ -346,5 +357,6 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         cookRecipe,
         applyBooster,
         consumeBooster,
+        devResetMealClaims,
     };
 }

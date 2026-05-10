@@ -40,6 +40,7 @@ exports.endSleep = gameState.endSleep;
 exports.drainForaged = gameState.drainForaged;
 exports.applyBooster = gameState.applyBooster;
 exports.consumeBooster = gameState.consumeBooster;
+exports.devResetMealClaims = gameState.devResetMealClaims;
 
 // Cooking
 exports.cook = cooking.cook;

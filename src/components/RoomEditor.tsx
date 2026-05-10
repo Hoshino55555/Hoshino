@@ -24,6 +24,7 @@ import {
     itemPixelRect,
     resolveRoomAsset,
 } from '../services/RoomLayout';
+import { Frames } from '../assets';
 
 interface PaletteEntry {
     asset: RoomItemAssetKey;
@@ -398,13 +399,15 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
 
             <TouchableOpacity
                 onPress={() => setEditing((prev) => !prev)}
-                style={[
-                    styles.editButton,
-                    { bottom: bottomInset + 8 },
-                    editing && styles.editButtonActive,
-                ]}
+                style={[styles.editButton, { bottom: bottomInset + 8 }]}
+                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
             >
-                <Text style={styles.editButtonText}>{editing ? 'Done' : 'Edit'}</Text>
+                <Image
+                    source={Frames.editButton}
+                    style={styles.editButtonImage}
+                    resizeMode="contain"
+                />
+                {editing && <View style={styles.editButtonActiveTint} pointerEvents="none" />}
             </TouchableOpacity>
         </View>
     );
@@ -500,22 +503,22 @@ const styles = StyleSheet.create({
     editButton: {
         position: 'absolute',
         right: 8,
-        backgroundColor: 'rgba(46, 90, 62, 0.9)',
-        borderWidth: 2,
-        borderColor: '#E8F5E8',
-        borderRadius: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
         zIndex: 10,
         elevation: 10,
+        padding: 4,
     },
-    editButtonActive: {
-        backgroundColor: 'rgba(168, 93, 0, 0.95)',
+    editButtonImage: {
+        width: 60,
+        height: 65,
     },
-    editButtonText: {
-        color: '#E8F5E8',
-        fontFamily: 'Monaco',
-        fontSize: 21,
+    editButtonActiveTint: {
+        position: 'absolute',
+        top: 4,
+        left: 4,
+        right: 4,
+        bottom: 4,
+        backgroundColor: 'rgba(168, 93, 0, 0.45)',
+        borderRadius: 8,
     },
     paletteWrap: {
         position: 'absolute',

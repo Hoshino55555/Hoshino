@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SettingsService, { MenuButton, type SoundLevel } from '../services/SettingsService';
-import { Menu, Backgrounds } from '../assets';
+import MusicService from '../services/MusicService';
+import { Menu, Backgrounds, Frames } from '../assets';
 
 interface Props {
     onBack: () => void;
@@ -83,6 +84,10 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
     const updateSoundLevel = async (level: SoundLevel) => {
         await settingsService.setSoundLevel(level);
         setSoundLevelState(level);
+        // Push the new gain into the background-music loop so the slider
+        // edits the player's volume in real time. Level 0 → MusicService
+        // pauses; non-zero → resumes from where the loop left off.
+        MusicService.getInstance().syncVolume();
     };
 
     const updateNotificationSetting = async (enabled: boolean) => {
@@ -313,7 +318,12 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
                         onPress={onBack}
                         hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                     >
-                        <Text style={styles.backButtonText}>{'<'} Back</Text>
+                        <Image
+                            source={Frames.backButton}
+                            style={styles.backButtonImage}
+                            resizeMode="contain"
+                        />
+                        <Text style={styles.backButtonLabel}>Back</Text>
                     </TouchableOpacity>
                 </View>
             </ImageBackground>
@@ -339,17 +349,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
     },
     backButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        backgroundColor: 'rgba(46, 90, 62, 0.85)',
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#E8F5E8',
+        padding: 4,
+        alignItems: 'center',
     },
-    backButtonText: {
-        fontSize: 21,
-        color: '#E8F5E8',
+    backButtonImage: {
+        width: 56,
+        height: 46,
+    },
+    backButtonLabel: {
+        color: '#e84a4a',
         fontFamily: 'Monaco',
+        fontSize: 14,
+        marginTop: 1,
     },
     content: {
         flex: 1,

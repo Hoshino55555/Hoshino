@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Animated, Easing, TouchableOpacity, Text } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useChromeConfig } from '../contexts/ChromeContext';
 import Room from './Room';
 import RoomEditor from './RoomEditor';
 import { type RoomLayout, STARTER_ROOM_LAYOUT } from '../services/RoomLayout';
+import { Frames } from '../assets';
 
 // Single shared room for the local-only MVP. Switch to per-character keying
 // (`room:layout:${characterId}`) when the editor moves to a per-moonoko home.
@@ -141,7 +142,12 @@ const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
                     onPress={handleClose}
                     hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                 >
-                    <Text style={styles.backButtonText}>{'<'} Back</Text>
+                    <Image
+                        source={Frames.backButton}
+                        style={styles.backButtonImage}
+                        resizeMode="contain"
+                    />
+                    <Text style={styles.backButtonLabel}>Back</Text>
                 </TouchableOpacity>
             </View>
         </Animated.View>
@@ -163,17 +169,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     backButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        backgroundColor: 'rgba(46, 90, 62, 0.85)',
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#E8F5E8',
+        padding: 4,
+        alignItems: 'center',
     },
-    backButtonText: {
-        color: '#E8F5E8',
+    backButtonImage: {
+        width: 56,
+        height: 46,
+    },
+    backButtonLabel: {
+        color: '#e84a4a',
         fontFamily: 'Monaco',
-        fontSize: 21,
+        fontSize: 14,
+        marginTop: 1,
     },
 });
 

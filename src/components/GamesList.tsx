@@ -10,7 +10,7 @@ import {
     Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Backgrounds } from '../assets';
+import { Backgrounds, Frames } from '../assets';
 
 interface GamesListProps {
     onClose: () => void;
@@ -29,6 +29,12 @@ const GAMES: GameTile[] = [
         id: 'starburst',
         name: 'STARBURST',
         description: 'Constellation puzzle',
+        available: true,
+    },
+    {
+        id: 'water-ring-toss',
+        name: 'RING TOSS',
+        description: 'Water jet arcade',
         available: true,
     },
 ];
@@ -122,7 +128,12 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
                         onPress={onClose}
                         hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                     >
-                        <Text style={styles.backButtonText}>{'<'} Back</Text>
+                        <Image
+                            source={Frames.backButton}
+                            style={styles.backButtonImage}
+                            resizeMode="contain"
+                        />
+                        <Text style={styles.backButtonLabel}>Back</Text>
                     </TouchableOpacity>
                 </View>
             </ImageBackground>
@@ -147,17 +158,18 @@ const styles = StyleSheet.create({
         zIndex: 2,
     },
     backButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        backgroundColor: 'rgba(46, 90, 62, 0.85)',
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#E8F5E8',
+        padding: 4,
+        alignItems: 'center',
     },
-    backButtonText: {
-        color: '#E8F5E8',
+    backButtonImage: {
+        width: 56,
+        height: 46,
+    },
+    backButtonLabel: {
+        color: '#e84a4a',
         fontFamily: 'Monaco',
-        fontSize: 21,
+        fontSize: 14,
+        marginTop: 1,
     },
     scrollClipper: {
         position: 'absolute',

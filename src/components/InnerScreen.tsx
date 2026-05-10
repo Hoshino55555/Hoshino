@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image, Keyboard, Animated, Easing } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { useChromeConfig } from '../contexts/ChromeContext';
 import { Backgrounds } from '../assets';
 
@@ -205,36 +204,6 @@ const InnerScreen: React.FC<InnerScreenProps> = ({
                         </TouchableOpacity>
                     )}
 
-                    {/* Inset shadow overlays — casing lip casts shadow into
-                        the cavity along the top and left edges. Smooth
-                        gradients tinted slightly blue to match the casing
-                        ambiance instead of pure black. */}
-                    <LinearGradient
-                        pointerEvents="none"
-                        colors={['rgba(22,32,62,0.42)', 'rgba(22,32,62,0)']}
-                        style={styles.vignetteTop}
-                    />
-                    <LinearGradient
-                        pointerEvents="none"
-                        colors={['rgba(22,32,62,0.32)', 'rgba(22,32,62,0)']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.vignetteLeft}
-                    />
-                    <LinearGradient
-                        pointerEvents="none"
-                        colors={['rgba(22,32,62,0)', 'rgba(22,32,62,0.18)']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.vignetteRight}
-                    />
-                    <LinearGradient
-                        pointerEvents="none"
-                        colors={['rgba(22,32,62,0)', 'rgba(22,32,62,0.22)']}
-                        style={styles.vignetteBottom}
-                    />
-                    {/* Subtle light catches the far edge. */}
-                    <View pointerEvents="none" style={[styles.insetHighlightBottom, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
                 </View>
             </ShadowWrapper>
         </View>
@@ -289,7 +258,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         overflow: 'hidden',
         position: 'relative',
-        borderWidth: 1,
+        borderWidth: 0,
         borderColor: 'rgba(0, 0, 0, 0.35)',
         backgroundColor: '#E8F5E8',
         shadowColor: 'transparent',

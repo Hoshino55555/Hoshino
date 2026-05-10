@@ -163,7 +163,18 @@ interface Props {
 //   items in form the wide base, later items stack higher and narrower
 //   toward the apex.
 const ARC_HALF_MS = 220;
-const STAGGER_MS = 55;
+// Stagger drives both item-launch cadence and the bag's per-item squeeze
+// pulse in MoonokoInteraction. Computed from item count so total spill
+// duration stays roughly constant (~TARGET_SPILL_MS) — small queues spill
+// slowly so the bag stays visible long enough to read, big queues spill
+// fast so the player isn't waiting forever.
+const TARGET_SPILL_MS = 1800;
+const MIN_STAGGER_MS = 50;
+const MAX_STAGGER_MS = 350;
+export const computeForageStaggerMs = (count: number): number => {
+    if (count <= 1) return MAX_STAGGER_MS;
+    return Math.max(MIN_STAGGER_MS, Math.min(MAX_STAGGER_MS, Math.round(TARGET_SPILL_MS / count)));
+};
 const GROUND_HOLD_MS = 10000;
 const FADE_DURATION_MS = 400;
 
@@ -177,7 +188,7 @@ const ITEM_SIZE_REF = 40;
 const PILE_BASE_SPREAD_REF = 52; // ±dp at the base of the pile
 const PILE_LIFT_PER_ITEM_REF = 12;
 const PILE_LIFT_CAP_REF = 72;
-const PILE_BASE_GAP_REF = -28; // dp above bottom chrome where the pile sits (negative pushes pile down toward/into menu bar)
+const PILE_BASE_GAP_REF = -10; // dp above bottom chrome where the pile sits
 const ARC_PEAK_BASE_REF = 110; // dp the arc rises above the launch point
 const ARC_PEAK_JITTER_REF = 18;
 
@@ -261,8 +272,9 @@ const ForagePopOut: React.FC<Props> = ({
             return;
         }
         const flight = flightMs();
+        const staggerMs = computeForageStaggerMs(items.length);
         items.forEach((item, i) => {
-            const delayMs = i * STAGGER_MS;
+            const delayMs = i * staggerMs;
             // Slightly varying arc heights so identical sprites don't fly in
             // perfect lockstep — pure visual texture, no gameplay meaning.
             // Base + jitter scale with the screen so the arc reads the same
@@ -306,7 +318,7 @@ const ForagePopOut: React.FC<Props> = ({
         // Global ground-hold timer: starts when the LAST item has finished
         // landing, so every find gets its full shelf life regardless of
         // batch size. Fades whatever is still on the ground and resolves.
-        const lastLandingMs = flight + (items.length - 1) * STAGGER_MS;
+        const lastLandingMs = flight + (items.length - 1) * staggerMs;
         const timeout = setTimeout(() => {
             const remaining = items.filter((it) => !dismissed.has(it.id));
             if (remaining.length === 0) {

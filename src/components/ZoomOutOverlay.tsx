@@ -1,10 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, {
+    cancelAnimation,
     Easing,
     runOnJS,
     useAnimatedProps,
+    useAnimatedStyle,
     useSharedValue,
+    withDelay,
     withTiming,
 } from 'react-native-reanimated';
 import Svg, { G, Path } from 'react-native-svg';
@@ -14,7 +17,7 @@ import { HOSHINO_STAR_PATH } from './hoshinoStarPath';
 // IRIS_BUILD_TAG bumps every time we change this file so we can verify the
 // device is actually running the latest JS bundle (not a cached one).
 // Look for "iris build" in `adb logcat` after a transition fires.
-const IRIS_BUILD_TAG = '2026-05-08-subpixel-pinhole';
+const IRIS_BUILD_TAG = '2026-05-10-ui-thread-hard-mask';
 console.log('[iris build]', IRIS_BUILD_TAG);
 
 // Iris-out reveal: a Hoshino-star-shaped hole opens from the center of the
@@ -46,9 +49,9 @@ const irisCenterY = screenHeight / 2;
 //      solid-black cover layer to plug it — and that cover had its own
 //      mount/unmount seams.
 //   Solution: shrink INITIAL_SCALE 10× (star pinhole → 0.1px, sub-pixel,
-//   doesn't render) and grow the rect half-extent 10× to compensate (still
-//   covers any phone screen at the new scale). The iris is now genuinely
-//   opaque when "closed" and no auxiliary cover layer is needed.
+//   doesn't render) and grow the rect half-extent 10× to compensate. The
+//   hard mask below now only protects the route-swap/opening handoff from
+//   renderer timing, not a visible hole in the iris path itself.
 const HUGE_RECT_PATH = 'M-50000000,-50000000 H50000000 V50000000 H-50000000 Z ';
 const COMPOUND_PATH = HUGE_RECT_PATH + HOSHINO_STAR_PATH;
 
@@ -58,7 +61,20 @@ export const IRIS_FINAL_SCALE = (Math.max(screenWidth, screenHeight) * 2) / STAR
 // no visible hole. 0.0001 × 50_000_000 rect half-extent → 5_000px rect
 // coverage, still far bigger than any phone screen.
 export const IRIS_INITIAL_SCALE = 0.0001;
-export const IRIS_DURATION_MS = 1400;
+export const IRIS_OPEN_DURATION_MS = 1400;
+export const IRIS_CLOSE_DURATION_MS = 1850;
+// Legacy name retained for callers that mean the reveal/open duration.
+export const IRIS_DURATION_MS = IRIS_OPEN_DURATION_MS;
+
+const IRIS_OPEN_EASING = Easing.in(Easing.cubic);
+const IRIS_CLOSE_EASING = Easing.inOut(Easing.quad);
+const IRIS_LAYER_Z = 20000;
+const HARD_MASK_LAYER_Z = IRIS_LAYER_Z + 1;
+// Hard mask timing lives with the iris because it protects the visual seam
+// between the JS route swap and Reanimated's first committed open frame.
+const HARD_MASK_ARM_BEFORE_CLOSE_MS = 180;
+const HARD_MASK_RELEASE_AFTER_OPEN_MS = 560;
+const HARD_MASK_PRE_SWAP_SETTLE_MS = 120;
 
 interface Props {
     children: React.ReactNode;
@@ -81,31 +97,78 @@ const ZoomOutOverlay: React.FC<Props> = ({
     initialOpen = false,
 }) => {
     const scale = useSharedValue(initialOpen ? IRIS_FINAL_SCALE : IRIS_INITIAL_SCALE);
+    const hardMaskOpacity = useSharedValue(initialOpen ? 0 : 1);
+    const exitCompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const notifyExitCompleteAfterMaskSettles = useCallback(() => {
+        if (exitCompleteTimerRef.current != null) {
+            clearTimeout(exitCompleteTimerRef.current);
+            exitCompleteTimerRef.current = null;
+        }
+        exitCompleteTimerRef.current = setTimeout(() => {
+            exitCompleteTimerRef.current = null;
+            onExitComplete?.();
+        }, HARD_MASK_PRE_SWAP_SETTLE_MS);
+    }, [onExitComplete]);
 
     useEffect(() => {
-        // Symmetric ease-in on both directions. We tried ease-out on close
-        // to make the closing motion more visible, but front-loading the
-        // motion left a long static-black window before the swap during
-        // which any micro-flicker (screen A unmounting, screen B mounting,
-        // cover panel hand-off) became visible. Ease-in on close keeps the
-        // eye tracking motion right up to the swap, masking the seam.
+        return () => {
+            if (exitCompleteTimerRef.current != null) {
+                clearTimeout(exitCompleteTimerRef.current);
+                exitCompleteTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        cancelAnimation(hardMaskOpacity);
+        if (exitCompleteTimerRef.current != null) {
+            clearTimeout(exitCompleteTimerRef.current);
+            exitCompleteTimerRef.current = null;
+        }
+
+        if (exiting) {
+            hardMaskOpacity.value = withDelay(
+                Math.max(0, IRIS_CLOSE_DURATION_MS - HARD_MASK_ARM_BEFORE_CLOSE_MS),
+                withTiming(1, { duration: 0 }),
+            );
+        } else {
+            hardMaskOpacity.value = withDelay(
+                HARD_MASK_RELEASE_AFTER_OPEN_MS,
+                withTiming(0, { duration: 0 }),
+            );
+        }
+
+        // Opening keeps the original timing/curve; its slow-start reveal is
+        // the part that already feels right. Closing gets its own longer
+        // in-out curve so the star aperture visibly collapses instead of
+        // snapping shut in the final stretch.
         scale.value = withTiming(
             exiting ? IRIS_INITIAL_SCALE : IRIS_FINAL_SCALE,
             {
-                duration: IRIS_DURATION_MS,
-                easing: Easing.in(Easing.cubic),
+                duration: exiting ? IRIS_CLOSE_DURATION_MS : IRIS_OPEN_DURATION_MS,
+                easing: exiting ? IRIS_CLOSE_EASING : IRIS_OPEN_EASING,
             },
             (finished) => {
                 'worklet';
                 if (!finished) return;
                 if (exiting && onExitComplete) {
-                    runOnJS(onExitComplete)();
+                    hardMaskOpacity.value = 1;
+                    runOnJS(notifyExitCompleteAfterMaskSettles)();
                 } else if (!exiting && onOpenComplete) {
+                    hardMaskOpacity.value = 0;
                     runOnJS(onOpenComplete)();
                 }
             },
         );
-    }, [exiting, scale, onExitComplete, onOpenComplete]);
+    }, [
+        exiting,
+        hardMaskOpacity,
+        notifyExitCompleteAfterMaskSettles,
+        onExitComplete,
+        onOpenComplete,
+        scale,
+    ]);
 
     // RN-style transform array instead of SVG transform string. Reanimated 4 +
     // react-native-svg's string-transform animator only reliably applies the
@@ -125,6 +188,10 @@ const ZoomOutOverlay: React.FC<Props> = ({
         } as any;
     });
 
+    const hardMaskStyle = useAnimatedStyle(() => ({
+        opacity: hardMaskOpacity.value,
+    }));
+
     return (
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
             {children}
@@ -136,7 +203,10 @@ const ZoomOutOverlay: React.FC<Props> = ({
                 says it should be on top. */}
             <View
                 pointerEvents="none"
-                style={[StyleSheet.absoluteFill, { zIndex: 999, elevation: 999 }]}
+                style={[
+                    StyleSheet.absoluteFill,
+                    { zIndex: IRIS_LAYER_Z, elevation: IRIS_LAYER_Z },
+                ]}
             >
                 <Svg
                     pointerEvents="none"
@@ -149,8 +219,20 @@ const ZoomOutOverlay: React.FC<Props> = ({
                     </AnimatedG>
                 </Svg>
             </View>
+            <Animated.View
+                pointerEvents="none"
+                style={[StyleSheet.absoluteFill, styles.hardMask, hardMaskStyle]}
+            />
         </View>
     );
 };
+
+const styles = StyleSheet.create({
+    hardMask: {
+        backgroundColor: 'black',
+        zIndex: HARD_MASK_LAYER_Z,
+        elevation: HARD_MASK_LAYER_Z,
+    },
+});
 
 export default ZoomOutOverlay;

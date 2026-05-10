@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Linking, Image } from 'react-native';
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-} from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
@@ -24,6 +20,7 @@ import MoonokoSelection from './src/components/MoonokoSelection';
 import MoonokoInteraction from './src/components/MoonokoInteraction';
 import GamesList from './src/components/GamesList';
 import Starburst from './src/components/Starburst';
+import WaterRingToss from './src/components/WaterRingToss';
 import SleepScreen from './src/components/SleepScreen';
 import SleepConfirmationModal from './src/components/SleepConfirmationModal';
 import MorningRecapModal, { MorningRecapDeltas } from './src/components/MorningRecapModal';
@@ -47,7 +44,7 @@ import { HoshinoPrivyProvider } from './src/contexts/PrivyContext';
 import { usePrivy } from '@privy-io/expo';
 import LoginScreen from './src/components/LoginScreen';
 import { DeviceCasing, DeviceButtons } from './src/components/DeviceChrome';
-import ZoomOutOverlay, { IRIS_DURATION_MS } from './src/components/ZoomOutOverlay';
+import ZoomOutOverlay from './src/components/ZoomOutOverlay';
 import { Logos } from './src/assets';
 import { Connection, PublicKey } from '@solana/web3.js';
 
@@ -60,6 +57,7 @@ import { GameStateProvider, useGameStateContext } from './src/contexts/GameState
 import { GameStateService, SLEEP_REQUIRED_MS } from './src/services/GameStateService';
 import type { ForagedItem } from './src/services/GameStateService';
 import { scheduleSleepAlarm, cancelSleepAlarm } from './src/services/AlarmService';
+import MusicService from './src/services/MusicService';
 import { pushEmptySnapshot } from './src/widgets/widgetService';
 
 // Pending one-shot action requested by a widget tap. Includes characterId so
@@ -249,40 +247,6 @@ function App() {
     const pendingViewRef = useRef<string | null>(null);
     const coverRafRef = useRef<number | null>(null);
     const coverHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Black "cover panel" that overlaps the close→open seam. The iris alone
-    // can't fully bridge the seam — any sub-frame gap in the screens'
-    // unmount→mount sequence, or a momentary lapse in iris opacity at
-    // INITIAL_SCALE, exposes whatever's behind. Cover panel mounts BEFORE
-    // the close finishes (during late-close) and unmounts AFTER the open
-    // begins (during early-open) so there's always a fully opaque layer
-    // covering the swap, with overlap on both ends. See COVER_OVERLAP_MS.
-    const [coverMounted, setCoverMounted] = useState(false);
-    const coverPanelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Two independent overlaps so the close side can be tighter than the
-    // open side (or vice versa). CLOSE_OVERLAP = how many ms before the
-    // close finishes the cover mounts; OPEN_OVERLAP = how many ms after the
-    // open starts the cover unmounts.
-    const COVER_CLOSE_OVERLAP_MS = 95;
-    const COVER_OPEN_OVERLAP_MS = 120;
-    // Cover fades out (rather than unmounting) during the open animation so
-    // there's no discrete handoff frame between "cover visible" and "iris has
-    // grown enough to cover". Binary unmount used to expose a black→open gap
-    // because the cubic-ease-in iris has barely moved off INITIAL_SCALE in
-    // the first few hundred ms. Animating opacity in lockstep with the iris
-    // means the new screen is revealed by the cover's transparency curve and
-    // the iris's growth simultaneously — no swap frame.
-    const coverOpacity = useSharedValue(1);
-    // Match the iris's duration + easing exactly so the cover's transparency
-    // curve mirrors the iris hole's growth curve. The iris uses
-    // Easing.in(Easing.cubic) over IRIS_DURATION_MS — slow start, fast end —
-    // so for the first several hundred ms the iris hole is still essentially
-    // sub-pixel. A linear 600ms fade emptied the cover long before the iris
-    // had grown enough to take over, leaving a black-then-bare beat. Same
-    // curve + duration means: while the iris hole is tiny, the cover is also
-    // still nearly opaque; both transition off in the final stretch together.
-    const animatedCoverStyle = useAnimatedStyle(() => ({
-        opacity: coverOpacity.value,
-    }));
     // Refs mirror state for the iris callbacks below. Without them, the
     // useCallback identities would change every time currentView or
     // transitionPhase ticks, which would re-fire ZoomOutOverlay's animation
@@ -343,55 +307,6 @@ function App() {
                 coverHoldRef.current = null;
             }
         };
-    }, [transitionPhase]);
-
-    // Drive the cover panel with overlap on both ends of the seam:
-    //   closing → schedule mount at (closeDuration - OVERLAP)  [late-close]
-    //   covered → ensure mounted (in case timer didn't fire)
-    //   opening → schedule unmount at +OVERLAP                  [early-open]
-    //   idle    → ensure unmounted
-    // The overlap means the cover is already in place before the close iris
-    // reaches INITIAL_SCALE, and is still in place after the open iris has
-    // started moving — so there's never a frame where the swap is exposed
-    // between the iris and the cover handing off to each other.
-    useEffect(() => {
-        const clearTimer = () => {
-            if (coverPanelTimerRef.current != null) {
-                clearTimeout(coverPanelTimerRef.current);
-                coverPanelTimerRef.current = null;
-            }
-        };
-        clearTimer();
-
-        if (transitionPhase === 'closing') {
-            // Reset opacity so a re-entered transition starts fully opaque.
-            coverOpacity.value = 1;
-            const armDelay = Math.max(0, IRIS_DURATION_MS - COVER_CLOSE_OVERLAP_MS);
-            coverPanelTimerRef.current = setTimeout(() => {
-                coverPanelTimerRef.current = null;
-                setCoverMounted(true);
-            }, armDelay);
-        } else if (transitionPhase === 'covered') {
-            // Defensive: in case 'closing' was very short or skipped.
-            coverOpacity.value = 1;
-            setCoverMounted(true);
-        } else if (transitionPhase === 'opening') {
-            // Snap-unmount after a short overlap. With the sub-pixel pinhole
-            // fix in place (IRIS_INITIAL_SCALE = 0.0001 → 0.1px star hole),
-            // the iris is genuinely opaque even when "closed", so the cover
-            // doesn't need to fade — it can just disappear once the iris has
-            // started moving and the user no longer expects the cover.
-            coverOpacity.value = 1;
-            coverPanelTimerRef.current = setTimeout(() => {
-                coverPanelTimerRef.current = null;
-                setCoverMounted(false);
-            }, COVER_OPEN_OVERLAP_MS);
-        } else {
-            coverOpacity.value = 1;
-            setCoverMounted(false);
-        }
-
-        return clearTimer;
     }, [transitionPhase]);
 
     const navigateToView = (view: string) => {
@@ -999,6 +914,7 @@ function App() {
                 return null;
             case 'arcade':
             case 'starburst':
+            case 'water-ring-toss':
             case 'sleep':
                 return null;
             case 'chat':
@@ -1064,7 +980,6 @@ function App() {
         <GameStateGate hasCharacter={!!selectedCharacter}>
         <SafeAreaView style={styles.container}>
             <StatusBar style="light" hidden={true} />
-            <DeviceCasing />
             {/* Single global iris. Everything that should be hidden during a
                 page transition lives inside this overlay — the persistent MI
                 layer, the route-overlay layer, the chrome buttons, the
@@ -1126,6 +1041,11 @@ function App() {
                         <StarburstView onBack={() => transitionTo('arcade')} />
                     </View>
                 )}
+                {currentView === 'water-ring-toss' && (
+                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
+                        <WaterRingTossView onBack={() => transitionTo('arcade')} />
+                    </View>
+                )}
                 {currentView === 'inventory' && (
                     <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
                         <InventoryPage onBack={() => transitionTo('interaction')} />
@@ -1142,7 +1062,7 @@ function App() {
                 {currentView === 'profile' && (
                     <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
                         <Profile
-                            onBack={() => transitionTo(previousView || 'interaction')}
+                            onBack={() => navigateToView(previousView || 'interaction')}
                             onNotification={addNotification}
                             playerName={playerName}
                             publicKey={publicKey?.toString() ?? null}
@@ -1187,6 +1107,19 @@ function App() {
                     Shop/Inventory/Settings/etc. is up. The iris covers it
                     during page transitions because the iris is the last
                     sibling rendered inside ZoomOutOverlay's wrapper. */}
+                {/* DeviceCasing — sits ABOVE the mi-layer (z 0) so the
+                    painted frame overlaps the InnerScreen edges and hides
+                    the seam, but BELOW route overlays (z 50) so screens
+                    like Shop/Inventory/Settings paint over it on their
+                    own routes. DeviceButtons, WalletButton (1000),
+                    notifications, and the iris layers all sit above. */}
+                <View
+                    style={[StyleSheet.absoluteFill, { zIndex: 20, elevation: 20 }]}
+                    pointerEvents="none"
+                >
+                    <DeviceCasing />
+                </View>
+
                 <DeviceButtons />
 
                 {ENABLE_VRF_DEV_SCREEN && currentView !== 'vrf-dev' && (
@@ -1203,7 +1136,7 @@ function App() {
                     publicKey={publicKey}
                     playerName={playerName}
                     onConnect={connectWallet}
-                    onOpenProfile={() => transitionTo('profile')}
+                    onOpenProfile={() => navigateToView('profile')}
                 />
 
                 {notifications.map((notification, i) => (
@@ -1216,24 +1149,6 @@ function App() {
                     />
                 ))}
 
-                {/* Cover panel — solid black layer that overlaps the seam.
-                    Mounts during late-close (before the iris reaches
-                    INITIAL_SCALE) and unmounts during early-open (after the
-                    iris has begun growing). zIndex/elevation 100 puts it
-                    above the screens (50) but below the iris (999) so the
-                    iris still renders on top during its animation; the
-                    cover's job is to be a stable opaque layer that doesn't
-                    change while the screens swap underneath. */}
-                {coverMounted && (
-                    <Animated.View
-                        pointerEvents="none"
-                        style={[
-                            StyleSheet.absoluteFill,
-                            { backgroundColor: 'black', zIndex: 100, elevation: 100 },
-                            animatedCoverStyle,
-                        ]}
-                    />
-                )}
             </ZoomOutOverlay>
         </SafeAreaView>
         </GameStateGate>
@@ -1374,6 +1289,18 @@ function StarburstView({ onBack }: { onBack: () => void }) {
     );
 }
 
+function WaterRingTossView({ onBack }: { onBack: () => void }) {
+    const { play } = useGameStateContext();
+    return (
+        <WaterRingToss
+            onBack={onBack}
+            onGameEnd={(won) => {
+                play(won).catch((e) => console.warn('water ring toss mood update failed', e));
+            }}
+        />
+    );
+}
+
 // Sleep is App-level navigation: a first-class route managed by the App's
 // iris transition, not an in-place overlay inside MoonokoInteraction.
 // SleepController owns the entire sleep state machine — server callables,
@@ -1507,6 +1434,18 @@ function SleepController({
     // The user-driven paths (modal confirm, wake button) call transitionTo
     // directly in the handlers below; this effect is the safety net for
     // server-side or restored state we didn't initiate locally.
+    // Background-music lifecycle: kick the loop off once on mount, then
+    // duck it whenever the moonoko is sleeping so the sleep screen feels
+    // genuinely quiet. The service hydrates SettingsService internally so
+    // the initial gain matches the user's saved slider value.
+    useEffect(() => {
+        MusicService.getInstance().start();
+    }, []);
+
+    useEffect(() => {
+        MusicService.getInstance().setPaused(isSleeping);
+    }, [isSleeping]);
+
     useEffect(() => {
         if (isSleeping && currentView !== 'sleep') {
             transitionTo('sleep');

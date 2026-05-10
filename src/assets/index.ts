@@ -158,6 +158,7 @@ export function getRecipeArt(id: string) {
 // stays catalog-agnostic).
 export const RecipeCards = {
     common: require('../../assets/images/ui/menu-cards/common.png'),
+    intermediate: require('../../assets/images/ui/frames/recipe-card-uncommon.png'),
     rare: require('../../assets/images/ui/menu-cards/rare.png'),
 } as const;
 
@@ -195,6 +196,9 @@ export const Backgrounds = {
     shopBannerShadow: require('../../assets/images/ui/backgrounds/shop-bg-shadow.png'),
     shopBottom: require('../../assets/images/ui/backgrounds/shop-bg-bottom.png'),
     settings: require('../../assets/images/ui/backgrounds/settings-bg.jpg'),
+    inventory: require('../../assets/images/ui/backgrounds/inventory-bg-base.png'),
+    inventoryBanner: require('../../assets/images/ui/backgrounds/inventory-bg-top.png'),
+    inventoryBottom: require('../../assets/images/ui/backgrounds/inventory-bg-bottom.png'),
 } as const;
 
 // Sleep-screen chrome — pillow the moonoko sleeps on, the alarm row's
@@ -229,6 +233,10 @@ export const Menu = {
     settings: require('../../assets/images/ui/menu/settings.png'),
     inventory: require('../../assets/images/ui/menu/backpack.png'),
     sleep: require('../../assets/images/ui/menu/sleepzzzz.png'),
+} as const;
+
+export const Cooking = {
+    pot: require('../../assets/images/ui/cook-pot.png'),
 } as const;
 
 // 54-frame button-strip animation. Frames 1–18 are the left-button press
@@ -301,6 +309,7 @@ export const Chrome = {
 
 export const Forage = {
     bag: require('../../assets/images/ui/forage/forage-bag.png'),
+    exclamation: require('../../assets/images/ui/forage/exclamation.png'),
 } as const;
 
 export const Frames = {
@@ -313,6 +322,14 @@ export const Frames = {
     casingRare: require('../../assets/images/ui/frames/casing-blue.png'),
     casingEpic: require('../../assets/images/ui/frames/casing-pink.png'),
     casingLegendary: require('../../assets/images/ui/frames/casing-yellow.png'),
+    backButton: require('../../assets/images/ui/frames/back-button.png'),
+    editButton: require('../../assets/images/ui/frames/edit-button.png'),
+    inventorySlot: require('../../assets/images/ui/frames/inventory-slot.png'),
+    pantrySlot: require('../../assets/images/ui/frames/pantry-slot.png'),
+} as const;
+
+export const Audio = {
+    theme: require('../../assets/audio/hoshi-theme.m4a'),
 } as const;
 
 export const Logos = {

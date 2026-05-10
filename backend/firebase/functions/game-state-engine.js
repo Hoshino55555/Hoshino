@@ -755,4 +755,6 @@ module.exports = {
   currentWindowName,
   localDateKey,
   localHour,
+  gameDayKey,
+  defaultMealClaims,
 };

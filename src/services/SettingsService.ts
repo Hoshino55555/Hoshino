@@ -20,8 +20,8 @@ export interface UserSettings {
 }
 
 const DEFAULT_MENU_BUTTONS: MenuButton[] = [
-    { id: 'chat', name: 'Chat', icon: 'chat', enabled: true, order: 0, action: 'chat' },
-    { id: 'feed', name: 'Feed', icon: 'feed', enabled: true, order: 1, action: 'feed' },
+    { id: 'feed', name: 'Feed', icon: 'feed', enabled: true, order: 0, action: 'feed' },
+    { id: 'chat', name: 'Chat', icon: 'chat', enabled: true, order: 1, action: 'chat' },
     { id: 'games', name: 'Games', icon: 'games', enabled: true, order: 2, action: 'games' },
     { id: 'sleep', name: 'Sleep', icon: 'sleep', enabled: true, order: 3, action: 'sleep' },
     { id: 'shop', name: 'Shop', icon: 'shop', enabled: true, order: 4, action: 'shop' },

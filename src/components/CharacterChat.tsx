@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
     StyleSheet,
-    ScrollView,
+    FlatList,
     TextInput,
     Image,
     Keyboard,
@@ -13,6 +13,7 @@ import {
     Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import chatService from '../services/ChatService';
 import { getCharacterAnim } from '../assets';
@@ -55,6 +56,44 @@ const getImageSource = (imageName: string) => getCharacterAnim(imageName);
 const SESSION_AI_BUDGET = 30;
 const CAPACITY_SEGMENTS = 30;
 
+interface PersistedMessage {
+    id: string;
+    text: string;
+    sender: 'user' | 'character';
+    timestamp: string;
+}
+
+const chatCacheKey = (moonokoId: string) => `chat:${moonokoId}`;
+
+const persistMessages = (moonokoId: string, messages: Message[]): void => {
+    const serialized: PersistedMessage[] = messages.map((m) => ({
+        id: m.id,
+        text: m.text,
+        sender: m.sender,
+        timestamp: m.timestamp.toISOString(),
+    }));
+    AsyncStorage.setItem(chatCacheKey(moonokoId), JSON.stringify(serialized)).catch((e) =>
+        console.warn('chat cache write failed', e),
+    );
+};
+
+const readMessageCache = async (moonokoId: string): Promise<Message[] | null> => {
+    try {
+        const raw = await AsyncStorage.getItem(chatCacheKey(moonokoId));
+        if (!raw) return null;
+        const parsed: PersistedMessage[] = JSON.parse(raw);
+        return parsed.map((m) => ({
+            id: m.id,
+            text: m.text,
+            sender: m.sender,
+            timestamp: new Date(m.timestamp),
+        }));
+    } catch (e) {
+        console.warn('chat cache read failed', e);
+        return null;
+    }
+};
+
 // PictoChat-style name handle. Lowercases, strips non-alphanum, caps the
 // length so the pill stays a fixed width regardless of the source name.
 const namePlateHandle = (name: string): string => {
@@ -76,7 +115,6 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     const [capacityVisible, setCapacityVisible] = useState(false);
     const [capacityTrackHeight, setCapacityTrackHeight] = useState(0);
     const [typingDots, setTypingDots] = useState(0);
-    const messagesEndRef = useRef<ScrollView>(null);
     const capacityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { chat: bumpChatMood } = useGameStateContext();
 
@@ -142,12 +180,21 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
         }
     };
 
-    // Load prior conversation with this character on mount
+    // Hydrate from a local AsyncStorage cache first so the chat opens at the
+    // most recent message instantly, then fetch fresh from the server in the
+    // background. The inverted FlatList below means data[0] is the newest
+    // message and naturally pins to the bottom of the viewport — no scroll
+    // race needed.
     useEffect(() => {
         let cancelled = false;
+        const moonokoId = character.name.toLowerCase();
         const loadHistory = async () => {
+            const cached = await readMessageCache(moonokoId);
+            if (cancelled) return;
+            if (cached && cached.length > 0) {
+                setMessages(cached);
+            }
             try {
-                const moonokoId = character.name.toLowerCase();
                 const convo = await chatService.getConversation(moonokoId);
                 if (cancelled) return;
                 const restored: Message[] = (convo.messages || []).map((m, idx) => ({
@@ -157,6 +204,7 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
                     timestamp: new Date(m.timestamp),
                 }));
                 setMessages(restored);
+                persistMessages(moonokoId, restored);
             } catch (error) {
                 console.error('Failed to load chat history:', error);
             }
@@ -166,11 +214,6 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
             cancelled = true;
         };
     }, [character.name, playerName]);
-
-    // Auto-scroll to bottom when new messages are added
-    useEffect(() => {
-        messagesEndRef.current?.scrollToEnd({ animated: true });
-    }, [messages]);
 
     const generateCharacterResponse = async (userInput: string): Promise<string> => {
         try {
@@ -190,6 +233,7 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     const sendMessage = async () => {
         if (!inputText.trim()) return;
 
+        const moonokoId = character.name.toLowerCase();
         const userMessage: Message = {
             id: Date.now().toString(),
             text: inputText.trim(),
@@ -197,7 +241,11 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
             timestamp: new Date(),
         };
 
-        setMessages((prev) => [...prev, userMessage]);
+        setMessages((prev) => {
+            const next = [...prev, userMessage];
+            persistMessages(moonokoId, next);
+            return next;
+        });
         setInputText('');
         setIsThinking(true);
 
@@ -217,7 +265,11 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
                 timestamp: new Date(),
             };
 
-            setMessages((prev) => [...prev, characterMessage]);
+            setMessages((prev) => {
+                const next = [...prev, characterMessage];
+                persistMessages(moonokoId, next);
+                return next;
+            });
         } catch (error) {
             console.error('Error generating response:', error);
             onNotification?.('Failed to generate response', 'error');
@@ -225,6 +277,11 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
             setIsThinking(false);
         }
     };
+
+    // Inverted FlatList wants newest-first ordering: data[0] renders at the
+    // bottom of the viewport, so reversing the chronological array places the
+    // most recent message right above the input bar with no scroll math.
+    const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
 
     return (
         <View style={{ flex: 1, backgroundColor: '#1a1a1a' }} testID="chat-screen">
@@ -325,66 +382,69 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
                             );
                         })()}
 
-                        <ScrollView
-                            style={styles.messagesContainer}
-                            ref={messagesEndRef}
-                            contentContainerStyle={styles.messagesContent}
-                            keyboardShouldPersistTaps="handled"
-                        >
-                            {messages.length === 0 && !isThinking && (
+                        {messages.length === 0 && !isThinking ? (
+                            <View style={styles.messagesContainer}>
                                 <Text style={styles.emptyHint}>
                                     Say hi to {character.name}. Long-press any message to copy it.
                                 </Text>
-                            )}
-
-                            {messages.map((message) => {
-                                const isUser = message.sender === 'user';
-                                const handle = namePlateHandle(
-                                    isUser ? playerName || 'user' : character.name
-                                );
-                                return (
-                                    <Pressable
-                                        key={message.id}
-                                        onLongPress={() => copyMessage(message.text)}
-                                        delayLongPress={350}
-                                        style={({ pressed }) => [
-                                            styles.row,
-                                            pressed && styles.rowPressed,
-                                        ]}
-                                    >
-                                        <View
-                                            style={[
-                                                styles.namePill,
-                                                isUser ? styles.userPill : styles.characterPill,
+                            </View>
+                        ) : (
+                            <FlatList
+                                style={styles.messagesContainer}
+                                contentContainerStyle={styles.messagesContent}
+                                keyboardShouldPersistTaps="handled"
+                                data={reversedMessages}
+                                inverted
+                                keyExtractor={(item) => item.id}
+                                renderItem={({ item }) => {
+                                    const isUser = item.sender === 'user';
+                                    const handle = namePlateHandle(
+                                        isUser ? playerName || 'user' : character.name
+                                    );
+                                    return (
+                                        <Pressable
+                                            onLongPress={() => copyMessage(item.text)}
+                                            delayLongPress={350}
+                                            style={({ pressed }) => [
+                                                styles.row,
+                                                pressed && styles.rowPressed,
                                             ]}
                                         >
-                                            <Text style={styles.namePillText}>{handle}</Text>
+                                            <View
+                                                style={[
+                                                    styles.namePill,
+                                                    isUser ? styles.userPill : styles.characterPill,
+                                                ]}
+                                            >
+                                                <Text style={styles.namePillText}>{handle}</Text>
+                                            </View>
+                                            <View style={styles.messageBox}>
+                                                <Text style={styles.rowText} selectable>
+                                                    {item.text}
+                                                </Text>
+                                            </View>
+                                        </Pressable>
+                                    );
+                                }}
+                                ListHeaderComponent={
+                                    isThinking ? (
+                                        <View style={styles.row}>
+                                            <View style={[styles.namePill, styles.characterPill]}>
+                                                <Text style={styles.namePillText}>
+                                                    {namePlateHandle(character.name)}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.messageBox}>
+                                                <Text style={styles.rowText}>
+                                                    {character.name} is typing
+                                                    {'.'.repeat(typingDots)}
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <View style={styles.messageBox}>
-                                            <Text style={styles.rowText} selectable>
-                                                {message.text}
-                                            </Text>
-                                        </View>
-                                    </Pressable>
-                                );
-                            })}
-
-                            {isThinking && (
-                                <View style={styles.row}>
-                                    <View style={[styles.namePill, styles.characterPill]}>
-                                        <Text style={styles.namePillText}>
-                                            {namePlateHandle(character.name)}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.messageBox}>
-                                        <Text style={styles.rowText}>
-                                            {character.name} is typing
-                                            {'.'.repeat(typingDots)}
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
-                        </ScrollView>
+                                    ) : null
+                                }
+                            />
+                        )}
                     </View>
 
                     <View

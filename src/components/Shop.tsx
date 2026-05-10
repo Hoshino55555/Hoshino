@@ -41,6 +41,7 @@ import {
     groupBySubcategory,
 } from '../data/shopCatalog';
 import { INGREDIENT_TIER } from '../services/RecipeCatalog';
+import { ItemCategory } from '../services/MarketplaceService';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import type { BoosterSkuId } from '../services/GameStateService';
 import BoxRevealModal, { type BoxReveal } from './BoxRevealModal';
@@ -151,7 +152,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     const starFragmentService = useMemo(() => new StarFragmentService(connection), [connection]);
     const { refreshPantry } = useGameStateContext();
 
-    const [selectedTab, setSelectedTab] = useState<ShopTab>('consumables');
+    const [selectedTab, setSelectedTab] = useState<ShopTab>('deals');
     const [balance, setBalance] = useState<number>(0);
     const [cart, setCart] = useState<{ item: ShopItem; quantity: number }[]>([]);
     const [flashingItem, setFlashingItem] = useState<string | null>(null);
@@ -539,13 +540,25 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     resizeMode="stretch"
                 >
                     <View style={[styles.cardInner, disabled && styles.disabledItem]}>
-                        <View style={styles.cardHeader}>
-                            {title ? (
+                        <View
+                            style={[
+                                styles.cardHeader,
+                                // Rarity is the title on ingredient boxes (Common /
+                                // Uncommon / Rare); on every other card the rarity
+                                // label is dropped so the header collapses and the
+                                // item image gets the freed-up vertical space.
+                                item.category === ItemCategory.INGREDIENT
+                                    ? styles.cardHeaderIngredient
+                                    : styles.cardHeaderCompact,
+                            ]}
+                        >
+                            {item.category === ItemCategory.INGREDIENT ? (
+                                <Text style={styles.ingredientBoxTitle} numberOfLines={1}>
+                                    {rarityLabel(item.rarity)}
+                                </Text>
+                            ) : title ? (
                                 <Text style={styles.itemName} numberOfLines={1}>{title}</Text>
                             ) : null}
-                            <Text style={styles.itemRank} numberOfLines={1}>
-                                {rarityLabel(item.rarity)}
-                            </Text>
                         </View>
                         <View style={styles.cardMiddle}>
                             <Image
@@ -1198,7 +1211,12 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                         onPress={handleClose}
                         hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                     >
-                        <Text style={styles.backButtonText}>{'<'} Back</Text>
+                        <Image
+                            source={Frames.backButton}
+                            style={styles.backButtonImage}
+                            resizeMode="contain"
+                        />
+                        <Text style={styles.backButtonLabel}>Back</Text>
                     </TouchableOpacity>
                 </View>
             </ImageBackground>
@@ -1599,17 +1617,18 @@ const styles = StyleSheet.create({
         color: '#3a2a1a',
     },
     backButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        backgroundColor: 'rgba(46, 90, 62, 0.85)',
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#E8F5E8',
+        padding: 4,
+        alignItems: 'center',
     },
-    backButtonText: {
-        color: '#E8F5E8',
+    backButtonImage: {
+        width: 56,
+        height: 46,
+    },
+    backButtonLabel: {
+        color: '#e84a4a',
         fontFamily: 'Monaco',
-        fontSize: 21,
+        fontSize: 14,
+        marginTop: 1,
     },
     scrollClipper: {
         position: 'absolute',
@@ -1769,6 +1788,20 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-start',
         paddingTop: 4,
     },
+    cardHeaderCompact: {
+        height: 22,
+    },
+    cardHeaderIngredient: {
+        height: 32,
+        paddingTop: 8,
+    },
+    ingredientBoxTitle: {
+        fontFamily: 'Monaco',
+        fontSize: 26,
+        lineHeight: 18,
+        textAlign: 'center',
+        color: '#2e2014',
+    },
     cardMiddle: {
         flex: 1,
         alignItems: 'center',
@@ -1781,8 +1814,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     itemImage: {
-        width: 44,
-        height: 44,
+        width: 64,
+        height: 64,
         marginBottom: 2,
     },
     itemName: {

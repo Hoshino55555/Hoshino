@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Image, ImageBackground, TouchableOpacity, Modal, StyleSheet, Dimensions, Animated, Easing, useWindowDimensions } from 'react-native';
+import type { ImageStyle } from 'react-native';
 import Shop from './Shop';
 import Gallery from './Gallery';
 import InnerScreen from './InnerScreen';
 import Settings from './Settings';
 import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
-import ForagePopOut from './ForagePopOut';
+import ForagePopOut, { computeForageStaggerMs, FORAGE_FLIGHT_MS } from './ForagePopOut';
 import type { ForagedItem } from '../services/GameStateService';
 import { pushMoonokoSnapshot } from '../widgets/widgetService';
 import type { PendingWidgetAction } from '../../App';
@@ -84,7 +85,7 @@ const MoonokoInteraction: React.FC<Props> = ({
     const { width: winW, height: winH } = useWindowDimensions();
     const characterSize = Math.min(winW * 0.62, winH * 0.42);
     const characterMarginTop = -characterSize * 0.48;
-    const badgeOffset = -characterSize * 0.4;
+    const badgeOffset = -characterSize * 0.5;
     const badgeFontSize = Math.max(40, Math.min(64, winW * 0.13));
     const menuIconSize = Math.min(winW * 0.10, 44);
     const currentStats = {
@@ -100,6 +101,11 @@ const MoonokoInteraction: React.FC<Props> = ({
     const hasPendingFinds = pendingFinds.length > 0;
 
     const [popOutItems, setPopOutItems] = useState<ForagedItem[] | null>(null);
+    // Flips true once the per-item squeeze sequence finishes — i.e. every
+    // item has been ejected. Bag rendering hides on this so the bag
+    // visibly disappears the moment it's "empty," even though
+    // popOutItems is still set while the items finish their arcs.
+    const [bagEmpty, setBagEmpty] = useState(false);
     const drainInFlightRef = useRef(false);
 
     const handleCharacterLongPress = () => {
@@ -140,7 +146,7 @@ const MoonokoInteraction: React.FC<Props> = ({
             }
             return tiers[0];
         };
-        const count = 50;
+        const count = 10;
         const now = Date.now();
         const fake: ForagedItem[] = Array.from({ length: count }, (_, i) => {
             const t = pickTier();
@@ -304,21 +310,23 @@ const MoonokoInteraction: React.FC<Props> = ({
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuBarLayout, setMenuBarLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
     const bobAnim = useRef(new Animated.Value(0)).current;
+    const excBobAnim = useRef(new Animated.Value(0)).current;
+    const bagSqueezeAnim = useRef(new Animated.Value(0)).current;
+    const bagFadeAnim = useRef(new Animated.Value(1)).current;
 
-    // Gentle up/down loop to match the Moonoko's baked-in float. Native driver
-    // so it doesn't fight any JS work while forage ticks land.
+    // Gentle up/down loop for the bag (and any other smooth floaters).
     useEffect(() => {
         const loop = Animated.loop(
             Animated.sequence([
                 Animated.timing(bobAnim, {
                     toValue: 1,
-                    duration: 900,
+                    duration: 1400,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
                 Animated.timing(bobAnim, {
                     toValue: 0,
-                    duration: 900,
+                    duration: 1400,
                     easing: Easing.inOut(Easing.sin),
                     useNativeDriver: true,
                 }),
@@ -327,6 +335,101 @@ const MoonokoInteraction: React.FC<Props> = ({
         loop.start();
         return () => loop.stop();
     }, [bobAnim]);
+
+    // Exclamation float — matches ARO-anim.gif cadence (7 frames × 300ms =
+    // 2100ms cycle). Frame y-offsets in source-px: [0, +12, 0, 0, 0, -13, 0]
+    // (baseline → dip → 3× rest → peak → baseline). Snapped, not eased, to
+    // match the gif's stepped motion. Scaled to ~3dp amplitude for the badge.
+    useEffect(() => {
+        const FRAME_MS = 300;
+        const frames = [0, 3, 0, 0, 0, -3, 0];
+        const seq = Animated.sequence(
+            frames.flatMap((y) => [
+                Animated.timing(excBobAnim, {
+                    toValue: y,
+                    duration: 0,
+                    useNativeDriver: true,
+                }),
+                Animated.delay(FRAME_MS),
+            ])
+        );
+        const loop = Animated.loop(seq);
+        loop.start();
+        return () => loop.stop();
+    }, [excBobAnim]);
+
+    // One squeeze per item: the bag pulses N times (N = items spilling),
+    // each pulse synced to the same staggerMs ForagePopOut uses to launch
+    // items. After the last pulse, wait for that final item to finish its
+    // flight and land on the ground, then fade the bag out — the bag
+    // stays in the foreground throughout the spill, then dissolves once
+    // the spill is visually done.
+    const BAG_FADE_MS = 360;
+    useEffect(() => {
+        bagSqueezeAnim.setValue(0);
+        bagFadeAnim.setValue(1);
+        if (!popOutItems || popOutItems.length === 0) {
+            setBagEmpty(true);
+            return;
+        }
+        setBagEmpty(false);
+        // Each pulse: snap squish (in), quick release (out). Total cycle
+        // length = staggerMs so pulse N fires alongside item-launch N.
+        // staggerMs is derived from item count so total spill stays ~constant
+        // regardless of queue length — bag stays visible long enough on
+        // small drops, doesn't drag forever on big ones.
+        // Split: ~40% squish, 60% release — release feels less robotic
+        // when it slightly lags the next squish's leading edge.
+        const staggerMs = computeForageStaggerMs(popOutItems.length);
+        const squishMs = Math.max(20, Math.round(staggerMs * 0.4));
+        const releaseMs = Math.max(20, staggerMs - squishMs);
+        const seq = Animated.sequence(
+            popOutItems.map(() =>
+                Animated.sequence([
+                    Animated.timing(bagSqueezeAnim, {
+                        toValue: 1,
+                        duration: squishMs,
+                        easing: Easing.in(Easing.quad),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(bagSqueezeAnim, {
+                        toValue: 0,
+                        duration: releaseMs,
+                        easing: Easing.out(Easing.quad),
+                        useNativeDriver: true,
+                    }),
+                ])
+            )
+        );
+        // The last item launches when its squish starts — i.e. at
+        // (length-1)*staggerMs from the squeeze start, finishing flight
+        // FORAGE_FLIGHT_MS later. The squeeze sequence itself ends at
+        // length*staggerMs. Fire the fade when the last item lands; if
+        // that's before the squeeze ends (large drops where flight <
+        // staggerMs), fall back to squeeze end so the final pulse plays.
+        let fadeTimer: ReturnType<typeof setTimeout> | null = null;
+        let fadeAnim: Animated.CompositeAnimation | null = null;
+        seq.start();
+        const lastLandingMs = Math.max(
+            popOutItems.length * staggerMs,
+            (popOutItems.length - 1) * staggerMs + FORAGE_FLIGHT_MS,
+        );
+        fadeTimer = setTimeout(() => {
+            fadeAnim = Animated.timing(bagFadeAnim, {
+                toValue: 0,
+                duration: BAG_FADE_MS,
+                useNativeDriver: true,
+            });
+            fadeAnim.start(({ finished }) => {
+                if (finished) setBagEmpty(true);
+            });
+        }, lastLandingMs);
+        return () => {
+            seq.stop();
+            if (fadeTimer) clearTimeout(fadeTimer);
+            fadeAnim?.stop();
+        };
+    }, [popOutItems, bagSqueezeAnim, bagFadeAnim]);
 
     // The three center buttons act as a cursor controller for the menu grid:
     // left/right move a highlight across the rendered menu icons, and the
@@ -465,7 +568,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                 <Image
                     source={isSelected ? Frames.iconSelect : Frames.iconSelectDim}
                     style={[
-                        styles.menuIconSelectImage,
+                        styles.menuIconSelectImage as ImageStyle,
                         { width: menuIconSize + 16, height: menuIconSize + 16 },
                     ]}
                     resizeMode="stretch"
@@ -473,7 +576,11 @@ const MoonokoInteraction: React.FC<Props> = ({
 
                 <Image
                     source={getImageSource(button.icon)}
-                    style={[styles.menuImage, { width: menuIconSize, height: menuIconSize }]}
+                    style={[
+                        styles.menuImage as ImageStyle,
+                        { width: menuIconSize, height: menuIconSize },
+                        button.icon === 'chat' && ({ transform: [{ translateY: -2 }] } as ImageStyle),
+                    ]}
                 />
             </View>
         );
@@ -490,7 +597,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                     <ImageBackground
                         source={Frames.statBack}
                         style={styles.statItem}
-                        imageStyle={styles.statBackImage}
+                        imageStyle={styles.statBackImage as ImageStyle}
                         resizeMode="stretch"
                     >
                         <Text style={styles.statLabel}>Mood</Text>
@@ -499,7 +606,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                                 <Image
                                     key={`mood-${index}`}
                                     source={index < currentStats.mood ? Stars.lifeFilled : Stars.lifeEmpty}
-                                    style={styles.starImage}
+                                    style={styles.starImage as ImageStyle}
                                 />
                             ))}
                         </View>
@@ -507,7 +614,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                     <ImageBackground
                         source={Frames.statBack}
                         style={styles.statItem}
-                        imageStyle={styles.statBackImage}
+                        imageStyle={styles.statBackImage as ImageStyle}
                         resizeMode="stretch"
                     >
                         <Text style={styles.statLabel}>Hunger</Text>
@@ -516,7 +623,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                                 <Image
                                     key={`hunger-${index}`}
                                     source={index < currentStats.hunger ? Stars.lifeFilled : Stars.lifeEmpty}
-                                    style={styles.starImage}
+                                    style={styles.starImage as ImageStyle}
                                 />
                             ))}
                         </View>
@@ -524,7 +631,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                     <ImageBackground
                         source={Frames.statBack}
                         style={styles.statItem}
-                        imageStyle={styles.statBackImage}
+                        imageStyle={styles.statBackImage as ImageStyle}
                         resizeMode="stretch"
                     >
                         <Text style={styles.statLabel}>Energy</Text>
@@ -533,7 +640,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                                 <Image
                                     key={`energy-${index}`}
                                     source={index < currentStats.energy ? Stars.lifeFilled : Stars.lifeEmpty}
-                                    style={styles.starImage}
+                                    style={styles.starImage as ImageStyle}
                                 />
                             ))}
                         </View>
@@ -549,7 +656,7 @@ const MoonokoInteraction: React.FC<Props> = ({
         >
             {/* Main Display Area */}
             <View style={styles.mainDisplayArea}>
-                <Image source={imageSources.background} style={styles.backgroundImage} resizeMode="cover" />
+                <Image source={imageSources.background} style={styles.backgroundImage as ImageStyle} resizeMode="cover" />
                 {selectedCharacter ? (
                     <TouchableOpacity
                         activeOpacity={hasPendingFinds ? 0.7 : 1}
@@ -562,7 +669,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                         <Image
                             source={getImageSource(selectedCharacter.image)}
                             style={[
-                                styles.characterImage,
+                                styles.characterImage as ImageStyle,
                                 { width: characterSize, height: characterSize, marginTop: characterMarginTop },
                             ]}
                         />
@@ -570,21 +677,21 @@ const MoonokoInteraction: React.FC<Props> = ({
                             <Animated.View
                                 style={[
                                     styles.exclamationBadge,
-                                    { top: badgeOffset },
+                                    { top: badgeOffset + 12 },
                                     {
                                         transform: [
-                                            {
-                                                translateY: bobAnim.interpolate({
-                                                    inputRange: [0, 1],
-                                                    outputRange: [0, -8],
-                                                }),
-                                            },
+                                            { translateX: 70 },
+                                            { translateY: excBobAnim },
                                         ],
                                     },
                                 ]}
                                 pointerEvents="none"
                             >
-                                <Text style={[styles.exclamationText, { fontSize: badgeFontSize }]}>!</Text>
+                                <Image
+                                    source={Forage.exclamation}
+                                    style={{ width: badgeFontSize, height: badgeFontSize }}
+                                    resizeMode="contain"
+                                />
                             </Animated.View>
                         )}
                     </TouchableOpacity>
@@ -593,26 +700,12 @@ const MoonokoInteraction: React.FC<Props> = ({
                         <Text>No Character Selected</Text>
                     </View>
                 )}
-                {popOutItems && (
-                    <ForagePopOut
-                        items={popOutItems}
-                        bottomInset={menuBarLayout.height}
-                        // Spawn from the forage bag's approximate position so
-                        // items look like they're tossed out of it. Bag center
-                        // (in characterTouch coords) is left=0.18 + width/2 =
-                        // 0.28 of characterSize, which is -0.22 of characterSize
-                        // from the touch's horizontal center.
-                        launchOffsetX={-characterSize * 0.22}
-                        launchOffsetY={characterSize * 0.30}
-                        onComplete={() => setPopOutItems(null)}
-                    />
-                )}
-                {/* Bag rendered AFTER ForagePopOut so it sits in the
-                   foreground while items spill out of it. The wrapper
+                {/* Bag rendered BEFORE ForagePopOut so spilling ingredients
+                   pass over the bag instead of behind it. The wrapper
                    mirrors characterTouch's flex-centered layout (size +
                    negative marginTop) so the bag's `left`/`bottom`
                    offsets read off the same anchor as before. */}
-                {selectedCharacter && (hasPendingFinds || popOutItems) && (
+                {selectedCharacter && popOutItems && !bagEmpty && (
                     <View
                         pointerEvents="none"
                         style={[
@@ -634,11 +727,18 @@ const MoonokoInteraction: React.FC<Props> = ({
                                     height: characterSize * 0.20,
                                     left: characterSize * 0.18,
                                     bottom: characterSize * 0.08,
+                                    opacity: bagFadeAnim,
                                     transform: [
                                         {
-                                            translateY: bobAnim.interpolate({
+                                            scaleX: bagSqueezeAnim.interpolate({
                                                 inputRange: [0, 1],
-                                                outputRange: [0, -8],
+                                                outputRange: [1, 0.9],
+                                            }),
+                                        },
+                                        {
+                                            scaleY: bagSqueezeAnim.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [1, 1.08],
                                             }),
                                         },
                                     ],
@@ -651,6 +751,20 @@ const MoonokoInteraction: React.FC<Props> = ({
                             </Animated.View>
                         </View>
                     </View>
+                )}
+                {popOutItems && (
+                    <ForagePopOut
+                        items={popOutItems}
+                        bottomInset={menuBarLayout.height}
+                        // Spawn from the forage bag's approximate position so
+                        // items look like they're tossed out of it. Bag center
+                        // (in characterTouch coords) is left=0.18 + width/2 =
+                        // 0.28 of characterSize, which is -0.22 of characterSize
+                        // from the touch's horizontal center.
+                        launchOffsetX={-characterSize * 0.22}
+                        launchOffsetY={characterSize * 0.30}
+                        onComplete={() => setPopOutItems(null)}
+                    />
                 )}
             </View>
 

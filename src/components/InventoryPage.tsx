@@ -23,7 +23,7 @@ import {
 import type { BoosterSkuId } from '../services/GameStateService';
 import { SHOP_CATALOG } from '../data/shopCatalog';
 import type { ActiveCamp } from '../services/StarFragmentService';
-import { Backgrounds, getIngredientArt, ShopItems } from '../assets';
+import { Backgrounds, getIngredientArt, ShopItems, Frames } from '../assets';
 
 type InventoryTab = 'ingredients' | 'consumables' | 'accessories';
 
@@ -84,13 +84,6 @@ const newRequestId = (prefix: string) =>
         .toString(36)
         .slice(2, 10)}`;
 
-const TIER_COLOR: Record<IngredientTier, string> = {
-    common: '#cfd8c4',
-    uncommon: '#7ecf7a',
-    rare: '#6aaaff',
-    ultra_rare: '#d6a2ff',
-};
-
 const TIER_ORDER: IngredientTier[] = ['ultra_rare', 'rare', 'uncommon', 'common'];
 
 interface Props {
@@ -102,11 +95,10 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
     const { ready, firebaseUid } = useFirebaseAuth();
     const insets = useSafeAreaInsets();
     const { width: screenWidth } = useWindowDimensions();
-    // Reserves match the painted strip art aspect ratios (heights at 1200
-    // wide, mirroring FeedingPage). Reusing the cooking-bg-* trio for now
-    // until the inventory-specific banner/bottom art lands.
-    const bannerReserve = screenWidth * (807 / 1200);
-    const bottomBarReserve = screenWidth * (284 / 1200);
+    // Reserves match the painted strip art aspect ratios at 1200 wide:
+    // inventory-bg-top.png is 1200×790, inventory-bg-bottom.png is 1200×278.
+    const bannerReserve = screenWidth * (790 / 1200);
+    const bottomBarReserve = screenWidth * (278 / 1200);
 
     const [boosters, setBoosters] = useState<Record<string, number>>({});
     const [activeCamp, setActiveCamp] = useState<ActiveCamp | null>(null);
@@ -181,7 +173,7 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
     return (
         <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
             <ImageBackground
-                source={Backgrounds.cooking}
+                source={Backgrounds.inventory}
                 style={styles.bg}
                 resizeMode="cover"
                 testID="inventory-screen"
@@ -196,7 +188,7 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                         contentContainerStyle={[
                             styles.scrollBody,
                             {
-                                paddingTop: bannerReserve + insets.top + 8,
+                                paddingTop: bannerReserve + insets.top - 12,
                                 paddingBottom: bottomBarReserve + insets.bottom + 16,
                             },
                         ]}
@@ -228,31 +220,26 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                                     </Text>
                                 ) : (
                                     <View style={styles.grid}>
-                                        {owned.map(({ id, count, tier, label }) => (
-                                            <View
+                                        {owned.map(({ id, count, label }) => (
+                                            <ImageBackground
                                                 key={id}
-                                                style={[
-                                                    styles.card,
-                                                    { borderColor: TIER_COLOR[tier] },
-                                                ]}
+                                                source={Frames.inventorySlot}
+                                                style={styles.card}
+                                                imageStyle={styles.cardTile}
+                                                resizeMode="cover"
                                             >
                                                 <Image
                                                     source={getIngredientArt(id)}
                                                     style={styles.itemImage}
-                                                    resizeMode="contain"
+                                                    resizeMode="cover"
                                                 />
                                                 <Text style={styles.itemName} numberOfLines={2}>
                                                     {label}
                                                 </Text>
-                                                <View
-                                                    style={[
-                                                        styles.countPill,
-                                                        { backgroundColor: TIER_COLOR[tier] },
-                                                    ]}
-                                                >
-                                                    <Text style={styles.countText}>×{count}</Text>
-                                                </View>
-                                            </View>
+                                                <Text style={styles.countText}>
+                                                    ×{count}
+                                                </Text>
+                                            </ImageBackground>
                                         ))}
                                     </View>
                                 )}
@@ -273,40 +260,33 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                                             return (
                                                 <TouchableOpacity
                                                     key={id}
-                                                    style={[
-                                                        styles.card,
-                                                        styles.boosterCard,
-                                                        busy && { opacity: 0.6 },
-                                                    ]}
+                                                    style={[busy && { opacity: 0.6 }]}
                                                     disabled={!!consumingId}
                                                     onPress={() => handleConsumeBooster(id)}
                                                     activeOpacity={0.7}
                                                 >
-                                                    {meta.image ? (
-                                                        <Image
-                                                            source={meta.image}
-                                                            style={styles.itemImage}
-                                                            resizeMode="contain"
-                                                        />
-                                                    ) : (
-                                                        <View style={styles.itemImage} />
-                                                    )}
-                                                    <Text style={styles.itemName} numberOfLines={2}>
-                                                        {meta.name}
-                                                    </Text>
-                                                    <View style={styles.boosterUseRow}>
-                                                        <Text style={styles.boosterUseLabel}>
-                                                            {busy ? '…' : 'TAP TO USE'}
+                                                    <ImageBackground
+                                                        source={Frames.inventorySlot}
+                                                        style={styles.card}
+                                                        imageStyle={styles.cardTile}
+                                                        resizeMode="cover"
+                                                    >
+                                                        {meta.image ? (
+                                                            <Image
+                                                                source={meta.image}
+                                                                style={styles.itemImage}
+                                                                resizeMode="cover"
+                                                            />
+                                                        ) : (
+                                                            <View style={styles.itemImage} />
+                                                        )}
+                                                        <Text style={styles.itemName} numberOfLines={2}>
+                                                            {meta.name}
                                                         </Text>
-                                                        <View
-                                                            style={[
-                                                                styles.countPill,
-                                                                { backgroundColor: '#7ecf7a' },
-                                                            ]}
-                                                        >
-                                                            <Text style={styles.countText}>×{count}</Text>
-                                                        </View>
-                                                    </View>
+                                                        <Text style={styles.countText}>
+                                                            {busy ? '…' : `×${count}`}
+                                                        </Text>
+                                                    </ImageBackground>
                                                 </TouchableOpacity>
                                             );
                                         })}
@@ -334,15 +314,18 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                                             const remaining =
                                                 activeCamp.expiresAtMs - Date.now();
                                             return (
-                                                <View
+                                                <ImageBackground
                                                     key={activeCamp.id}
-                                                    style={[styles.card, styles.boosterCard]}
+                                                    source={Frames.inventorySlot}
+                                                    style={styles.card}
+                                                    imageStyle={styles.cardTile}
+                                                    resizeMode="cover"
                                                 >
                                                     {meta.image ? (
                                                         <Image
                                                             source={meta.image}
                                                             style={styles.itemImage}
-                                                            resizeMode="contain"
+                                                            resizeMode="cover"
                                                         />
                                                     ) : (
                                                         <View style={styles.itemImage} />
@@ -350,10 +333,10 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                                                     <Text style={styles.itemName} numberOfLines={2}>
                                                         {meta.name}
                                                     </Text>
-                                                    <Text style={styles.boosterUseLabel} numberOfLines={1}>
+                                                    <Text style={styles.countText} numberOfLines={1}>
                                                         {formatRemaining(remaining)}
                                                     </Text>
-                                                </View>
+                                                </ImageBackground>
                                             );
                                         })()}
                                     </View>
@@ -368,7 +351,7 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                     style={[styles.bottomOverlay, { height: bottomBarReserve }]}
                 >
                     <Image
-                        source={Backgrounds.cookingBottom}
+                        source={Backgrounds.inventoryBottom}
                         style={styles.overlayImage}
                         resizeMode="contain"
                     />
@@ -378,7 +361,7 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                     style={[styles.bannerOverlay, { top: 0, height: bannerReserve }]}
                 >
                     <Image
-                        source={Backgrounds.cookingBanner}
+                        source={Backgrounds.inventoryBanner}
                         style={styles.overlayImage}
                         resizeMode="contain"
                     />
@@ -396,7 +379,12 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                         onPress={onBack}
                         hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                     >
-                        <Text style={styles.backButtonText}>{'<'} Back</Text>
+                        <Image
+                            source={Frames.backButton}
+                            style={styles.backButtonImage}
+                            resizeMode="contain"
+                        />
+                        <Text style={styles.backButtonLabel}>Back</Text>
                     </TouchableOpacity>
                 </View>
             </ImageBackground>
@@ -418,17 +406,18 @@ const styles = StyleSheet.create({
         zIndex: 2,
     },
     backButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        backgroundColor: 'rgba(46, 90, 62, 0.85)',
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#E8F5E8',
+        padding: 4,
+        alignItems: 'center',
     },
-    backButtonText: {
-        color: '#E8F5E8',
+    backButtonImage: {
+        width: 56,
+        height: 46,
+    },
+    backButtonLabel: {
+        color: '#e84a4a',
         fontFamily: 'Monaco',
-        fontSize: 21,
+        fontSize: 14,
+        marginTop: 1,
     },
     scrollClipper: {
         position: 'absolute',
@@ -507,51 +496,50 @@ const styles = StyleSheet.create({
     },
     card: {
         width: '31%',
-        backgroundColor: '#f5eed6',
-        borderWidth: 2,
-        borderColor: '#3a2a1a',
-        borderRadius: 0,
-        padding: 8,
+        aspectRatio: 320 / 360,
+        minHeight: 130,
+        paddingTop: 8,
+        paddingBottom: 8,
+        paddingLeft: 2,
+        paddingRight: 14,
         marginBottom: 10,
         alignItems: 'center',
+        justifyContent: 'flex-start',
+    },
+    cardTile: {
+        // ImageBackground stretches the asset to the card box; the source art
+        // already paints the bg + border + count panel, so the View underneath
+        // stays bare.
+        width: '100%',
+        height: '100%',
     },
     itemImage: {
         width: 44,
         height: 44,
-        marginBottom: 4,
+        marginTop: 2,
+        marginBottom: 2,
     },
     itemName: {
         color: '#3a2a1a',
         fontFamily: 'Monaco',
-        fontSize: 23,
+        fontSize: 18,
         textAlign: 'center',
-        marginBottom: 4,
     },
-    countPill: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderWidth: 1,
-        borderColor: '#3a2a1a',
-    },
+    // The slot art has transparent padding around the painted shape; the
+    // mint count panel sits at ~22% from the View's bottom edge, so pin the
+    // count text there absolutely instead of pushing to the View's bottom.
+    // `right: 12` mirrors the card's asymmetric padding (paddingLeft 2,
+    // paddingRight 14) so the count centers over the painted slot rather
+    // than the geometric card box.
     countText: {
+        position: 'absolute',
+        left: 0,
+        right: 12,
+        bottom: '28%',
         color: '#3a2a1a',
         fontFamily: 'Monaco',
-        fontSize: 26,
-    },
-    boosterCard: {
-        borderColor: '#7ecf7a',
-    },
-    boosterUseRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
-        marginTop: 4,
-    },
-    boosterUseLabel: {
-        color: '#3a2a1a',
-        fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 22,
+        textAlign: 'center',
     },
 });
 

@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 40,
         right: 20,
-        zIndex: 1000,
+        zIndex: 90,
     },
     connectButton: {
         backgroundColor: '#2E5A3E',

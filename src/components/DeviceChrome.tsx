@@ -104,7 +104,6 @@ export const DeviceButtons: React.FC = () => {
 const styles = StyleSheet.create({
     casingLayer: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'black',
         alignItems: 'center',
         justifyContent: 'center',
     },

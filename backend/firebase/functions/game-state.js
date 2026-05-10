@@ -519,3 +519,31 @@ exports.drainForaged = onCall(COMMON_OPTS, async (request) => {
     inventoryCap: opts.inventoryCap,
   };
 });
+
+// Dev-only: clear all meal-window claim flags so the feeding flow can be
+// tested without waiting for the next game-day rollover. Gated to local
+// emulator + non-production projects so it can't be triggered against
+// production data via the wrong client build. Returns the resolved state
+// with mealBonusClaimed wiped to all-false for the current game day.
+exports.devResetMealClaims = onCall(COMMON_OPTS, async (request) => {
+  const projectId = process.env.GCLOUD_PROJECT || '';
+  const isEmulator = !!process.env.FUNCTIONS_EMULATOR;
+  const isProd = /(^|-)prod(-|$)/i.test(projectId);
+  if (isProd && !isEmulator) {
+    throw new HttpsError('permission-denied', 'Dev-only function disabled in production');
+  }
+  const uid = requireAuth(request);
+  const characterId = validateCharacterId(request.data && request.data.characterId);
+  const nowMs = Date.now();
+  const state = await loadOrDefault(uid, characterId, nowMs);
+  const opts = await getForagingOptsForUser(uid, nowMs);
+  const resolved = engine.resolve(state, nowMs, opts);
+  const tz = resolved.timezone || 'UTC';
+  const todayKey = engine.gameDayKey(nowMs, tz);
+  const next = {
+    ...resolved,
+    mealBonusClaimed: engine.defaultMealClaims(todayKey),
+  };
+  await saveState(uid, characterId, next);
+  return { state: next };
+});

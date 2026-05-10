@@ -28,7 +28,7 @@ interface GameStateContextType {
     recipeProgress: RecipeProgressMap;
     refreshPantry: () => Promise<void>;
     cookManual: (ingredients: string[]) => Promise<CookResponse>;
-    cookRecipe: (recipeId: string) => Promise<CookResponse>;
+    cookRecipe: (recipeId: string, ingredients?: string[]) => Promise<CookResponse>;
     applyBooster: (
         skuId: BoosterSkuId,
         qty?: number,
@@ -52,6 +52,7 @@ interface GameStateContextType {
         skuId: BoosterSkuId;
         replayed: boolean;
     }>;
+    devResetMealClaims: () => Promise<GameState>;
 }
 
 const GameStateContext = createContext<GameStateContextType | undefined>(undefined);

@@ -38,12 +38,20 @@ function validateCharacterId(characterId) {
   return characterId.trim();
 }
 
+// Pot capacity hard cap. Mirrors the client's MAX_POT_INGREDIENTS so the
+// server stays the source of truth even if a tampered client tries to push
+// past the upgrade tier.
+const MAX_POT_INGREDIENTS = 15;
+
 function validateIngredientList(ingredients) {
   if (!Array.isArray(ingredients) || ingredients.length === 0) {
     throw new HttpsError('invalid-argument', 'ingredients[] required');
   }
-  if (ingredients.length > 10) {
-    throw new HttpsError('invalid-argument', 'Too many ingredients (max 10 per cook)');
+  if (ingredients.length > MAX_POT_INGREDIENTS) {
+    throw new HttpsError(
+      'invalid-argument',
+      `Too many ingredients (max ${MAX_POT_INGREDIENTS} per cook)`
+    );
   }
   for (const ing of ingredients) {
     if (typeof ing !== 'string' || !catalog.isKnownIngredient(ing)) {
@@ -138,7 +146,9 @@ async function runCookTransaction({ uid, characterId, ingredients, recipe, nowMs
   const cookDoc = cookingRef(uid);
 
   const needed = countMultiset(ingredients);
-  const rewards = recipe ? catalog.recipeRewards(recipe) : catalog.SLOP_REWARD;
+  const rewards = recipe
+    ? catalog.recipeRewards(recipe, ingredients.length)
+    : catalog.SLOP_REWARD;
 
   // Foraging RNG is resolved outside the txn — its own I/O (Firestore writes
   // for VRF cache, potential Solana RPC) can't run inside a transaction.
@@ -278,7 +288,10 @@ exports.cook = onCall(COMMON_OPTS, async (request) => {
 
   if (mode === 'manual') {
     ingredients = validateIngredientList(data.ingredients);
-    recipe = catalog.matchRecipe(ingredients);
+    // Min-multiset matcher: pot must cover a recipe's minimum and contain no
+    // ingredients outside that recipe. Extras of a recipe ingredient count as
+    // a bulk-cook bonus, not a mismatch.
+    recipe = catalog.matchRecipeFromCounts(ingredients);
   } else if (mode === 'recipe') {
     if (typeof data.recipeId !== 'string' || !data.recipeId.trim()) {
       throw new HttpsError('invalid-argument', 'recipeId required for recipe mode');
@@ -298,7 +311,32 @@ exports.cook = onCall(COMMON_OPTS, async (request) => {
         'Recipe not yet discovered — use manual cook first'
       );
     }
-    ingredients = [...recipe.ingredients];
+    // ingredients[] is now player-chosen: must cover the recipe's minimum
+    // and contain no extras outside the recipe. Falls back to the recipe's
+    // own min-multiset if the client omits ingredients (older clients).
+    if (Array.isArray(data.ingredients) && data.ingredients.length > 0) {
+      ingredients = validateIngredientList(data.ingredients);
+      const counts = catalog.countMultiset(ingredients);
+      const min = catalog.countMultiset(recipe.ingredients);
+      for (const ing of Object.keys(counts)) {
+        if (!(ing in min)) {
+          throw new HttpsError(
+            'invalid-argument',
+            `Ingredient '${ing}' is not part of recipe '${recipe.id}'`
+          );
+        }
+      }
+      for (const [ing, n] of Object.entries(min)) {
+        if ((counts[ing] || 0) < n) {
+          throw new HttpsError(
+            'failed-precondition',
+            `Recipe '${recipe.id}' needs at least ${n} ${ing}`
+          );
+        }
+      }
+    } else {
+      ingredients = [...recipe.ingredients];
+    }
   } else {
     throw new HttpsError('invalid-argument', "mode must be 'manual' or 'recipe'");
   }

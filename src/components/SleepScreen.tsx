@@ -8,6 +8,7 @@ import {
     Image,
     Dimensions,
 } from 'react-native';
+import type { ImageStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Backgrounds, Sleep, getCharacterSleep } from '../assets';
 
@@ -110,12 +111,12 @@ const SleepScreen: React.FC<Props> = ({
                     <View style={styles.pillowContainer}>
                         <Image
                             source={Sleep.pillow}
-                            style={styles.pillow}
+                            style={styles.pillow as ImageStyle}
                             resizeMode="contain"
                         />
                         <Image
                             source={getCharacterSleep(characterId)}
-                            style={styles.character}
+                            style={styles.character as ImageStyle}
                             resizeMode="contain"
                         />
                     </View>
@@ -144,7 +145,7 @@ const SleepScreen: React.FC<Props> = ({
                     >
                         <Image
                             source={Sleep.wakeupButton}
-                            style={styles.wakeImage}
+                            style={styles.wakeImage as ImageStyle}
                             resizeMode="contain"
                         />
                     </TouchableOpacity>
@@ -218,6 +219,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 32,
+        transform: [{ translateX: 8 }, { translateY: 3 }],
     },
     alarmLabel: {
         fontFamily: '04b03',
