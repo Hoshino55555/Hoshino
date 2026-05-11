@@ -14,18 +14,18 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FooterBackBar from './FooterBackBar';
-import PageArtShell from './PageArtShell';
-import { useGameStateContext } from '../contexts/GameStateContext';
+import FooterBackBar from '../FooterBackBar';
+import PageArtShell from '../PageArtShell';
+import { useGameStateContext } from '../../contexts/GameStateContext';
 import {
     RECIPES,
     INGREDIENT_TIER,
     type Recipe,
     type IngredientId,
     type IngredientTier,
-} from '../services/RecipeCatalog';
-import type { CookResponse, IngredientCounts } from '../services/GameStateService';
-import { Backgrounds, Cooking, getIngredientArt, getRecipeArt, RecipeCards, Frames } from '../assets';
+} from '../../services/RecipeCatalog';
+import type { CookResponse, IngredientCounts } from '../../services/GameStateService';
+import { Backgrounds, Cooking, getIngredientArt, getRecipeArt, RecipeCards, Frames } from '../../assets';
 
 // Tier rule for the recipe-card background art: any rare/ultra_rare ingredient
 // promotes to RARE (rainbow), any uncommon promotes to INTERMEDIATE (yellow),

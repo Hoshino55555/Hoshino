@@ -8,9 +8,9 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FooterBackBar from './FooterBackBar';
-import PageArtShell from './PageArtShell';
-import { Backgrounds } from '../assets';
+import FooterBackBar from '../FooterBackBar';
+import PageArtShell from '../PageArtShell';
+import { Backgrounds } from '../../assets';
 
 export type ArcadeGameId = 'starburst' | 'water-ring-toss';
 

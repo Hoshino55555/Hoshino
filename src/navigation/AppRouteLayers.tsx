@@ -7,19 +7,19 @@ import {
 } from 'react-native';
 import type { Connection } from '@solana/web3.js';
 
-import CharacterChat from '../components/CharacterChat';
-import FeedingPage from '../components/FeedingPage';
-import Gallery from '../components/Gallery';
-import GamesList from '../components/GamesList';
-import InventoryPage from '../components/InventoryPage';
-import MoonokoInteraction from '../components/MoonokoInteraction';
-import MoonokoSelection from '../components/MoonokoSelection';
-import Profile from '../components/Profile';
-import Settings from '../components/Settings';
-import Shop from '../components/Shop';
-import Starburst from '../components/Starburst';
-import WaterRingToss from '../components/WaterRingToss';
-import WelcomeScreen from '../components/WelcomeScreen';
+import CharacterChat from '../components/chat/CharacterChat';
+import FeedingPage from '../components/feeding/FeedingPage';
+import Gallery from '../components/room/Gallery';
+import GamesList from '../components/games/GamesList';
+import InventoryPage from '../components/inventory/InventoryPage';
+import MoonokoInteraction from '../components/moonoko/MoonokoInteraction';
+import MoonokoSelection from '../components/moonoko/MoonokoSelection';
+import Profile from '../components/settings/Profile';
+import Settings from '../components/settings/Settings';
+import Shop from '../components/shop/Shop';
+import Starburst from '../components/games/Starburst';
+import WaterRingToss from '../components/games/WaterRingToss';
+import WelcomeScreen from '../components/welcome/WelcomeScreen';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import type {
     AppCharacter,

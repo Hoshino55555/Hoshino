@@ -10,10 +10,10 @@ import {
     Modal
 } from 'react-native';
 
-import InnerScreen from './InnerScreen';
+import InnerScreen from '../InnerScreen';
 
-import { MOONOKOS } from '../data/moonokos';
-import { Backgrounds, getCharacterAnim } from '../assets';
+import { MOONOKOS } from '../../data/moonokos';
+import { Backgrounds, getCharacterAnim } from '../../assets';
 
 const getImageSource = (imageName: string) => getCharacterAnim(imageName);
 

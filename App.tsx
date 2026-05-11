@@ -23,7 +23,7 @@ import { useWallet, WalletProvider } from './src/contexts/WalletContext';
 import { ChromeProvider } from './src/contexts/ChromeContext';
 import { HoshinoPrivyProvider } from './src/contexts/PrivyContext';
 import { usePrivy } from '@privy-io/expo';
-import LoginScreen from './src/components/LoginScreen';
+import LoginScreen from './src/components/welcome/LoginScreen';
 import { DeviceCasing, DeviceButtons } from './src/components/DeviceChrome';
 import ZoomOutOverlay from './src/components/ZoomOutOverlay';
 import { Logos } from './src/assets';

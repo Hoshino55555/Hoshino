@@ -15,9 +15,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
-import chatService from '../services/ChatService';
-import { getCharacterAnim } from '../assets';
-import { useGameStateContext } from '../contexts/GameStateContext';
+import chatService from '../../services/ChatService';
+import { getCharacterAnim } from '../../assets';
+import { useGameStateContext } from '../../contexts/GameStateContext';
 
 interface Character {
     id: string;

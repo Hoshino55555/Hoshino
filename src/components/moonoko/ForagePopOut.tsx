@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Image, Animated, Easing, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
-import type { ForagedItem } from '../services/GameStateService';
-import { getIngredientArt } from '../assets';
+import type { ForagedItem } from '../../services/GameStateService';
+import { getIngredientArt } from '../../assets';
 
 // Hash to a deterministic float in [-1, 1] so each item gets stable jitter
 // across rerenders without using random (which would reshuffle on every render).

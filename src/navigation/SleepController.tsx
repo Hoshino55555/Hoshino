@@ -4,8 +4,8 @@ import { StyleSheet, View } from 'react-native';
 import MorningRecapModal, {
     MorningRecapDeltas,
 } from '../components/MorningRecapModal';
-import SleepConfirmationModal from '../components/SleepConfirmationModal';
-import SleepScreen from '../components/SleepScreen';
+import SleepConfirmationModal from '../components/sleep/SleepConfirmationModal';
+import SleepScreen from '../components/sleep/SleepScreen';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import { cancelSleepAlarm, scheduleSleepAlarm } from '../services/AlarmService';
 import { SLEEP_REQUIRED_MS } from '../services/GameStateService';

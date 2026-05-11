@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import type { ImageStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Backgrounds, Sleep, getCharacterSleep } from '../assets';
+import { Backgrounds, Sleep, getCharacterSleep } from '../../assets';
 
 const SLEEP_REQUIRED_MS = 8 * 60 * 60 * 1000;
 

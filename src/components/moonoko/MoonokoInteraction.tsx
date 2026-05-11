@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, Text, Image, ImageBackground, TouchableOpacity, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import type { ImageStyle } from 'react-native';
-import InnerScreen from './InnerScreen';
-import SettingsService, { MenuButton } from '../services/SettingsService';
-import { useGameStateContext } from '../contexts/GameStateContext';
+import InnerScreen from '../InnerScreen';
+import SettingsService, { MenuButton } from '../../services/SettingsService';
+import { useGameStateContext } from '../../contexts/GameStateContext';
 import ForagePopOut, { computeForageStaggerMs, FORAGE_FLIGHT_MS } from './ForagePopOut';
-import type { ForagedItem } from '../services/GameStateService';
-import type { PendingWidgetAction } from '../types/AppTypes';
-import { Backgrounds, Menu, Stars, Frames, Forage, getCharacterAnim } from '../assets';
+import type { ForagedItem } from '../../services/GameStateService';
+import type { PendingWidgetAction } from '../../types/AppTypes';
+import { Backgrounds, Menu, Stars, Frames, Forage, getCharacterAnim } from '../../assets';
 
 const WIDGET_ACTION_TTL_MS = 60_000;
 

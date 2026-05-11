@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
-import Frame from './Frame';
-import { useWallet } from '../contexts/WalletContext';
-import InnerScreen from './InnerScreen';
-import { Logos, Misc } from '../assets';
+import Frame from '../Frame';
+import { useWallet } from '../../contexts/WalletContext';
+import InnerScreen from '../InnerScreen';
+import { Logos, Misc } from '../../assets';
 
 interface Props {
     onContinue: (playerName?: string) => void;

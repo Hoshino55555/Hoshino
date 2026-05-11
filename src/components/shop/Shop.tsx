@@ -13,9 +13,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Modal } from 'react-native';
-import FooterBackBar from './FooterBackBar';
-import PageArtShell from './PageArtShell';
-import { MarketplaceItem, ItemRarity } from '../services/MarketplaceService';
+import FooterBackBar from '../FooterBackBar';
+import PageArtShell from '../PageArtShell';
+import { MarketplaceItem, ItemRarity } from '../../services/MarketplaceService';
 import StarFragmentService, {
     type DailySpinReward,
     type ServerCaps,
@@ -24,30 +24,30 @@ import StarFragmentService, {
     type CampId,
     type CartLine,
     type IngredientBoxId,
-} from '../services/StarFragmentService';
-import { ingredientLabel } from '../services/RecipeCatalog';
-import { getIngredientArt } from '../assets';
-import { useWallet } from '../contexts/WalletContext';
+} from '../../services/StarFragmentService';
+import { ingredientLabel } from '../../services/RecipeCatalog';
+import { getIngredientArt } from '../../assets';
+import { useWallet } from '../../contexts/WalletContext';
 import { Connection } from '@solana/web3.js';
 import IAPService, {
     type IAPPaymentToken,
     type IAPSkuId,
-} from '../services/IAPService';
+} from '../../services/IAPService';
 import { useFundSolanaWallet } from '@privy-io/expo/ui';
-import { Backgrounds, Stars, Frames } from '../assets';
+import { Backgrounds, Stars, Frames } from '../../assets';
 import {
     SHOP_TABS,
     type ShopTab,
     type ShopItem,
     itemsForTab,
     groupBySubcategory,
-} from '../data/shopCatalog';
-import { INGREDIENT_TIER } from '../services/RecipeCatalog';
-import { ItemCategory } from '../services/MarketplaceService';
-import { useGameStateContext } from '../contexts/GameStateContext';
-import type { BoosterSkuId } from '../services/GameStateService';
+} from '../../data/shopCatalog';
+import { INGREDIENT_TIER } from '../../services/RecipeCatalog';
+import { ItemCategory } from '../../services/MarketplaceService';
+import { useGameStateContext } from '../../contexts/GameStateContext';
+import type { BoosterSkuId } from '../../services/GameStateService';
 import BoxRevealModal, { type BoxReveal } from './BoxRevealModal';
-import { newRequestId } from '../services/requestId';
+import { newRequestId } from '../../services/requestId';
 
 // Per-line dispatch result. Drives the post-checkout reveal queue:
 // boxes open via BoxRevealModal (TCG pack-style), spin replays the reel

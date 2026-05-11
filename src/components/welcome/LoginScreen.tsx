@@ -17,9 +17,9 @@ import {
     useBackpackDeeplinkWalletConnector,
     usePhantomDeeplinkWalletConnector,
 } from '@privy-io/expo/connectors';
-import { mobileWalletService, useWallet } from '../contexts/WalletContext';
-import type { ExternalWalletProvider } from '../contexts/WalletContext';
-import { Logos } from '../assets';
+import { mobileWalletService, useWallet } from '../../contexts/WalletContext';
+import type { ExternalWalletProvider } from '../../contexts/WalletContext';
+import { Logos } from '../../assets';
 
 const WALLET_APP_URL = 'https://hoshino.gg';
 const WALLET_REDIRECT_PATH = '/wallet-auth';

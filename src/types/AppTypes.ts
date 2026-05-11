@@ -1,4 +1,4 @@
-import type { ArcadeGameId } from '../components/GamesList';
+import type { ArcadeGameId } from '../components/games/GamesList';
 
 export type AppView =
     | 'welcome'

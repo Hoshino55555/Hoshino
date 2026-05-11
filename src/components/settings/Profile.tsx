@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FooterBackButton, { FOOTER_BACK_BUTTON_OFFSET_Y } from './FooterBackButton';
+import FooterBackButton, { FOOTER_BACK_BUTTON_OFFSET_Y } from '../FooterBackButton';
 
 interface Props {
     onBack: () => void;

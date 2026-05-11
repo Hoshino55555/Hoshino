@@ -2,11 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useChromeConfig } from '../contexts/ChromeContext';
-import FooterBackBar from './FooterBackBar';
+import { useChromeConfig } from '../../contexts/ChromeContext';
+import FooterBackBar from '../FooterBackBar';
 import Room from './Room';
 import RoomEditor from './RoomEditor';
-import { type RoomLayout, STARTER_ROOM_LAYOUT } from '../services/RoomLayout';
+import { type RoomLayout, STARTER_ROOM_LAYOUT } from '../../services/RoomLayout';
 
 // Single shared room for the local-only MVP. Switch to per-character keying
 // (`room:layout:${characterId}`) when the editor moves to a per-moonoko home.

@@ -7,8 +7,8 @@ import {
     WALL_BAND_FRACTION,
     itemPixelRect,
     resolveRoomAsset,
-} from '../services/RoomLayout';
-import { Rooms } from '../assets';
+} from '../../services/RoomLayout';
+import { Rooms } from '../../assets';
 
 interface Props {
     /** Layout to render. Defaults to the starter mockup until persistence + editor land. */

@@ -24,8 +24,8 @@ import {
     gridFor,
     itemPixelRect,
     resolveRoomAsset,
-} from '../services/RoomLayout';
-import { Frames } from '../assets';
+} from '../../services/RoomLayout';
+import { Frames } from '../../assets';
 
 interface PaletteEntry {
     asset: RoomItemAssetKey;

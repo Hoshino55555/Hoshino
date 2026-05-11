@@ -9,12 +9,12 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { getIngredientArt } from '../assets';
+import { getIngredientArt } from '../../assets';
 import {
     INGREDIENT_TIER,
     ingredientLabel,
     type IngredientTier,
-} from '../services/RecipeCatalog';
+} from '../../services/RecipeCatalog';
 
 const TIER_BORDER_COLOR: Record<IngredientTier, string> = {
     common: '#8B8B8B',

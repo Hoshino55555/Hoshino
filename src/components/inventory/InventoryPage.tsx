@@ -12,21 +12,21 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../config/firebase';
-import { useGameStateContext } from '../contexts/GameStateContext';
-import { useFirebaseAuth } from '../contexts/FirebaseAuthContext';
+import { functions } from '../../config/firebase';
+import { useGameStateContext } from '../../contexts/GameStateContext';
+import { useFirebaseAuth } from '../../contexts/FirebaseAuthContext';
 import {
     INGREDIENT_TIER,
     ingredientLabel,
     type IngredientTier,
-} from '../services/RecipeCatalog';
-import FooterBackBar from './FooterBackBar';
-import PageArtShell from './PageArtShell';
-import type { BoosterSkuId } from '../services/GameStateService';
-import { SHOP_CATALOG } from '../data/shopCatalog';
-import type { ActiveCamp } from '../services/StarFragmentService';
-import { newRequestId } from '../services/requestId';
-import { Backgrounds, getIngredientArt, ShopItems, Frames } from '../assets';
+} from '../../services/RecipeCatalog';
+import FooterBackBar from '../FooterBackBar';
+import PageArtShell from '../PageArtShell';
+import type { BoosterSkuId } from '../../services/GameStateService';
+import { SHOP_CATALOG } from '../../data/shopCatalog';
+import type { ActiveCamp } from '../../services/StarFragmentService';
+import { newRequestId } from '../../services/requestId';
+import { Backgrounds, getIngredientArt, ShopItems, Frames } from '../../assets';
 
 type InventoryTab = 'ingredients' | 'consumables' | 'accessories';
 
