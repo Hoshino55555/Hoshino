@@ -10,7 +10,7 @@ import {
     TextWidget,
 } from 'react-native-android-widget';
 import StatStars from './StatStars';
-import ForageBadge from './ForageBadge';
+import WidgetActionBadges from './WidgetActionBadges';
 import { WidgetSnapshot, isFilledSnapshot } from './types';
 import {
     resolveAvatar,
@@ -24,7 +24,7 @@ interface Props {
 }
 
 // Wide 4x2 — landscape canvas. Avatar fills the left half centered, stat
-// stars stack on the right, forage badge tucked far right.
+// stars stack on the right, action badges tuck into the bottom-right corner.
 const WideWidget: React.FC<Props> = ({ snapshot }) => {
     // Type predicate gives us a narrowed `filled: WidgetMoonokoSnapshot | null`
     // — see types.ts for why we route through a predicate instead of a plain
@@ -109,17 +109,21 @@ const WideWidget: React.FC<Props> = ({ snapshot }) => {
                         </FlexWidget>
                     )}
                 </FlexWidget>
-
-                {filled && filled.foragedCount > 0 && (
-                    <FlexWidget style={{ marginLeft: 6 }}>
-                        <ForageBadge
-                            count={filled.foragedCount}
-                            compact
-                            characterId={filled.characterId}
-                        />
-                    </FlexWidget>
-                )}
             </FlexWidget>
+
+            {filled && (
+                <FlexWidget
+                    style={{
+                        width: 'match_parent',
+                        height: 'match_parent',
+                        padding: 14,
+                        alignItems: 'flex-end',
+                        justifyContent: 'flex-end',
+                    }}
+                >
+                    <WidgetActionBadges snapshot={filled} compact />
+                </FlexWidget>
+            )}
         </OverlapWidget>
     );
 };

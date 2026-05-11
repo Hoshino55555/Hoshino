@@ -25,6 +25,10 @@ export interface WidgetMoonokoSnapshot {
     // existing drain animation plays. Zero means no badge — keeps the tile
     // quiet most of the time.
     foragedCount: number;
+    // Meal claims let the widget compute whether the current meal window is
+    // available at render time, including periodic launcher refreshes.
+    mealBonusClaimed?: WidgetMealClaims;
+    timezone?: string;
     // ms-since-epoch the snapshot was taken. Surfaced as "Updated 3m ago" on
     // the larger variant so a stale tile reads as stale rather than wrong.
     snapshotAt: number;
@@ -42,6 +46,65 @@ export interface WidgetEmptySnapshot {
 }
 
 export type WidgetSnapshot = WidgetMoonokoSnapshot | WidgetEmptySnapshot;
+
+export type WidgetMealWindow = 'breakfast' | 'lunch' | 'dinner';
+
+export interface WidgetMealClaims {
+    dateKey: string;
+    breakfast: boolean;
+    lunch: boolean;
+    dinner: boolean;
+}
+
+function localDateKey(now: Date, timezone?: string): string {
+    try {
+        return new Intl.DateTimeFormat('en-CA', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(now);
+    } catch {
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+}
+
+function currentMealWindow(now: Date, timezone?: string): WidgetMealWindow {
+    let hour = now.getHours();
+    if (timezone) {
+        try {
+            const hourPart = new Intl.DateTimeFormat('en-US', {
+                timeZone: timezone,
+                hour: '2-digit',
+                hour12: false,
+            }).formatToParts(now).find((part) => part.type === 'hour');
+            if (hourPart) {
+                hour = Number(hourPart.value) % 24;
+            }
+        } catch {
+            // Fall back to device-local time.
+        }
+    }
+
+    if (hour >= 6 && hour < 12) return 'breakfast';
+    if (hour >= 12 && hour < 18) return 'lunch';
+    return 'dinner';
+}
+
+export function isFeedingReady(
+    snapshot: WidgetMoonokoSnapshot,
+    now = new Date()
+): boolean {
+    if (snapshot.isSleeping) return false;
+    const claims = snapshot.mealBonusClaimed;
+    if (!claims) return false;
+    const today = localDateKey(now, snapshot.timezone);
+    if (claims.dateKey !== today) return true;
+    return !claims[currentMealWindow(now, snapshot.timezone)];
+}
 
 // Discriminator predicate. `tsconfig.strict` is currently off, which keeps
 // TypeScript from narrowing the union via a plain `s.characterId !== null`

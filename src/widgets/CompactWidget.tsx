@@ -10,7 +10,7 @@ import {
     TextWidget,
 } from 'react-native-android-widget';
 import StatStars from './StatStars';
-import ForageBadge from './ForageBadge';
+import WidgetActionBadges from './WidgetActionBadges';
 import { WidgetSnapshot, isFilledSnapshot } from './types';
 import {
     resolveAvatar,
@@ -98,13 +98,7 @@ const CompactWidget: React.FC<Props> = ({ snapshot }) => {
                             labelSize={9}
                         />
                     </FlexWidget>
-                    {filled.foragedCount > 0 && (
-                        <ForageBadge
-                            count={filled.foragedCount}
-                            compact
-                            characterId={filled.characterId}
-                        />
-                    )}
+                    <WidgetActionBadges snapshot={filled} compact />
                 </FlexWidget>
             )}
 

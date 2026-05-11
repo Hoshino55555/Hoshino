@@ -6,8 +6,7 @@ import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import ForagePopOut, { computeForageStaggerMs, FORAGE_FLIGHT_MS } from './ForagePopOut';
 import type { ForagedItem } from '../services/GameStateService';
-import { pushMoonokoSnapshot } from '../widgets/widgetService';
-import type { PendingWidgetAction } from '../../App';
+import type { PendingWidgetAction } from '../types/AppTypes';
 import { Backgrounds, Menu, Stars, Frames, Forage, getCharacterAnim } from '../assets';
 
 const WIDGET_ACTION_TTL_MS = 60_000;
@@ -326,44 +325,6 @@ const MoonokoInteraction: React.FC<Props> = ({
         }
         onWidgetActionConsumed?.();
     }, [pendingWidgetAction, gameState, hasPendingFinds, popOutItems, handleCharacterPress, onWidgetActionConsumed]);
-
-    // Push the home-screen widget a fresh snapshot whenever the state that
-    // drives its rendering changes. The widget runs in the launcher process
-    // and can't see React state — this is the only way it learns that
-    // mood/hunger/energy/foraging have moved. Cheap to over-call: the
-    // launcher coalesces redraws. Empty-state pushes happen at the App
-    // lifecycle level on profile reset, not here — pushing empty during
-    // the cold-start gameState load window would briefly blank the widget.
-    useEffect(() => {
-        if (!selectedCharacter || !gameState) return;
-        const avatarKey = selectedCharacter.image.replace(/\.gif$/i, '');
-        // gameState stats are on a 0..5 scale — same as the in-app 5-star
-        // readout. Widget contract is 0..100, so multiply by 20.
-        const scale = (n: number) => n * 20;
-        pushMoonokoSnapshot({
-            characterId: gameState.characterId,
-            name: selectedCharacter.name,
-            avatarKey,
-            mood: scale(gameState.mood),
-            hunger: scale(gameState.hunger),
-            energy: scale(gameState.energy),
-            level: gameState.level,
-            // Player-wide currency lives outside gameState; for now we omit
-            // it (widget shows 0). The forage interaction doesn't depend on it.
-            fragments: 0,
-            isSleeping: gameState.sleepStartedAt != null,
-            foragedCount: pendingFinds.length,
-        }).catch(() => {});
-    }, [
-        selectedCharacter,
-        gameState?.characterId,
-        gameState?.mood,
-        gameState?.hunger,
-        gameState?.energy,
-        gameState?.level,
-        gameState?.sleepStartedAt,
-        pendingFinds.length,
-    ]);
 
     // Arcade + individual games are App-level views now (see App.tsx
     // renderContent). Tapping the games menu button calls onArcade which

@@ -3,7 +3,7 @@ import { saveSnapshot } from './snapshotStore';
 import CompactWidget from './CompactWidget';
 import WideWidget from './WideWidget';
 import HeroWidget from './HeroWidget';
-import { WidgetMoonokoSnapshot, WidgetSnapshot } from './types';
+import type { WidgetMealClaims, WidgetMoonokoSnapshot, WidgetSnapshot } from './types';
 
 interface PushArgs {
     characterId: string;
@@ -16,6 +16,8 @@ interface PushArgs {
     fragments: number;
     isSleeping: boolean;
     foragedCount: number;
+    mealBonusClaimed: WidgetMealClaims;
+    timezone?: string;
 }
 
 // Build a snapshot from raw game state and push it to every active widget.
@@ -34,6 +36,8 @@ export async function pushMoonokoSnapshot(args: PushArgs): Promise<void> {
         fragments: Math.max(0, args.fragments),
         isSleeping: args.isSleeping,
         foragedCount: Math.max(0, Math.floor(args.foragedCount)),
+        mealBonusClaimed: args.mealBonusClaimed,
+        timezone: args.timezone,
         snapshotAt: Date.now(),
     };
     await saveSnapshot(snapshot);

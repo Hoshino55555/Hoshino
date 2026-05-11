@@ -43,6 +43,7 @@ export const FORAGE_SPRITES = [
     require('../../assets/images/widget/forage-egg.png'),
     require('../../assets/images/widget/forage-sugar.png'),
 ];
+export const FORAGE_BAG = require('../../assets/images/ui/forage/forage-bag.png');
 
 // Filename prefix is what `react-native-android-widget` resolves at runtime
 // (see ResourceUtils.findAssetFont). Defining the names here keeps every
