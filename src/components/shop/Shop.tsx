@@ -1355,7 +1355,7 @@ const styles = StyleSheet.create({
     },
     spinPoolText: {
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 18,
         color: '#3a2a1a',
         marginTop: -2,
     },
@@ -1446,7 +1446,7 @@ const styles = StyleSheet.create({
     },
     spinRewardText: {
         fontFamily: 'Monaco',
-        fontSize: 27,
+        fontSize: 24,
         color: '#3a2a1a',
     },
     spinCloseButton: {
@@ -1540,7 +1540,7 @@ const styles = StyleSheet.create({
     },
     tabButtonText: {
         fontFamily: 'Monaco',
-        fontSize: 26,
+        fontSize: 24,
         color: '#003300',
     },
     itemsContainer: {
@@ -1558,7 +1558,7 @@ const styles = StyleSheet.create({
     },
     sectionHeader: {
         fontFamily: 'Monaco',
-        fontSize: 26,
+        fontSize: 24,
         color: '#003300',
         marginBottom: 6,
         paddingBottom: 2,
@@ -1605,7 +1605,7 @@ const styles = StyleSheet.create({
     },
     ingredientBoxTitle: {
         fontFamily: 'Monaco',
-        fontSize: 26,
+        fontSize: 24,
         lineHeight: 18,
         textAlign: 'center',
         color: '#2e2014',
@@ -1635,7 +1635,7 @@ const styles = StyleSheet.create({
     },
     itemRank: {
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 18,
         lineHeight: 8,
         textAlign: 'center',
         color: '#2e2014',
@@ -1643,7 +1643,7 @@ const styles = StyleSheet.create({
     },
     itemSummary: {
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 18,
         lineHeight: 13,
         color: '#3a2a1a',
         textAlign: 'center',
@@ -1781,7 +1781,7 @@ const styles = StyleSheet.create({
     },
     confirmBtnText: {
         fontFamily: 'Monaco',
-        fontSize: 26,
+        fontSize: 24,
         color: '#003300',
     },
     confirmBuyBtnText: {
@@ -1880,7 +1880,7 @@ const styles = StyleSheet.create({
         borderColor: '#FFD54F',
         alignItems: 'center',
     },
-    iapTopUpText: { color: '#FFD54F', fontFamily: 'Monaco', fontSize: 26 },
+    iapTopUpText: { color: '#FFD54F', fontFamily: 'Monaco', fontSize: 24 },
 });
 
 export default Shop;

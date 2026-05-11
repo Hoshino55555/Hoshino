@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
         borderColor: colors.forestDark,
     },
     sectionTitle: {
-        fontSize: 26,
+        fontSize: 24,
         color: colors.forestDark,
         fontFamily: 'Monaco',
         marginBottom: 6,
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     buttonName: {
-        fontSize: 23,
+        fontSize: 24,
         color: colors.forestDark,
         fontFamily: 'Monaco',
     },
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
         borderColor: colors.forestDark,
     },
     dragHandleText: {
-        fontSize: 23,
+        fontSize: 24,
         color: colors.forestDark,
         fontFamily: 'Monaco',
     },
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     settingLabel: {
-        fontSize: 23,
+        fontSize: 24,
         color: colors.forestDark,
         fontFamily: 'Monaco',
     },

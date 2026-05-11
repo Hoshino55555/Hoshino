@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     },
     glyphText: {
         fontFamily: 'Monaco',
-        fontSize: 23,
+        fontSize: 24,
         lineHeight: 13,
     },
     messageWrap: {
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     },
     closeText: {
         color: '#9bb4c7',
-        fontSize: 27,
+        fontSize: 24,
         lineHeight: 18,
         fontFamily: 'Monaco',
     },
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     bannerTitle: {
-        fontSize: 27,
+        fontSize: 24,
         color: 'white',
         fontFamily: 'Monaco',
     },

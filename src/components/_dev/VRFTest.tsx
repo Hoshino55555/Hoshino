@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     title: {
-        fontSize: 27,
+        fontSize: 24,
         color: '#111827',
         fontFamily: 'Monaco',
     },
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
         borderColor: '#d1d5db',
     },
     cardTitle: {
-        fontSize: 23,
+        fontSize: 24,
         color: '#111827',
         fontFamily: 'Monaco',
     },

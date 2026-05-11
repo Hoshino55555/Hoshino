@@ -155,14 +155,14 @@ const styles = StyleSheet.create({
     tileName: {
         color: '#FFD700',
         fontFamily: 'Monaco',
-        fontSize: 26,
+        fontSize: 24,
         marginBottom: 6,
         textAlign: 'center',
     },
     tileDescription: {
         color: colors.mintPale,
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 18,
         textAlign: 'center',
         lineHeight: 12,
     },
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
         marginTop: 6,
         color: '#FFB6C1',
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 18,
     },
 });
 

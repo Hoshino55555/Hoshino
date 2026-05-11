@@ -443,12 +443,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     winMessage: {
-        fontSize: 26,
+        fontSize: 24,
         color: colors.mintPale,
         fontFamily: 'Monaco',
     },
     loseMessage: {
-        fontSize: 26,
+        fontSize: 24,
         color: colors.mintPale,
         fontFamily: 'Monaco',
     },
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
         fontFamily: 'Monaco',
     },
     hintStar: {
-        fontSize: 17,
+        fontSize: 18,
         color: colors.forestDark,
         fontFamily: 'Monaco',
     },
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     noteText: {
-        fontSize: 17,
+        fontSize: 18,
         color: colors.forestDark,
         fontFamily: 'Monaco',
         textAlign: 'center',
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
         color: colors.mintPale,
     },
     instructionText: {
-        fontSize: 17,
+        fontSize: 18,
         color: colors.forestDark,
         fontFamily: 'Monaco',
         textAlign: 'center',

@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
         borderColor: colors.forestDark,
     },
     sectionTitle: {
-        fontSize: 26,
+        fontSize: 24,
         color: colors.forestDark,
         fontFamily: 'Monaco',
         marginBottom: 10,
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     valueText: {
-        fontSize: 23,
+        fontSize: 24,
         color: colors.forestDark,
         fontFamily: 'Monaco',
         lineHeight: 15,
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 8,
         color: colors.forestDark,
-        fontSize: 23,
+        fontSize: 24,
         fontFamily: 'Monaco',
         marginRight: 8,
     },
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     },
     logoutButtonText: {
         color: colors.mintPale,
-        fontSize: 23,
+        fontSize: 24,
         fontFamily: 'Monaco',
     },
 });

@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
         fontFamily: 'Monaco',
     },
     modalDescription: {
-        fontSize: 26,
+        fontSize: 24,
         color: colors.forestDark,
         textAlign: 'center',
         lineHeight: 20,

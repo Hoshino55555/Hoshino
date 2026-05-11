@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         paddingHorizontal: 14,
         paddingVertical: Platform.OS === 'ios' ? 14 : 12,
-        fontSize: 23,
+        fontSize: 24,
         color: '#103142',
         fontFamily: 'Monaco',
     },
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: {
         fontFamily: 'Monaco',
-        fontSize: 23,
+        fontSize: 24,
         color: '#071019',
         letterSpacing: 0.6,
         textAlign: 'center',
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
     },
     errorText: {
         fontFamily: 'Monaco',
-        fontSize: 27,
+        fontSize: 24,
         lineHeight: 18,
         color: '#7b2e27',
     },

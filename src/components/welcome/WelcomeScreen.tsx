@@ -777,7 +777,7 @@ const styles = StyleSheet.create({
         fontFamily: 'Monaco',
     },
     storyTextLarge: {
-        fontSize: 23,
+        fontSize: 24,
         color: colors.forestDark, // Dark green text
         lineHeight: 18,
         fontFamily: 'Monaco',
@@ -801,7 +801,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     storyPromptLarge: {
-        fontSize: 26,
+        fontSize: 24,
         color: colors.forestMid, // Medium green for subtle text
         marginTop: 5,
         fontStyle: 'italic',
@@ -930,7 +930,7 @@ const styles = StyleSheet.create({
         right: 0,
     },
     choiceText: {
-        fontSize: 27,
+        fontSize: 24,
         color: colors.forestMid, // Medium green for choice text
         marginHorizontal: 30, // Increased horizontal spacing instead of gap
         fontFamily: 'Monaco',

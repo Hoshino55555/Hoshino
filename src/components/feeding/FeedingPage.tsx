@@ -1224,7 +1224,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: colors.white,
         fontFamily: 'Monaco',
-        fontSize: 23,
+        fontSize: 24,
         textShadowColor: colors.purpleText,
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,

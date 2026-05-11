@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     },
     connectedText: {
         color: colors.forestDark,
-        fontSize: 26,
+        fontSize: 24,
         lineHeight: 17,
         fontFamily: 'Monaco',
         textAlign: 'center',

@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     title: {
         color: colors.gold,
         fontFamily: 'Monaco',
-        fontSize: 26,
+        fontSize: 24,
         flexShrink: 1,
     },
     counter: {
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     cardName: {
         color: colors.mintPale,
         fontFamily: 'Monaco',
-        fontSize: 17,
+        fontSize: 18,
         marginTop: 4,
         textAlign: 'center',
     },

@@ -602,7 +602,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: '#5a4a2a',
         fontFamily: 'Monaco',
-        fontSize: 23,
+        fontSize: 24,
         marginTop: 32,
         paddingHorizontal: 24,
         lineHeight: 19,
@@ -646,7 +646,7 @@ const styles = StyleSheet.create({
     namePillText: {
         color: '#1a1a1a',
         fontFamily: 'Monaco',
-        fontSize: 26,
+        fontSize: 24,
         letterSpacing: 0.5,
     },
     messageBox: {
@@ -702,7 +702,7 @@ const styles = StyleSheet.create({
     sendButtonText: {
         color: '#f5d65f',
         fontFamily: 'Monaco',
-        fontSize: 23,
+        fontSize: 24,
     },
 });
 
