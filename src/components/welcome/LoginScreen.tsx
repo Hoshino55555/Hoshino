@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
     formShell: {
         gap: 14,
         padding: 18,
-        borderRadius: 24,
+        borderRadius: 16,
         backgroundColor: 'rgba(240, 249, 255, 0.96)',
         borderWidth: 2,
         borderColor: '#164257',

@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 2,
         borderWidth: 2,
         borderColor: '#1a1a1a',
-        borderRadius: 10,
+        borderRadius: 12,
         zIndex: 10,
     },
     capacityPct: {

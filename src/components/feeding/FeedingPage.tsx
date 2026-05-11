@@ -1269,7 +1269,7 @@ const modalStyles = StyleSheet.create({
     },
     sheet: {
         backgroundColor: '#1a1f36',
-        borderRadius: 10,
+        borderRadius: 12,
         borderWidth: 2,
         borderColor: colors.gold,
         padding: 16,
@@ -1400,7 +1400,7 @@ const modalStyles = StyleSheet.create({
         paddingHorizontal: 3,
         paddingVertical: 1,
         backgroundColor: colors.gold,
-        borderRadius: 3,
+        borderRadius: 4,
         zIndex: 1,
     },
     minBadgeText: {

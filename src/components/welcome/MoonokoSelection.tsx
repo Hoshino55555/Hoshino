@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
     },
     slotMachineCard: {
         backgroundColor: colors.mintPale,
-        borderRadius: 10,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 3,
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
     },
     modalContent: {
         backgroundColor: colors.mintPale,
-        borderRadius: 20,
+        borderRadius: 16,
         padding: 20,
         margin: 20,
         maxWidth: '90%',

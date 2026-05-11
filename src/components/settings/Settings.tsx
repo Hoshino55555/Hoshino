@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     },
     miniMenuBar: {
         backgroundColor: colors.mintPale,
-        borderRadius: 3,
+        borderRadius: 4,
         padding: 4,
         borderWidth: 1,
         borderColor: colors.forestDark,

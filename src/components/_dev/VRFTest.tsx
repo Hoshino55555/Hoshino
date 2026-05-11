@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         backgroundColor: '#1f7a5a',
-        borderRadius: 10,
+        borderRadius: 12,
         paddingVertical: 12,
         paddingHorizontal: 14,
     },
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     },
     secondaryButton: {
         backgroundColor: '#e5e7eb',
-        borderRadius: 10,
+        borderRadius: 12,
         paddingVertical: 12,
         paddingHorizontal: 14,
     },

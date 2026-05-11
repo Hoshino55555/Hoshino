@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.forestDark,
         paddingVertical: 6,
         paddingHorizontal: 12,
-        borderRadius: 20,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: colors.mintPale,
         shadowColor: '#000',

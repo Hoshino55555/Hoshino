@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     innerScreen: {
         width: '100%',
         height: '100%',
-        borderRadius: 20,
+        borderRadius: 16,
         overflow: 'hidden',
         position: 'relative',
         borderWidth: 0,
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
         left: -4,
         right: -4,
         bottom: -4,
-        borderRadius: 24,
+        borderRadius: 16,
         backgroundColor: 'rgba(0, 0, 0, 0.28)',
         zIndex: 1,
         pointerEvents: 'none',
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
         left: -3,
         width: 6,
         height: 6,
-        borderRadius: 3,
+        borderRadius: 4,
         backgroundColor: 'rgba(255, 140, 0, 0.12)', // Soft orange corner
         zIndex: 3,
         pointerEvents: 'none', // Don't intercept touch events
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
         right: -3,
         width: 6,
         height: 6,
-        borderRadius: 3,
+        borderRadius: 4,
         backgroundColor: 'rgba(255, 140, 0, 0.12)', // Soft orange corner
         zIndex: 3,
         pointerEvents: 'none', // Don't intercept touch events
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
         left: -3,
         width: 6,
         height: 6,
-        borderRadius: 3,
+        borderRadius: 4,
         backgroundColor: 'rgba(255, 140, 0, 0.12)', // Soft orange corner
         zIndex: 3,
         pointerEvents: 'none', // Don't intercept touch events
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
         right: -3,
         width: 6,
         height: 6,
-        borderRadius: 3,
+        borderRadius: 4,
         backgroundColor: 'rgba(255, 140, 0, 0.12)', // Soft orange corner
         zIndex: 3,
         pointerEvents: 'none', // Don't intercept touch events

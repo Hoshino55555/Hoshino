@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     cloud: {
         position: 'absolute',
         backgroundColor: 'rgba(255, 255, 255, 0.3)',
-        borderRadius: 20,
+        borderRadius: 16,
         zIndex: 2,
     },
     cloud1: {

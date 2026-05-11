@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#8ee2d9',
         borderWidth: 2,
         borderColor: colors.black,
-        borderRadius: 3,
+        borderRadius: 4,
         ...PIXEL_SHADOW,
     },
     dismissText: {
