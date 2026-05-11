@@ -405,7 +405,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     return (
         <PageArtShell
             background={Backgrounds.cooking}
-            backgroundColor="#1a1033"
+            backgroundColor={colors.purpleBg}
             testID="feeding-screen"
             overlays={shellOverlays}
         >
@@ -1144,7 +1144,7 @@ const styles = StyleSheet.create({
         fontFamily: 'Monaco',
         fontSize: 20,
         letterSpacing: 0.5,
-        textShadowColor: '#2d1b69',
+        textShadowColor: colors.purpleText,
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
     },
@@ -1157,7 +1157,7 @@ const styles = StyleSheet.create({
         color: colors.white,
         fontFamily: 'Monaco',
         fontSize: 20,
-        textShadowColor: '#2d1b69',
+        textShadowColor: colors.purpleText,
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
     },
@@ -1205,7 +1205,7 @@ const styles = StyleSheet.create({
         marginRight: 5,
     },
     ingredientCount: {
-        color: '#2d1b69',
+        color: colors.purpleText,
         fontFamily: '04b03',
         fontSize: 13,
         // 04b03's glyph baseline reads a hair low against the 15dp icon
@@ -1225,7 +1225,7 @@ const styles = StyleSheet.create({
         color: colors.white,
         fontFamily: 'Monaco',
         fontSize: 23,
-        textShadowColor: '#2d1b69',
+        textShadowColor: colors.purpleText,
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
     },
@@ -1317,13 +1317,13 @@ const modalStyles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#1a1033',
+        borderColor: colors.purpleBg,
     },
     potCountBadgeFull: {
         backgroundColor: '#e87a7a',
     },
     potCountText: {
-        color: '#1a1033',
+        color: colors.purpleBg,
         fontFamily: 'Monaco',
         fontSize: 20,
     },
@@ -1404,7 +1404,7 @@ const modalStyles = StyleSheet.create({
         zIndex: 1,
     },
     minBadgeText: {
-        color: '#1a1033',
+        color: colors.purpleBg,
         fontFamily: 'Monaco',
         fontSize: 9,
     },
@@ -1474,7 +1474,7 @@ const modalStyles = StyleSheet.create({
     },
     cookDisabled: { opacity: 0.4 },
     cookText: {
-        color: '#1a1033',
+        color: colors.purpleBg,
         fontFamily: 'Monaco',
         fontSize: 18,
     },

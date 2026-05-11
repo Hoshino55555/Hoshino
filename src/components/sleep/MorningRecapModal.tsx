@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     windowHeaderText: {
         fontFamily: 'PressStart2P',
         fontSize: 11,
-        color: '#2d1b69',
+        color: colors.purpleText,
         letterSpacing: 1,
     },
     windowBody: {
@@ -335,13 +335,13 @@ const styles = StyleSheet.create({
     tallyLabel: {
         fontFamily: 'PressStart2P',
         fontSize: 11,
-        color: '#2d1b69',
+        color: colors.purpleText,
         letterSpacing: 0.5,
     },
     tallyValue: {
         fontFamily: 'PressStart2P',
         fontSize: 13,
-        color: '#2d1b69',
+        color: colors.purpleText,
         letterSpacing: 0.5,
     },
     itemsBody: {
@@ -361,13 +361,13 @@ const styles = StyleSheet.create({
         flex: 1,
         fontFamily: 'PressStart2P',
         fontSize: 10,
-        color: '#2d1b69',
+        color: colors.purpleText,
         textTransform: 'capitalize',
     },
     itemCount: {
         fontFamily: 'PressStart2P',
         fontSize: 12,
-        color: '#2d1b69',
+        color: colors.purpleText,
     },
     dismissButton: {
         marginTop: 8,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     dismissText: {
         fontFamily: 'PressStart2P',
         fontSize: 12,
-        color: '#2d1b69',
+        color: colors.purpleText,
         letterSpacing: 1,
     },
 });

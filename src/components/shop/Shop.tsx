@@ -48,6 +48,7 @@ import { useGameStateContext } from '../../contexts/GameStateContext';
 import type { BoosterSkuId } from '../../services/GameStateService';
 import BoxRevealModal, { type BoxReveal } from './BoxRevealModal';
 import { newRequestId } from '../../services/requestId';
+import { colors } from '../../styles/tokens';
 
 // Per-line dispatch result. Drives the post-checkout reveal queue:
 // boxes open via BoxRevealModal (TCG pack-style), spin replays the reel
@@ -1302,7 +1303,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 const styles = StyleSheet.create({
     root: {
         flex: 1,
-        backgroundColor: '#1a1033',
+        backgroundColor: colors.purpleBg,
     },
     spinBackdrop: {
         flex: 1,
@@ -1796,7 +1797,7 @@ const styles = StyleSheet.create({
     iapModalCard: {
         width: '100%',
         maxWidth: 380,
-        backgroundColor: '#1a1033',
+        backgroundColor: colors.purpleBg,
         borderColor: '#9C27B0',
         borderWidth: 2,
         borderRadius: 12,
@@ -1845,7 +1846,7 @@ const styles = StyleSheet.create({
     },
     iapRailBtnActive: {
         borderColor: '#FFD54F',
-        backgroundColor: '#2a1a4a',
+        backgroundColor: colors.purpleBg,
     },
     iapRailText: { color: '#bba8d6', fontFamily: 'Monaco' },
     iapRailTextActive: { color: '#FFD54F' },

@@ -193,7 +193,7 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
     return (
         <PageArtShell
             background={Backgrounds.inventory}
-            backgroundColor="#1a1033"
+            backgroundColor={colors.purpleBg}
             testID="inventory-screen"
             overlays={shellOverlays}
         >

@@ -108,7 +108,7 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
     return (
         <PageArtShell
             background={Backgrounds.settings}
-            backgroundColor="#1a1033"
+            backgroundColor={colors.purpleBg}
             testID="settings-screen"
         >
                 <View

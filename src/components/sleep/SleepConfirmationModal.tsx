@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     },
     titleText: {
         fontSize: 12,
-        color: '#2d1b69',
+        color: colors.purpleText,
         fontFamily: 'PressStart2P',
         letterSpacing: 1,
     },
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     },
     messageText: {
         fontSize: 11,
-        color: '#2d1b69',
+        color: colors.purpleText,
         textAlign: 'center',
         fontFamily: 'PressStart2P',
         marginBottom: 16,
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
     },
     arrowText: {
         fontSize: 18,
-        color: '#2d1b69',
+        color: colors.purpleText,
         lineHeight: 18,
     },
     digitBox: {
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
     digitText: {
         fontSize: DIGIT_FONT_SIZE,
         lineHeight: DIGIT_ROW_HEIGHT,
-        color: '#2d1b69',
+        color: colors.purpleText,
         fontFamily: 'PressStart2P',
         textAlign: 'center',
         textAlignVertical: 'center',
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     },
     colon: {
         fontSize: DIGIT_FONT_SIZE,
-        color: '#2d1b69',
+        color: colors.purpleText,
         fontFamily: 'PressStart2P',
         marginHorizontal: 8,
         includeFontPadding: false,
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
         letterSpacing: 1,
     },
     ampmTextActive: {
-        color: '#2d1b69',
+        color: colors.purpleText,
     },
     pickerOffset: {
         fontSize: 9,
@@ -587,7 +587,7 @@ const styles = StyleSheet.create({
     yesButton: { backgroundColor: '#8ee2d9' },
     buttonText: {
         fontSize: 11,
-        color: '#2d1b69',
+        color: colors.purpleText,
         fontFamily: 'PressStart2P',
         letterSpacing: 1,
     },

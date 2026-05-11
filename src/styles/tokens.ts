@@ -14,6 +14,8 @@ export const colors = {
     white: '#FFFFFF',        // 24× combined — normalized from #FFFFFF/#ffffff drift
     black: '#000000',        // 14× — text shadow, hard borders
     gold: '#E8B84A',         // 9×, 3 files — prices, rewards, badges
+    purpleBg: '#1a1033',     // 9×, 4 files — dark purple modal background tint
+    purpleText: '#2d1b69',   // 17×, 3 files — purple body text on light bg
 } as const;
 
 // Type scale. Step values picked from the histogram of existing
