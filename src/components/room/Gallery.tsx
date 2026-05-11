@@ -3,7 +3,7 @@ import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useChromeConfig } from '../../contexts/ChromeContext';
-import FooterBackBar from '../FooterBackBar';
+import FooterBackBar from '../chrome/FooterBackBar';
 import Room from './Room';
 import RoomEditor from './RoomEditor';
 import { type RoomLayout, STARTER_ROOM_LAYOUT } from '../../services/RoomLayout';

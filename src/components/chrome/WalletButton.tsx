@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ImageBackground, StyleSheet } from 'react-native';
-import { Frames } from '../assets';
+import { Frames } from '../../assets';
 
 interface WalletButtonProps {
     connected: boolean;

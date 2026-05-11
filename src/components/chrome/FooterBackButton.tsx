@@ -6,7 +6,7 @@ import {
     type StyleProp,
     type ViewStyle,
 } from 'react-native';
-import { Frames } from '../assets';
+import { Frames } from '../../assets';
 
 const FOOTER_BACK_BUTTON_OFFSET_Y = 12;
 

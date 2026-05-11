@@ -10,7 +10,7 @@ import {
     Modal
 } from 'react-native';
 
-import InnerScreen from '../InnerScreen';
+import InnerScreen from '../chrome/InnerScreen';
 
 import { MOONOKOS } from '../../data/moonokos';
 import { Backgrounds, getCharacterAnim } from '../../assets';

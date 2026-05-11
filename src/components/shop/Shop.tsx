@@ -13,8 +13,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Modal } from 'react-native';
-import FooterBackBar from '../FooterBackBar';
-import PageArtShell from '../PageArtShell';
+import FooterBackBar from '../chrome/FooterBackBar';
+import PageArtShell from '../chrome/PageArtShell';
 import { MarketplaceItem, ItemRarity } from '../../services/MarketplaceService';
 import StarFragmentService, {
     type DailySpinReward,

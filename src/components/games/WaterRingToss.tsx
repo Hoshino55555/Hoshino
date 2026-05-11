@@ -18,7 +18,7 @@ import Svg, {
     Rect,
     Stop,
 } from 'react-native-svg';
-import InnerScreen from '../InnerScreen';
+import InnerScreen from '../chrome/InnerScreen';
 
 interface WaterRingTossProps {
     onBack: () => void;

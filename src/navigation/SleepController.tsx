@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import MorningRecapModal, {
     MorningRecapDeltas,
-} from '../components/MorningRecapModal';
+} from '../components/sleep/MorningRecapModal';
 import SleepConfirmationModal from '../components/sleep/SleepConfirmationModal';
 import SleepScreen from '../components/sleep/SleepScreen';
 import { useGameStateContext } from '../contexts/GameStateContext';

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, Text, Image, ImageBackground, TouchableOpacity, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import type { ImageStyle } from 'react-native';
-import InnerScreen from '../InnerScreen';
+import InnerScreen from '../chrome/InnerScreen';
 import SettingsService, { MenuButton } from '../../services/SettingsService';
 import { useGameStateContext } from '../../contexts/GameStateContext';
 import ForagePopOut, { computeForageStaggerMs, FORAGE_FLIGHT_MS } from './ForagePopOut';

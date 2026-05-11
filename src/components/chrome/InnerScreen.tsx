@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Easing } from 'react-native';
-import { useChromeConfig } from '../contexts/ChromeContext';
-import { Backgrounds } from '../assets';
+import { useChromeConfig } from '../../contexts/ChromeContext';
+import { Backgrounds } from '../../assets';
 
 interface InnerScreenProps {
     children: React.ReactNode;

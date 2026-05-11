@@ -7,8 +7,8 @@ import {
     Text,
     useWindowDimensions,
 } from 'react-native';
-import { useChrome } from '../contexts/ChromeContext';
-import { Chrome } from '../assets';
+import { useChrome } from '../../contexts/ChromeContext';
+import { Chrome } from '../../assets';
 
 export const DeviceCasing: React.FC = () => {
     const { active, pressFrame } = useChrome();

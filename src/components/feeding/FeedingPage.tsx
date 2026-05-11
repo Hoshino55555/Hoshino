@@ -14,8 +14,8 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FooterBackBar from '../FooterBackBar';
-import PageArtShell from '../PageArtShell';
+import FooterBackBar from '../chrome/FooterBackBar';
+import PageArtShell from '../chrome/PageArtShell';
 import { useGameStateContext } from '../../contexts/GameStateContext';
 import {
     RECIPES,

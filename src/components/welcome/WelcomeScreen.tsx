@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
-import Frame from '../Frame';
+import Frame from '../chrome/Frame';
 import { useWallet } from '../../contexts/WalletContext';
-import InnerScreen from '../InnerScreen';
+import InnerScreen from '../chrome/InnerScreen';
 import { Logos, Misc } from '../../assets';
 
 interface Props {

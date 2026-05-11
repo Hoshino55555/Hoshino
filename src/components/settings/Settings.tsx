@@ -13,8 +13,8 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FooterBackBar from '../FooterBackBar';
-import PageArtShell from '../PageArtShell';
+import FooterBackBar from '../chrome/FooterBackBar';
+import PageArtShell from '../chrome/PageArtShell';
 import SettingsService, { MenuButton, type SoundLevel } from '../../services/SettingsService';
 import MusicService from '../../services/MusicService';
 import { Menu, Backgrounds } from '../../assets';

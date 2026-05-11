@@ -11,8 +11,8 @@ import {
     ScrollView,
     useWindowDimensions,
 } from 'react-native';
-import { getCharacterSleep, Backgrounds, getIngredientArt } from '../assets';
-import type { ForagedItem } from '../services/GameStateService';
+import { getCharacterSleep, Backgrounds, getIngredientArt } from '../../assets';
+import type { ForagedItem } from '../../services/GameStateService';
 
 export interface MorningRecapDeltas {
     energyGained: number;

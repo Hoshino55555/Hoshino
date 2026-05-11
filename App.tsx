@@ -15,8 +15,8 @@ import {
 // need to first-paint is ready.
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-import Notification from './src/components/Notification';
-import WalletButton from './src/components/WalletButton';
+import Notification from './src/components/chrome/Notification';
+import WalletButton from './src/components/chrome/WalletButton';
 
 // React Native compatible wallet integration
 import { useWallet, WalletProvider } from './src/contexts/WalletContext';
@@ -24,8 +24,8 @@ import { ChromeProvider } from './src/contexts/ChromeContext';
 import { HoshinoPrivyProvider } from './src/contexts/PrivyContext';
 import { usePrivy } from '@privy-io/expo';
 import LoginScreen from './src/components/welcome/LoginScreen';
-import { DeviceCasing, DeviceButtons } from './src/components/DeviceChrome';
-import ZoomOutOverlay from './src/components/ZoomOutOverlay';
+import { DeviceCasing, DeviceButtons } from './src/components/chrome/DeviceChrome';
+import ZoomOutOverlay from './src/components/transition/ZoomOutOverlay';
 import { Logos } from './src/assets';
 import { Connection } from '@solana/web3.js';
 

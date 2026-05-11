@@ -20,8 +20,8 @@ import {
     ingredientLabel,
     type IngredientTier,
 } from '../../services/RecipeCatalog';
-import FooterBackBar from '../FooterBackBar';
-import PageArtShell from '../PageArtShell';
+import FooterBackBar from '../chrome/FooterBackBar';
+import PageArtShell from '../chrome/PageArtShell';
 import type { BoosterSkuId } from '../../services/GameStateService';
 import { SHOP_CATALOG } from '../../data/shopCatalog';
 import type { ActiveCamp } from '../../services/StarFragmentService';
