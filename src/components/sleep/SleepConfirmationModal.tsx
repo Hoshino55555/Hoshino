@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 import {
     View,
     Text,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     titleText: {
         fontSize: 12,
         color: colors.purpleText,
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         letterSpacing: 1,
     },
     contentArea: {
@@ -453,13 +453,13 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: colors.purpleText,
         textAlign: 'center',
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         marginBottom: 16,
     },
     pickerLabel: {
         fontSize: 8,
-        color: '#5a4a8a',
-        fontFamily: 'PressStart2P',
+        color: colors.purpleMid,
+        fontFamily: fonts.pixel,
         letterSpacing: 1,
         marginBottom: 10,
     },
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
         fontSize: DIGIT_FONT_SIZE,
         lineHeight: DIGIT_ROW_HEIGHT,
         color: colors.purpleText,
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         textAlign: 'center',
         textAlignVertical: 'center',
         includeFontPadding: false,
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
     colon: {
         fontSize: DIGIT_FONT_SIZE,
         color: colors.purpleText,
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         marginHorizontal: 8,
         includeFontPadding: false,
     },
@@ -552,8 +552,8 @@ const styles = StyleSheet.create({
     },
     ampmText: {
         fontSize: 10,
-        color: '#5a4a8a',
-        fontFamily: 'PressStart2P',
+        color: colors.purpleMid,
+        fontFamily: fonts.pixel,
         letterSpacing: 1,
     },
     ampmTextActive: {
@@ -561,8 +561,8 @@ const styles = StyleSheet.create({
     },
     pickerOffset: {
         fontSize: 9,
-        color: '#5a4a8a',
-        fontFamily: 'PressStart2P',
+        color: colors.purpleMid,
+        fontFamily: fonts.pixel,
         marginBottom: 14,
     },
     buttonContainer: {
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
     buttonText: {
         fontSize: 11,
         color: colors.purpleText,
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         letterSpacing: 1,
     },
     smokeBtn: {
@@ -596,14 +596,14 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         paddingHorizontal: 12,
         borderWidth: 1,
-        borderColor: '#5a4a8a',
+        borderColor: colors.purpleMid,
         borderRadius: 4,
         backgroundColor: 'transparent',
     },
     smokeText: {
         fontSize: 7,
-        color: '#5a4a8a',
-        fontFamily: 'PressStart2P',
+        color: colors.purpleMid,
+        fontFamily: fonts.pixel,
         letterSpacing: 1,
     },
 });

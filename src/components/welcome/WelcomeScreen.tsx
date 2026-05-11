@@ -4,7 +4,7 @@ import Frame from '../chrome/Frame';
 import { useWallet } from '../../contexts/WalletContext';
 import InnerScreen from '../chrome/InnerScreen';
 import { Logos, Misc } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 
 interface Props {
     onContinue: (playerName?: string) => void;
@@ -774,18 +774,17 @@ const styles = StyleSheet.create({
         fontSize: 24,
         color: colors.forestDark, // Dark green text
         marginBottom: 5,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     storyTextLarge: {
         fontSize: 24,
         color: colors.forestDark, // Dark green text
         lineHeight: 18,
-        fontFamily: 'Monaco',
-        letterSpacing: -1, // Reduce space between characters
+        fontFamily: fonts.body,
     },
     boldText: {
         fontSize: 33,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     storyTextContainer: {
         width: '100%',
@@ -805,7 +804,7 @@ const styles = StyleSheet.create({
         color: colors.forestMid, // Medium green for subtle text
         marginTop: 5,
         fontStyle: 'italic',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     starCharacterSection: {
         flex: 1,
@@ -814,8 +813,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     starCharacterImage: {
-        width: '58%',
-        aspectRatio: 1,
+        width: 200,
+        height: 200,
         resizeMode: 'contain',
         marginLeft: 0,
     },
@@ -844,11 +843,11 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     namePrompt: {
-        fontSize: 14,
-        marginBottom: 2,
+        fontSize: 24,
+        marginBottom: 6,
         textAlign: 'center',
         color: colors.forestDark, // Same dark green as the input text
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     nameDisplayContainer: {
         flexDirection: 'row',
@@ -859,15 +858,15 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     nameDisplay: {
-        fontSize: 18,
+        fontSize: 30,
         textAlign: 'center',
         color: colors.forestDark, // Dark green text to match border
         letterSpacing: 2,
         width: '100%',
-        lineHeight: 24,
+        lineHeight: 36,
         includeFontPadding: false,
         textAlignVertical: 'center',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         flexWrap: 'nowrap',
     },
     hiddenInput: {
@@ -891,11 +890,11 @@ const styles = StyleSheet.create({
     welcomePlayer: {
         fontSize: 24,
         marginBottom: 10,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     transitionText: {
         fontSize: 16,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     nameInputOuterBox: {
         width: '80%',
@@ -933,12 +932,12 @@ const styles = StyleSheet.create({
         fontSize: 24,
         color: colors.forestMid, // Medium green for choice text
         marginHorizontal: 30, // Increased horizontal spacing instead of gap
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         opacity: 0.5, // Make non-underlined options transparent
     },
     selectedChoice: {
         color: colors.forestDark, // Dark green for selected choice
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         opacity: 1, // Make selected option fully opaque
     },
     continueArrow: {

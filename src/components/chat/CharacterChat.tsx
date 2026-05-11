@@ -18,7 +18,21 @@ import * as Clipboard from 'expo-clipboard';
 import chatService from '../../services/ChatService';
 import { getCharacterAnim } from '../../assets';
 import { useGameStateContext } from '../../contexts/GameStateContext';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
+
+// File-local palette — these are chat-screen specifics (capacity meter pinks,
+// name pills, cream input panel) that don't recur elsewhere. Kept inline so
+// future tweaks land in one place without polluting the global token set.
+const PALETTE = {
+    capacityFill: '#e093c0',
+    capacityEdge: '#8a3a6a',
+    userPill: '#fff48f',
+    characterPill: '#b0d8ff',
+    inputBg: '#f7ebcb',
+    inputBorder: '#fff8df',
+    emptyHint: '#5a4a2a',
+    inputPlaceholder: '#9a8b6a',
+} as const;
 
 interface Character {
     id: string;
@@ -285,7 +299,7 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
     const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#1a1a1a' }} testID="chat-screen">
+        <View style={{ flex: 1, backgroundColor: colors.inkDark }} testID="chat-screen">
             <KeyboardAvoidingView
                 style={styles.flex}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -478,7 +492,7 @@ const CharacterChat = ({ character, onExit, playerName, onNotification }: Props)
                                 value={inputText}
                                 onChangeText={setInputText}
                                 placeholder={`Message ${character.name}...`}
-                                placeholderTextColor="#9a8b6a"
+                                placeholderTextColor={PALETTE.inputPlaceholder}
                                 multiline
                                 maxLength={500}
                             />
@@ -504,12 +518,12 @@ const styles = StyleSheet.create({
     flex: { flex: 1 },
     paperBg: {
         flex: 1,
-        backgroundColor: '#d4d4d4',
+        backgroundColor: colors.inkLight,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1a1a1a',
+        backgroundColor: colors.inkDark,
         paddingHorizontal: 8,
         paddingBottom: 6,
     },
@@ -519,15 +533,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerSideText: {
-        color: '#f5d65f',
-        fontFamily: 'Monaco',
+        color: colors.goldWarm,
+        fontFamily: fonts.body,
         fontSize: 30,
     },
     headerTitle: {
         flex: 1,
         textAlign: 'center',
-        color: '#f5d65f',
-        fontFamily: 'Monaco',
+        color: colors.goldWarm,
+        fontFamily: fonts.body,
         fontSize: 21,
         letterSpacing: 0.5,
     },
@@ -541,26 +555,26 @@ const styles = StyleSheet.create({
         bottom: 6,
         width: 36,
         height: '38%',
-        backgroundColor: '#2a2a2a',
+        backgroundColor: colors.inkMid,
         alignItems: 'stretch',
         paddingTop: 14,
         paddingBottom: 4,
         paddingHorizontal: 2,
         borderWidth: 2,
-        borderColor: '#1a1a1a',
+        borderColor: colors.inkDark,
         borderRadius: 12,
         zIndex: 10,
     },
     capacityPct: {
         color: colors.white,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 20,
         marginBottom: 2,
         textAlign: 'center',
     },
     capacityLabel: {
-        color: '#f5d65f',
-        fontFamily: 'Monaco',
+        color: colors.goldWarm,
+        fontFamily: fonts.body,
         fontSize: 11,
         marginBottom: 1,
         textAlign: 'center',
@@ -583,13 +597,13 @@ const styles = StyleSheet.create({
         borderRadius: 2,
     },
     capacitySegmentOn: {
-        backgroundColor: '#e093c0',
+        backgroundColor: PALETTE.capacityFill,
     },
     capacitySegmentEdge: {
-        backgroundColor: '#8a3a6a',
+        backgroundColor: PALETTE.capacityEdge,
     },
     capacitySegmentOff: {
-        backgroundColor: '#9a9a9a',
+        backgroundColor: colors.inkText,
     },
     messagesContainer: {
         flex: 1,
@@ -600,8 +614,8 @@ const styles = StyleSheet.create({
     },
     emptyHint: {
         textAlign: 'center',
-        color: '#5a4a2a',
-        fontFamily: 'Monaco',
+        color: PALETTE.emptyHint,
+        fontFamily: fonts.body,
         fontSize: 24,
         marginTop: 32,
         paddingHorizontal: 24,
@@ -613,7 +627,7 @@ const styles = StyleSheet.create({
         marginBottom: 6,
         backgroundColor: colors.white,
         borderWidth: 2,
-        borderColor: '#1a1a1a',
+        borderColor: colors.inkDark,
         borderRadius: 6,
         padding: 3,
         minHeight: 40,
@@ -626,7 +640,7 @@ const styles = StyleSheet.create({
         height: 30,
         marginRight: 4,
         borderWidth: 2,
-        borderColor: '#1a1a1a',
+        borderColor: colors.inkDark,
         borderRadius: 5,
         alignItems: 'center',
         justifyContent: 'center',
@@ -638,14 +652,14 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
     },
     userPill: {
-        backgroundColor: '#fff48f',
+        backgroundColor: PALETTE.userPill,
     },
     characterPill: {
-        backgroundColor: '#b0d8ff',
+        backgroundColor: PALETTE.characterPill,
     },
     namePillText: {
-        color: '#1a1a1a',
-        fontFamily: 'Monaco',
+        color: colors.inkDark,
+        fontFamily: fonts.body,
         fontSize: 24,
         letterSpacing: 0.5,
     },
@@ -656,8 +670,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     rowText: {
-        color: '#1a1a1a',
-        fontFamily: 'Monaco',
+        color: colors.inkDark,
+        fontFamily: fonts.body,
         fontSize: 24,
         lineHeight: 21,
     },
@@ -665,21 +679,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingTop: 8,
         borderTopWidth: 2,
-        borderTopColor: '#2a2a2a',
-        backgroundColor: '#f7ebcb',
+        borderTopColor: colors.inkMid,
+        backgroundColor: PALETTE.inputBg,
     },
     inputBorder: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        backgroundColor: '#fff8df',
+        backgroundColor: PALETTE.inputBorder,
         borderWidth: 2,
-        borderColor: '#2a2a2a',
+        borderColor: colors.inkMid,
         padding: 4,
     },
     textInput: {
         flex: 1,
-        color: '#2a2a2a',
-        fontFamily: 'Monaco',
+        color: colors.inkMid,
+        fontFamily: fonts.body,
         fontSize: 24,
         paddingHorizontal: 8,
         paddingVertical: 6,
@@ -690,9 +704,9 @@ const styles = StyleSheet.create({
         marginLeft: 6,
         paddingHorizontal: 12,
         paddingVertical: 10,
-        backgroundColor: '#1a1a1a',
+        backgroundColor: colors.inkDark,
         borderWidth: 2,
-        borderColor: '#2a2a2a',
+        borderColor: colors.inkMid,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -700,8 +714,8 @@ const styles = StyleSheet.create({
         opacity: 0.4,
     },
     sendButtonText: {
-        color: '#f5d65f',
-        fontFamily: 'Monaco',
+        color: colors.goldWarm,
+        fontFamily: fonts.body,
         fontSize: 24,
     },
 });

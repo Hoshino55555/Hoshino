@@ -10,6 +10,7 @@ import {
     TextWidget,
 } from 'react-native-android-widget';
 import { FONT_PIXEL, FORAGE_BAG } from './assets';
+import { colors } from '../styles/tokens';
 
 interface Props {
     count: number;
@@ -49,10 +50,10 @@ const ForageBadge: React.FC<Props> = ({ count, compact = false, characterId }) =
                         width: countSize,
                         height: countSize,
                         marginLeft: bagSize - countSize,
-                        backgroundColor: '#FFD700',
+                        backgroundColor: colors.goldBright,
                         borderRadius: countSize / 2,
                         borderWidth: 1,
-                        borderColor: '#3A225E',
+                        borderColor: colors.purpleDark,
                         alignItems: 'center',
                         justifyContent: 'center',
                     }}
@@ -61,7 +62,7 @@ const ForageBadge: React.FC<Props> = ({ count, compact = false, characterId }) =
                         text={label}
                         style={{
                             fontSize: compact ? 7 : 9,
-                            color: '#3A225E',
+                            color: colors.purpleDark,
                             fontFamily: FONT_PIXEL,
                         }}
                     />

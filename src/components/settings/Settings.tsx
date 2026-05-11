@@ -18,7 +18,8 @@ import PageArtShell from '../chrome/PageArtShell';
 import SettingsService, { MenuButton, type SoundLevel } from '../../services/SettingsService';
 import MusicService from '../../services/MusicService';
 import { Menu, Backgrounds } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
+import { scrollClipperFill } from '../../styles/primitives';
 
 interface Props {
     onBack: () => void;
@@ -113,10 +114,10 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
         >
                 <View
                     style={[
-                        styles.scrollClipper,
+                        scrollClipperFill,
                         {
-                            marginTop: bannerReserve + insets.top,
-                            marginBottom: bottomBarReserve,
+                            top: bannerReserve + insets.top,
+                            bottom: bottomBarReserve,
                         },
                     ]}
                 >
@@ -286,8 +287,8 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
                         <Switch
                             value={notificationsEnabled}
                             onValueChange={updateNotificationSetting}
-                            trackColor={{ false: '#767577', true: '#81b0ff' }}
-                            thumbColor={notificationsEnabled ? '#f5dd4b' : '#f4f3f4'}
+                            trackColor={{ false: colors.inkText, true: '#81b0ff' }}
+                            thumbColor={notificationsEnabled ? colors.goldWarm : '#f4f3f4'}
                         />
                     </View>
                 </View>
@@ -322,10 +323,6 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
 };
 
 const styles = StyleSheet.create({
-    scrollClipper: {
-        flex: 1,
-        overflow: 'hidden',
-    },
     content: {
         flex: 1,
         paddingHorizontal: 12,
@@ -337,13 +334,13 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 33,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         textAlign: 'center',
         marginBottom: 14,
     },
     section: {
         marginBottom: 16,
-        backgroundColor: '#f0fff0',
+        backgroundColor: colors.mintPale,
         borderRadius: 6,
         padding: 12,
         borderWidth: 2,
@@ -352,7 +349,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 24,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         marginBottom: 6,
     },
     collapseHeader: {
@@ -364,7 +361,7 @@ const styles = StyleSheet.create({
     collapseChevron: {
         fontSize: 33,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         marginBottom: 6,
         paddingHorizontal: 6,
     },
@@ -399,13 +396,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     volumeTooltip: {
-        backgroundColor: '#1a1a1a',
+        backgroundColor: colors.inkDark,
         paddingHorizontal: 6,
         paddingVertical: 2,
     },
     volumeTooltipText: {
         color: colors.white,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 14,
         lineHeight: 14,
     },
@@ -417,7 +414,7 @@ const styles = StyleSheet.create({
         borderTopWidth: 4,
         borderLeftColor: 'transparent',
         borderRightColor: 'transparent',
-        borderTopColor: '#1a1a1a',
+        borderTopColor: colors.inkDark,
         marginTop: -1,
     },
     volumeDot: {
@@ -426,7 +423,7 @@ const styles = StyleSheet.create({
         borderRadius: 7,
         borderWidth: 2,
         borderColor: colors.forestDark,
-        backgroundColor: '#f0fff0',
+        backgroundColor: colors.mintPale,
     },
     volumeDotActive: {
         backgroundColor: '#FF8A2B',
@@ -441,7 +438,7 @@ const styles = StyleSheet.create({
     sectionDescription: {
         fontSize: 20,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         marginBottom: 12,
         opacity: 0.75,
         lineHeight: 14,
@@ -452,7 +449,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderBottomWidth: 1,
         borderBottomColor: colors.forestDark,
-        backgroundColor: '#f0fff0',
+        backgroundColor: colors.mintPale,
     },
     buttonInfo: {
         flex: 1,
@@ -461,7 +458,7 @@ const styles = StyleSheet.create({
     buttonName: {
         fontSize: 24,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     dragHandle: {
         width: 24,
@@ -476,7 +473,7 @@ const styles = StyleSheet.create({
     dragHandleText: {
         fontSize: 24,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     buttonIcon: {
         width: 20,
@@ -485,12 +482,12 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     draggedItem: {
-        shadowColor: '#000',
+        shadowColor: colors.black,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 8,
-        backgroundColor: '#f0fff0',
+        backgroundColor: colors.mintPale,
     },
     resetButton: {
         backgroundColor: colors.forestDark,
@@ -502,7 +499,7 @@ const styles = StyleSheet.create({
     resetButtonText: {
         color: colors.mintPale,
         fontSize: 21,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     settingRow: {
         flexDirection: 'row',
@@ -513,7 +510,7 @@ const styles = StyleSheet.create({
     settingLabel: {
         fontSize: 24,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     themeButtons: {
         flexDirection: 'row',
@@ -534,7 +531,7 @@ const styles = StyleSheet.create({
     themeButtonText: {
         fontSize: 21,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     activeThemeButtonText: {
         color: colors.mintPale,
@@ -542,7 +539,7 @@ const styles = StyleSheet.create({
     miniMenuPreview: {
         marginBottom: 12,
         padding: 6,
-        backgroundColor: '#f0fff0',
+        backgroundColor: colors.mintPale,
         borderRadius: 4,
         borderWidth: 1,
         borderColor: colors.forestDark,

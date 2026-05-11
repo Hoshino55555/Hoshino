@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Easing } from 'react-native';
 import { useChromeConfig } from '../../contexts/ChromeContext';
 import { Backgrounds } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 
 interface InnerScreenProps {
     children: React.ReactNode;
@@ -214,12 +214,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    mainBackground: {
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        resizeMode: 'contain',
-    },
     topStatus: {
         position: 'absolute',
         top: 0,
@@ -245,16 +239,15 @@ const styles = StyleSheet.create({
     shadowContainerLarge: {
         position: 'absolute',
         top: '16%',
+        left: '6%',
         width: '88%',
         height: '68%',
         overflow: 'visible',
-        marginRight: '1%',
-        marginBottom: '1.5%',
     },
     innerScreen: {
         width: '100%',
         height: '100%',
-        borderRadius: 16,
+        borderRadius: 20,
         overflow: 'hidden',
         position: 'relative',
         borderWidth: 0,
@@ -266,46 +259,6 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 0 },
         elevation: 0,
     },
-    vignetteTop: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 32,
-        zIndex: 50,
-    },
-    vignetteLeft: {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: 0,
-        width: 22,
-        zIndex: 50,
-    },
-    vignetteRight: {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        right: 0,
-        width: 18,
-        zIndex: 50,
-    },
-    vignetteBottom: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 22,
-        zIndex: 50,
-    },
-    insetHighlightBottom: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 4,
-        zIndex: 50,
-    },
     innerScreenLarge: {
         shadowColor: 'transparent',
         shadowOpacity: 0,
@@ -313,12 +266,9 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 0 },
         elevation: 0,
     },
-    darkenedBackground: {
-        opacity: 0.3,
-    },
     overlayInnerScreen: {
         zIndex: 1000,
-        elevation: 10,
+        elevation: 1000,
     },
     innerScreenWithKeyboard: {
         height: '72%',
@@ -333,78 +283,6 @@ const styles = StyleSheet.create({
         height: '100%',
         zIndex: 1,
     },
-
-
-    // Dark halos in the gap between screen and casing — simulate
-    // ambient shadow pooling in the cavity depth, not an outward glow.
-    gradientShadowOuter: {
-        position: 'absolute',
-        top: -4,
-        left: -4,
-        right: -4,
-        bottom: -4,
-        borderRadius: 16,
-        backgroundColor: 'rgba(0, 0, 0, 0.28)',
-        zIndex: 1,
-        pointerEvents: 'none',
-    },
-    gradientShadowInner: {
-        position: 'absolute',
-        top: -2,
-        left: -2,
-        right: -2,
-        bottom: -2,
-        borderRadius: 22,
-        backgroundColor: 'rgba(0, 0, 0, 0.18)',
-        zIndex: 2,
-        pointerEvents: 'none',
-    },
-    gradientShadowCorner1: {
-        position: 'absolute',
-        top: -3,
-        left: -3,
-        width: 6,
-        height: 6,
-        borderRadius: 4,
-        backgroundColor: 'rgba(255, 140, 0, 0.12)', // Soft orange corner
-        zIndex: 3,
-        pointerEvents: 'none', // Don't intercept touch events
-    },
-    gradientShadowCorner2: {
-        position: 'absolute',
-        top: -3,
-        right: -3,
-        width: 6,
-        height: 6,
-        borderRadius: 4,
-        backgroundColor: 'rgba(255, 140, 0, 0.12)', // Soft orange corner
-        zIndex: 3,
-        pointerEvents: 'none', // Don't intercept touch events
-    },
-    gradientShadowCorner3: {
-        position: 'absolute',
-        bottom: -3,
-        left: -3,
-        width: 6,
-        height: 6,
-        borderRadius: 4,
-        backgroundColor: 'rgba(255, 140, 0, 0.12)', // Soft orange corner
-        zIndex: 3,
-        pointerEvents: 'none', // Don't intercept touch events
-    },
-    gradientShadowCorner4: {
-        position: 'absolute',
-        bottom: -3,
-        right: -3,
-        width: 6,
-        height: 6,
-        borderRadius: 4,
-        backgroundColor: 'rgba(255, 140, 0, 0.12)', // Soft orange corner
-        zIndex: 3,
-        pointerEvents: 'none', // Don't intercept touch events
-    },
-
-
 
 
 
@@ -461,7 +339,7 @@ const styles = StyleSheet.create({
     closeButtonText: {
         fontSize: 18,
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         transform: [{ translateY: -1 }],
     },
     transitionOverlay: {

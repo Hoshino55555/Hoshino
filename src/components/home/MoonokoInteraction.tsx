@@ -8,7 +8,7 @@ import ForagePopOut, { computeForageStaggerMs, FORAGE_FLIGHT_MS } from './Forage
 import type { ForagedItem } from '../../services/GameStateService';
 import type { PendingWidgetAction } from '../../types/AppTypes';
 import { Backgrounds, Menu, Stars, Frames, Forage, getCharacterAnim } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 
 const WIDGET_ACTION_TTL_MS = 60_000;
 
@@ -794,7 +794,7 @@ const styles = StyleSheet.create({
     },
     starRating: {
         fontSize: 16,
-        color: '#ffd700',
+        color: colors.goldBright,
     },
     starContainer: {
         flexDirection: 'row',
@@ -843,11 +843,11 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     exclamationText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 36,
         color: '#ff2a2a',
         textAlign: 'center',
-        textShadowColor: '#000',
+        textShadowColor: colors.black,
         textShadowOffset: { width: 2, height: 2 },
         textShadowRadius: 0,
     },
@@ -899,9 +899,9 @@ const styles = StyleSheet.create({
     },
     achievementStatusSection: {
         padding: 10,
-        backgroundColor: '#fff',
+        backgroundColor: colors.white,
         borderTopWidth: 1,
-        borderTopColor: '#ccc',
+        borderTopColor: colors.inkLight,
     },
     achievementNotification: {
         flexDirection: 'row',
@@ -925,7 +925,7 @@ const styles = StyleSheet.create({
     },
     galleryOverlay: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: colors.white,
     },
     settingsOverlay: {
         position: 'absolute',

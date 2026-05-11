@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { PrivyProvider } from '@privy-io/expo';
+import { colors, fonts } from '../styles/tokens';
 
 const PRIVY_APP_ID = process.env.EXPO_PUBLIC_PRIVY_APP_ID;
 const PRIVY_CLIENT_ID = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID;
@@ -47,7 +48,7 @@ export const HoshinoPrivyProvider: React.FC<Props> = ({ children }) => {
 const styles = StyleSheet.create({
     errorContainer: {
         flex: 1,
-        backgroundColor: '#1a1033',
+        backgroundColor: colors.purpleBg,
         alignItems: 'center',
         justifyContent: 'center',
         padding: 32,
@@ -57,13 +58,13 @@ const styles = StyleSheet.create({
         fontSize: 38,
         marginBottom: 16,
         textAlign: 'center',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     errorBody: {
         color: '#e5dcf5',
         fontSize: 27,
         textAlign: 'center',
         lineHeight: 20,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
 });

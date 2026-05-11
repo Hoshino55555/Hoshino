@@ -26,7 +26,7 @@ import {
     resolveRoomAsset,
 } from '../../services/RoomLayout';
 import { Frames } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 
 interface PaletteEntry {
     asset: RoomItemAssetKey;
@@ -667,7 +667,7 @@ const styles = StyleSheet.create({
     },
     trashLabel: {
         color: '#E8B5B5',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 15,
         textAlign: 'center',
     },
@@ -735,7 +735,7 @@ const styles = StyleSheet.create({
     },
     paletteLabel: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 9,
         lineHeight: 10,
         marginTop: 2,

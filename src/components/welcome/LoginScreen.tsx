@@ -17,18 +17,78 @@ import {
     useBackpackDeeplinkWalletConnector,
     usePhantomDeeplinkWalletConnector,
 } from '@privy-io/expo/connectors';
+import bs58 from 'bs58';
+import { Buffer } from 'buffer';
 import { mobileWalletService, useWallet } from '../../contexts/WalletContext';
 import type { ExternalWalletProvider } from '../../contexts/WalletContext';
 import { Logos } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 
 const WALLET_APP_URL = 'https://hoshino.gg';
-const WALLET_REDIRECT_PATH = '/wallet-auth';
+// Phantom/Backpack deeplinks return here after connect/sign. Must be a full
+// URI with a scheme registered in AndroidManifest (`hoshino://`), not a path.
+// Privy's connector rejects a bare path as invalid → user sees an auth error.
+const WALLET_REDIRECT_PATH = 'hoshino://wallet-auth';
 const SIWS_DOMAIN = 'hoshino.gg';
 const SIWS_URI = 'https://hoshino.gg';
 const WALLET_AUTH_TIMEOUT_MS = 75000;
 const ANDROID_PACKAGE_NAME = 'com.socks.hoshino';
 type WalletLoginProvider = 'native' | ExternalWalletProvider;
+
+// Single-screen "underwater terminal" palette. Stays local because these
+// only make sense as a coordinated set for this login screen — exposing
+// names like "panel"/"slateInk" on the global token would invite cross-use.
+// Near-identical drift collapsed here (slateMid covers #13384b/#14394b,
+// panelHover covers #17384a/#18394b, iceText covers #f1fbff/#f5fdff/#f7fdff).
+const PALETTE = {
+    // Backdrop gradient (deep → shallow)
+    deep: '#09161f',
+    mid: '#112735',
+    shallow: '#21424e',
+
+    abyss: '#071019',              // shadow / darkest spinner
+
+    // Panel fills (dark blue layers)
+    panel: '#163141',              // primary button bg
+    panelDeep: '#102836',          // wallet trigger bg
+    panelHover: '#17384a',         // wallet trigger pressed (collapses #18394b drift)
+    panelActive: '#21526b',        // wallet menu selected
+
+    // Panel strokes
+    panelStroke: '#164257',
+    panelStrokeActive: '#1c556c',
+
+    // Slate text + button shadow on light surfaces
+    slateInk: '#103142',
+    slateMid: '#13384b',           // (collapses #14394b drift)
+
+    // Aqua mids (placeholders, inactive borders)
+    aquaPlaceholder: '#6f8d98',
+    aquaMid: '#648797',
+    aquaMute: '#4c7e90',
+    aquaBorder: '#6db6d2',
+    aquaBorderActive: '#75b8d3',
+    aquaBorderSoft: '#8cbfd2',
+    aquaInactive: '#9ab7c3',
+
+    // Cyan accents
+    cyanCta: '#8be2ff',
+    cyanSpinner: '#e9fbff',
+
+    // Ice text + light borders
+    iceText: '#f7fdff',            // (collapses #f1fbff/#f5fdff drift)
+    iceSubtle: '#bdd7e0',
+    iceMuted: '#dff4fb',
+    iceBorderLight: '#d2edf7',
+    iceTextHi: '#d7f6ff',
+    iceSpinner: '#dceaf0',
+
+    // Error/warning rust
+    rustBg: '#ffe0dc',
+    rustBorder: '#cf6d64',
+    rustLabel: '#9d3e36',
+    rustText: '#7b2e27',
+} as const;
 
 function normalizeAuthError(error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -38,6 +98,21 @@ function normalizeAuthError(error: unknown) {
         message.includes('invalid_native_app_id')
     ) {
         return `Privy client must allow Android package ${ANDROID_PACKAGE_NAME}.`;
+    }
+
+    // User rejection patterns from MWA / Phantom / Backpack. Cancellation
+    // isn't an error to apologise for — just acknowledge it so the user can
+    // pick another method.
+    const lower = message.toLowerCase();
+    if (
+        lower.includes('user declined') ||
+        lower.includes('user rejected') ||
+        lower.includes('user cancel') ||
+        lower.includes('cancelled') ||
+        lower.includes('canceled') ||
+        lower.includes('authorization_failed')
+    ) {
+        return 'Wallet connection cancelled.';
     }
 
     return message;
@@ -155,9 +230,17 @@ const LoginScreen: React.FC = () => {
                     return;
                 }
 
-                const signature = pendingWalletProvider === 'native'
-                    ? await mobileWalletService.signMessage(message)
-                    : (await activeConnector.signMessage(message)).signature;
+                // MWA returns the signature already base64-encoded. Phantom
+                // and Backpack deeplinks return base58 per their protocol —
+                // Privy's SIWS endpoint expects base64, so re-encode here or
+                // the server replies "Invalid SIWS message and/or nonce".
+                let signature: string;
+                if (pendingWalletProvider === 'native') {
+                    signature = await mobileWalletService.signMessage(message);
+                } else {
+                    const { signature: rawSignature } = await activeConnector.signMessage(message);
+                    signature = Buffer.from(bs58.decode(rawSignature)).toString('base64');
+                }
 
                 if (cancelled) {
                     return;
@@ -258,7 +341,7 @@ const LoginScreen: React.FC = () => {
 
     return (
         <LinearGradient
-            colors={['#09161f', '#112735', '#21424e']}
+            colors={[PALETTE.deep, PALETTE.mid, PALETTE.shallow]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.fullScreen}
@@ -296,7 +379,7 @@ const LoginScreen: React.FC = () => {
                                         <TextInput
                                             style={styles.input}
                                             placeholder="Email"
-                                            placeholderTextColor="#6f8d98"
+                                            placeholderTextColor={PALETTE.aquaPlaceholder}
                                             value={email}
                                             onChangeText={setEmail}
                                             keyboardType="email-address"
@@ -314,7 +397,7 @@ const LoginScreen: React.FC = () => {
                                             activeOpacity={0.86}
                                         >
                                             {isSendingCode ? (
-                                                <ActivityIndicator color="#071019" />
+                                                <ActivityIndicator color={PALETTE.abyss} />
                                             ) : (
                                                 <Text style={styles.primaryButtonText}>Email</Text>
                                             )}
@@ -330,7 +413,7 @@ const LoginScreen: React.FC = () => {
                                         <TextInput
                                             style={styles.input}
                                             placeholder="6-digit code"
-                                            placeholderTextColor="#6f8d98"
+                                            placeholderTextColor={PALETTE.aquaPlaceholder}
                                             value={code}
                                             onChangeText={setCode}
                                             keyboardType="number-pad"
@@ -347,7 +430,7 @@ const LoginScreen: React.FC = () => {
                                             activeOpacity={0.86}
                                         >
                                             {isSubmittingCode ? (
-                                                <ActivityIndicator color="#071019" />
+                                                <ActivityIndicator color={PALETTE.abyss} />
                                             ) : (
                                                 <Text style={styles.primaryButtonText}>Verify</Text>
                                             )}
@@ -368,7 +451,7 @@ const LoginScreen: React.FC = () => {
                                     activeOpacity={0.86}
                                 >
                                     {isOauthPending ? (
-                                        <ActivityIndicator color="#dceaf0" />
+                                        <ActivityIndicator color={PALETTE.iceSpinner} />
                                     ) : (
                                         <>
                                             <View style={styles.googleMark}>
@@ -386,7 +469,7 @@ const LoginScreen: React.FC = () => {
                                     activeOpacity={0.86}
                                 >
                                     {isWalletPending ? (
-                                        <ActivityIndicator color="#f1fbff" />
+                                        <ActivityIndicator color={PALETTE.iceText} />
                                     ) : (
                                         <Text style={styles.secondaryButtonText}>Connect Wallet</Text>
                                     )}
@@ -405,7 +488,7 @@ const LoginScreen: React.FC = () => {
                                             activeOpacity={0.86}
                                         >
                                             {pendingWalletProvider === 'native' ? (
-                                                <ActivityIndicator color="#e9fbff" />
+                                                <ActivityIndicator color={PALETTE.cyanSpinner} />
                                             ) : (
                                                 <>
                                                     <Text style={styles.walletButtonEyebrow}>SEEKER</Text>
@@ -425,7 +508,7 @@ const LoginScreen: React.FC = () => {
                                             activeOpacity={0.86}
                                         >
                                             {pendingWalletProvider === 'phantom' ? (
-                                                <ActivityIndicator color="#e9fbff" />
+                                                <ActivityIndicator color={PALETTE.cyanSpinner} />
                                             ) : (
                                                 <>
                                                     <Text style={styles.walletButtonEyebrow}>EXTERNAL</Text>
@@ -445,7 +528,7 @@ const LoginScreen: React.FC = () => {
                                             activeOpacity={0.86}
                                         >
                                             {pendingWalletProvider === 'backpack' ? (
-                                                <ActivityIndicator color="#e9fbff" />
+                                                <ActivityIndicator color={PALETTE.cyanSpinner} />
                                             ) : (
                                                 <>
                                                     <Text style={styles.walletButtonEyebrow}>EXTERNAL</Text>
@@ -543,17 +626,17 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     title: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 47,
         lineHeight: 32,
-        color: '#f7fdff',
+        color: PALETTE.iceText,
         textAlign: 'center',
     },
     subtitle: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 30,
         lineHeight: 20,
-        color: '#bdd7e0',
+        color: PALETTE.iceSubtle,
         textAlign: 'center',
     },
     formShell: {
@@ -562,56 +645,56 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         backgroundColor: 'rgba(240, 249, 255, 0.96)',
         borderWidth: 2,
-        borderColor: '#164257',
+        borderColor: PALETTE.panelStroke,
     },
     input: {
         borderWidth: 2,
-        borderColor: '#1c556c',
+        borderColor: PALETTE.panelStrokeActive,
         backgroundColor: colors.white,
         borderRadius: 16,
         paddingHorizontal: 14,
         paddingVertical: Platform.OS === 'ios' ? 14 : 12,
         fontSize: 24,
-        color: '#103142',
-        fontFamily: 'Monaco',
+        color: PALETTE.slateInk,
+        fontFamily: fonts.body,
     },
     emailPreview: {
         paddingHorizontal: 14,
         paddingVertical: 12,
         borderRadius: 16,
-        backgroundColor: '#dff4fb',
+        backgroundColor: PALETTE.iceMuted,
         borderWidth: 1,
-        borderColor: '#8cbfd2',
+        borderColor: PALETTE.aquaBorderSoft,
         gap: 4,
     },
     emailPreviewLabel: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 15,
-        color: '#4c7e90',
+        color: PALETTE.aquaMute,
     },
     emailPreviewValue: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 21,
-        color: '#14394b',
+        color: PALETTE.slateMid,
     },
     primaryButton: {
         minHeight: 54,
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#8be2ff',
+        backgroundColor: PALETTE.cyanCta,
         borderWidth: 2,
-        borderColor: '#103142',
-        shadowColor: '#103142',
+        borderColor: PALETTE.slateInk,
+        shadowColor: PALETTE.slateInk,
         shadowOffset: { width: 0, height: 5 },
         shadowOpacity: 0.22,
         shadowRadius: 0,
         elevation: 5,
     },
     primaryButtonText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 24,
-        color: '#071019',
+        color: PALETTE.abyss,
         letterSpacing: 0.6,
         textAlign: 'center',
     },
@@ -624,12 +707,12 @@ const styles = StyleSheet.create({
     dividerLine: {
         flex: 1,
         height: 1,
-        backgroundColor: '#9ab7c3',
+        backgroundColor: PALETTE.aquaInactive,
     },
     dividerText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 15,
-        color: '#648797',
+        color: PALETTE.aquaMid,
     },
     secondaryButton: {
         minHeight: 54,
@@ -638,9 +721,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         flexDirection: 'row',
         gap: 12,
-        backgroundColor: '#163141',
+        backgroundColor: PALETTE.panel,
         borderWidth: 2,
-        borderColor: '#d2edf7',
+        borderColor: PALETTE.iceBorderLight,
         paddingHorizontal: 14,
     },
     googleMark: {
@@ -652,14 +735,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     googleMarkText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 21,
-        color: '#13384b',
+        color: PALETTE.slateMid,
     },
     secondaryButtonText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 21,
-        color: '#f1fbff',
+        color: PALETTE.iceText,
         letterSpacing: 0.6,
         textAlign: 'center',
     },
@@ -668,14 +751,14 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#102836',
+        backgroundColor: PALETTE.panelDeep,
         borderWidth: 2,
-        borderColor: '#6db6d2',
+        borderColor: PALETTE.aquaBorder,
         paddingHorizontal: 14,
     },
     walletTriggerButtonActive: {
-        backgroundColor: '#17384a',
-        borderColor: '#d2edf7',
+        backgroundColor: PALETTE.panelHover,
+        borderColor: PALETTE.iceBorderLight,
     },
     walletMenu: {
         gap: 10,
@@ -687,24 +770,24 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         justifyContent: 'center',
         alignItems: 'flex-start',
-        backgroundColor: '#18394b',
+        backgroundColor: PALETTE.panelHover,
         borderWidth: 1,
-        borderColor: '#75b8d3',
+        borderColor: PALETTE.aquaBorderActive,
     },
     walletButtonActive: {
-        backgroundColor: '#21526b',
-        borderColor: '#d7f6ff',
+        backgroundColor: PALETTE.panelActive,
+        borderColor: PALETTE.iceTextHi,
     },
     walletButtonEyebrow: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 12,
-        color: '#8be2ff',
+        color: PALETTE.cyanCta,
         marginBottom: 8,
     },
     walletButtonText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 20,
-        color: '#f5fdff',
+        color: PALETTE.iceText,
     },
     buttonDisabled: {
         opacity: 0.62,
@@ -714,21 +797,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
         borderRadius: 16,
-        backgroundColor: '#ffe0dc',
+        backgroundColor: PALETTE.rustBg,
         borderWidth: 1,
-        borderColor: '#cf6d64',
+        borderColor: PALETTE.rustBorder,
         gap: 4,
     },
     errorLabel: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 15,
-        color: '#9d3e36',
+        color: PALETTE.rustLabel,
     },
     errorText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 24,
         lineHeight: 18,
-        color: '#7b2e27',
+        color: PALETTE.rustText,
     },
 });
 

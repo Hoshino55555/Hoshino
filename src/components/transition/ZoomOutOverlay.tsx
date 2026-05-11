@@ -13,6 +13,7 @@ import Animated, {
 import Svg, { G, Path } from 'react-native-svg';
 
 import { HOSHINO_STAR_PATH } from './hoshinoStarPath';
+import { Z } from '../../styles/zLayers';
 
 // IRIS_BUILD_TAG bumps every time we change this file so we can verify the
 // device is actually running the latest JS bundle (not a cached one).
@@ -55,16 +56,14 @@ const STAR_RADIUS = 1024;
 // 0.0001 × 1024-unit star radius → 0.1px pinhole at "closed" — sub-pixel,
 // no visible hole. 0.0001 × 50_000_000 rect half-extent → 5_000px rect
 // coverage, still far bigger than any phone screen.
-export const IRIS_INITIAL_SCALE = 0.0001;
-export const IRIS_OPEN_DURATION_MS = 1400;
-export const IRIS_CLOSE_DURATION_MS = 1850;
-// Legacy name retained for callers that mean the reveal/open duration.
-export const IRIS_DURATION_MS = IRIS_OPEN_DURATION_MS;
+const IRIS_INITIAL_SCALE = 0.0001;
+const IRIS_OPEN_DURATION_MS = 1400;
+const IRIS_CLOSE_DURATION_MS = 1850;
 
 const IRIS_OPEN_EASING = Easing.in(Easing.cubic);
 const IRIS_CLOSE_EASING = Easing.inOut(Easing.quad);
-const IRIS_LAYER_Z = 20000;
-const HARD_MASK_LAYER_Z = IRIS_LAYER_Z + 1;
+const IRIS_LAYER_Z = Z.iris;
+const HARD_MASK_LAYER_Z = Z.hardMask;
 // Hard mask timing lives with the iris because it protects the visual seam
 // between the JS route swap and Reanimated's first committed open frame.
 const HARD_MASK_ARM_BEFORE_CLOSE_MS = 180;

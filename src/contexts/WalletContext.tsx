@@ -11,7 +11,9 @@ import type { VRFSigner } from '../services/VRFService';
 export const mobileWalletService = new MobileWalletService();
 
 const WALLET_APP_URL = 'https://hoshino.gg';
-const WALLET_REDIRECT_PATH = '/wallet-auth';
+// Must match the redirect in LoginScreen — full custom-scheme URI matching
+// the `hoshino://` intent filter registered in AndroidManifest.
+const WALLET_REDIRECT_PATH = 'hoshino://wallet-auth';
 
 export type ExternalWalletProvider = 'phantom' | 'backpack';
 export type WalletSource = 'mwa' | ExternalWalletProvider | 'embedded' | null;
@@ -148,7 +150,10 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
             }
         } catch (error) {
             console.error('📱 Failed to connect mobile wallet:', error);
-            alert('Failed to connect wallet. Please make sure you have Solflare or another mobile wallet installed.');
+            // Rethrow so the caller (LoginScreen) can surface a proper error
+            // and clear pending state — swallowing with alert() left the UI
+            // stuck in "Approve in wallet" until the 75s timeout fired.
+            throw error;
         }
     }, []);
 

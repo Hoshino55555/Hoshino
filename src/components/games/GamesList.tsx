@@ -11,7 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FooterBackBar from '../chrome/FooterBackBar';
 import PageArtShell from '../chrome/PageArtShell';
 import { Backgrounds } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
+import { scrollClipperFill } from '../../styles/primitives';
 
 export type ArcadeGameId = 'starburst' | 'water-ring-toss';
 
@@ -79,12 +80,7 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
                 },
             ]}
         >
-                <View
-                    style={[
-                        styles.scrollClipper,
-                        { top: 0, bottom: 0 },
-                    ]}
-                >
+                <View style={scrollClipperFill}>
                     <ScrollView
                         contentContainerStyle={[
                             styles.scrollBody,
@@ -123,12 +119,6 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
 };
 
 const styles = StyleSheet.create({
-    scrollClipper: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        overflow: 'hidden',
-    },
     scrollBody: {
         paddingHorizontal: 16,
     },
@@ -153,15 +143,15 @@ const styles = StyleSheet.create({
         opacity: 0.55,
     },
     tileName: {
-        color: '#FFD700',
-        fontFamily: 'Monaco',
+        color: colors.goldBright,
+        fontFamily: fonts.body,
         fontSize: 24,
         marginBottom: 6,
         textAlign: 'center',
     },
     tileDescription: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 18,
         textAlign: 'center',
         lineHeight: 12,
@@ -169,7 +159,7 @@ const styles = StyleSheet.create({
     tileLockBadge: {
         marginTop: 6,
         color: '#FFB6C1',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 18,
     },
 });

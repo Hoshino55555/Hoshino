@@ -12,7 +12,6 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Modal } from 'react-native';
 import FooterBackBar from '../chrome/FooterBackBar';
 import PageArtShell from '../chrome/PageArtShell';
 import { MarketplaceItem, ItemRarity } from '../../services/MarketplaceService';
@@ -26,7 +25,6 @@ import StarFragmentService, {
     type IngredientBoxId,
 } from '../../services/StarFragmentService';
 import { ingredientLabel } from '../../services/RecipeCatalog';
-import { getIngredientArt } from '../../assets';
 import { useWallet } from '../../contexts/WalletContext';
 import { Connection } from '@solana/web3.js';
 import IAPService, {
@@ -47,8 +45,18 @@ import { ItemCategory } from '../../services/MarketplaceService';
 import { useGameStateContext } from '../../contexts/GameStateContext';
 import type { BoosterSkuId } from '../../services/GameStateService';
 import BoxRevealModal, { type BoxReveal } from './BoxRevealModal';
+import ConfirmPurchaseModal from './ConfirmPurchaseModal';
+import SpinModal, {
+    REEL_TILES,
+    REEL_STEP,
+    findReelIndex,
+    computeLandingTranslateX,
+    type SpinPhase,
+} from './SpinModal';
+import IAPPurchaseModal from './IAPPurchaseModal';
 import { newRequestId } from '../../services/requestId';
-import { colors } from '../../styles/tokens';
+import { colors, terminalGreen, fonts } from '../../styles/tokens';
+import { scrollClipperFill } from '../../styles/primitives';
 
 // Per-line dispatch result. Drives the post-checkout reveal queue:
 // boxes open via BoxRevealModal (TCG pack-style), spin replays the reel
@@ -90,45 +98,6 @@ interface ShopProps {
 // Wallet address fed to StarFragmentService when the user isn't connected,
 // so local balances persist across the same profile pre-Privy.
 const FALLBACK_WALLET = 'demo-wallet';
-
-// Daily-spin reel preview pool. Mirrors backend SPIN_POOL — every distinct
-// reward type is shown so the player knows what's possible. Tier color
-// follows ingredient tier accents (matches Inventory + Feeding pages).
-type ReelTile =
-    | { kind: 'starFragments'; amount: number; color: string }
-    | { kind: 'ingredient'; id: string; tier: 'common' | 'uncommon' | 'rare' | 'ultra_rare'; color: string };
-
-const TIER_TILE_COLOR = {
-    common: '#8B8B8B',
-    uncommon: '#4CAF50',
-    rare: '#2196F3',
-    ultra_rare: '#9C27B0',
-} as const;
-
-const REEL_TILES: ReelTile[] = [
-    { kind: 'ingredient', id: 'egg',        tier: 'common',     color: TIER_TILE_COLOR.common },
-    { kind: 'starFragments', amount: 10,    color: '#2e5a3e' },
-    { kind: 'ingredient', id: 'lettuce',    tier: 'common',     color: TIER_TILE_COLOR.common },
-    { kind: 'ingredient', id: 'strawberry', tier: 'uncommon',   color: TIER_TILE_COLOR.uncommon },
-    { kind: 'starFragments', amount: 50,    color: '#2e5a3e' },
-    { kind: 'ingredient', id: 'tomato',     tier: 'uncommon',   color: TIER_TILE_COLOR.uncommon },
-    { kind: 'ingredient', id: 'bacon',      tier: 'rare',       color: TIER_TILE_COLOR.rare },
-    { kind: 'ingredient', id: 'milk',       tier: 'rare',       color: TIER_TILE_COLOR.rare },
-    { kind: 'starFragments', amount: 250,   color: '#FF9800' },
-    { kind: 'ingredient', id: 'star_dust',  tier: 'ultra_rare', color: TIER_TILE_COLOR.ultra_rare },
-];
-
-const REEL_TILE_SIZE = 84;
-const REEL_TILE_GAP = 8;
-const REEL_STEP = REEL_TILE_SIZE + REEL_TILE_GAP;
-// Spin reel renders three REEL_TILES copies stitched together so the
-// translate animation never visibly wraps. Hoist the spread once so the
-// 30-element array isn't rebuilt every render while the modal is open.
-const REEL_TRACK_TILES: ReelTile[] = [...REEL_TILES, ...REEL_TILES, ...REEL_TILES];
-
-// IAP payment token selector — three fixed options. Module scope so the
-// `.map` source isn't a new array literal on every render.
-const IAP_TOKENS: IAPPaymentToken[] = ['SOL', 'USDC', 'SKR'];
 
 const formatCooldown = (ms: number) => {
     if (ms <= 0) return 'Ready';
@@ -195,7 +164,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     const [spinNextAtMs, setSpinNextAtMs] = useState(0);
     const [spinning, setSpinning] = useState(false);
     const [spinReward, setSpinReward] = useState<DailySpinReward | null>(null);
-    type SpinPhase = 'idle' | 'spinning' | 'revealed';
     const [spinPhase, setSpinPhase] = useState<SpinPhase>('idle');
     const reelTranslateX = useRef(new Animated.Value(0)).current;
     const reelLoopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -261,15 +229,24 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         loop.start();
     }, [reelTranslateX]);
 
-    const stopReelAndReveal = useCallback(() => {
+    const stopReelAndReveal = useCallback((reward: DailySpinReward) => {
         if (reelLoopRef.current) {
             reelLoopRef.current.stop();
             reelLoopRef.current = null;
         }
+        // Match the server reward to its REEL_TILES index and compute the
+        // exact translateX that puts that tile under the pointer. Snap the
+        // reel one full cycle ahead of the target so the decel animation
+        // always travels a known distance regardless of where the loop
+        // happened to stop — the snap is masked by the fast spin motion.
+        const rewardIndex = findReelIndex(reward);
+        const targetX = computeLandingTranslateX(rewardIndex, 2);
+        const startX = targetX + REEL_STEP * REEL_TILES.length;
+        reelTranslateX.setValue(startX);
         // Deceleration: one last partial sweep with ease-out so the reel
-        // glides to a stop before the reveal pops, instead of cutting hard.
+        // glides to a stop on the matching tile.
         const decel = Animated.timing(reelTranslateX, {
-            toValue: -REEL_STEP * REEL_TILES.length * 1.4,
+            toValue: targetX,
             duration: 1400,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
@@ -324,7 +301,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             if (res.reward.kind === 'ingredient') {
                 await refreshPantry();
             }
-            stopReelAndReveal();
+            stopReelAndReveal(res.reward);
         } catch (err: any) {
             if (reelLoopRef.current) {
                 reelLoopRef.current.stop();
@@ -758,8 +735,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 iapItems: [],
                 purchased,
             };
+            setConfirmItem(null);
             runNextReveal();
         } catch (err: any) {
+            setConfirmItem(null);
             onNotification?.(err?.message || 'Checkout failed.', 'error');
             await refreshBalance();
         } finally {
@@ -769,8 +748,11 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 
     const handleConfirmPurchase = () => {
         const item = confirmItem;
-        setConfirmItem(null);
         if (!item) return;
+        // Leave the confirm modal mounted so its "Processing…" button shows
+        // through the network roundtrip — closeConfirmThenReveal hands off
+        // to the reveal modal in a single render so the user never sees a
+        // blank frame.
         purchaseItem(item);
     };
 
@@ -784,7 +766,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             disabled: !ready || spinning,
             onPress: () => requestPurchase(item),
             priceNode: (
-                <Text style={[styles.itemPrice, { color: ready ? '#2e5a3e' : '#888' }]}>
+                <Text style={[styles.itemPrice, { color: ready ? colors.forestDark : colors.inkText }]}>
                     {ready ? 'FREE' : 'COOLDOWN'}
                 </Text>
             ),
@@ -798,7 +780,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             description: item.summary,
             onPress: () => requestPurchase(item),
             priceNode: (
-                <Text style={[styles.itemPrice, { color: '#2e5a3e' }]}>FREE</Text>
+                <Text style={[styles.itemPrice, { color: colors.forestDark }]}>FREE</Text>
             ),
         });
 
@@ -966,12 +948,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 testID="shop-screen"
                 overlays={shellOverlays}
             >
-                <View
-                    style={[
-                        styles.scrollClipper,
-                        { top: 0, bottom: 0 },
-                    ]}
-                >
+                <View style={scrollClipperFill}>
                 <ScrollView
                     contentContainerStyle={[
                         styles.scrollBody,
@@ -1025,277 +1002,35 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             {revealBoxes.length > 0 && (
                 <BoxRevealModal boxes={revealBoxes} onClose={closeBoxReveal} />
             )}
-            <Modal
-                transparent
-                visible={spinPhase !== 'idle'}
-                animationType="fade"
-                onRequestClose={closeSpinModal}
-            >
-                <View style={styles.spinBackdrop}>
-                    <View style={styles.spinCard}>
-                        <Text style={styles.spinTitle}>
-                            {spinPhase === 'revealed' ? 'You won!' : 'Daily Spin'}
-                        </Text>
-
-                        <Text style={styles.spinPoolLabel}>Possible rewards</Text>
-                        <View style={styles.spinPoolGrid}>
-                            {REEL_TILES.map((t, i) => (
-                                <View
-                                    key={`pool-${i}`}
-                                    style={[styles.spinPoolTile, { borderColor: t.color }]}
-                                >
-                                    {t.kind === 'starFragments' ? (
-                                        <>
-                                            <Image
-                                                source={Stars.fragment}
-                                                style={styles.spinPoolIcon}
-                                                resizeMode="contain"
-                                            />
-                                            <Text style={styles.spinPoolText}>×{t.amount}</Text>
-                                        </>
-                                    ) : (
-                                        <Image
-                                            source={getIngredientArt(t.id)}
-                                            style={styles.spinPoolIcon}
-                                            resizeMode="contain"
-                                        />
-                                    )}
-                                </View>
-                            ))}
-                        </View>
-
-                        {spinPhase === 'spinning' && (
-                            <>
-                                <View style={styles.reelViewport}>
-                                    <View style={styles.reelPointer} />
-                                    <Animated.View
-                                        style={[
-                                            styles.reelTrack,
-                                            { transform: [{ translateX: reelTranslateX }] },
-                                        ]}
-                                    >
-                                        {REEL_TRACK_TILES.map((t, i) => (
-                                            <View
-                                                key={`reel-${i}`}
-                                                style={[styles.reelTile, { borderColor: t.color }]}
-                                            >
-                                                {t.kind === 'starFragments' ? (
-                                                    <>
-                                                        <Image
-                                                            source={Stars.fragment}
-                                                            style={styles.reelTileIcon}
-                                                            resizeMode="contain"
-                                                        />
-                                                        <Text style={styles.reelTileText}>×{t.amount}</Text>
-                                                    </>
-                                                ) : (
-                                                    <Image
-                                                        source={getIngredientArt(t.id)}
-                                                        style={styles.reelTileIcon}
-                                                        resizeMode="contain"
-                                                    />
-                                                )}
-                                            </View>
-                                        ))}
-                                    </Animated.View>
-                                </View>
-                                <Text style={styles.spinStatus}>Spinning…</Text>
-                            </>
-                        )}
-
-                        {spinPhase === 'revealed' && spinReward && (
-                            <>
-                                <Animated.View
-                                    style={[
-                                        styles.revealTile,
-                                        {
-                                            transform: [{ scale: revealScale }],
-                                            shadowOpacity: revealGlow,
-                                            borderColor:
-                                                spinReward.kind === 'ingredient'
-                                                    ? TIER_TILE_COLOR[spinReward.tier]
-                                                    : '#FF9800',
-                                        },
-                                    ]}
-                                >
-                                    {spinReward.kind === 'starFragments' ? (
-                                        <>
-                                            <Image
-                                                source={Stars.fragment}
-                                                style={styles.revealIcon}
-                                                resizeMode="contain"
-                                            />
-                                            <Text style={styles.revealText}>
-                                                +{spinReward.amount} Shards
-                                            </Text>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Image
-                                                source={getIngredientArt(spinReward.id)}
-                                                style={styles.revealIcon}
-                                                resizeMode="contain"
-                                            />
-                                            <Text style={styles.revealText}>
-                                                {ingredientLabel(spinReward.id)} ×{spinReward.qty}
-                                            </Text>
-                                        </>
-                                    )}
-                                </Animated.View>
-                                <TouchableOpacity
-                                    style={styles.spinCloseButton}
-                                    onPress={closeSpinModal}
-                                >
-                                    <Text style={styles.spinCloseText}>NICE</Text>
-                                </TouchableOpacity>
-                            </>
-                        )}
-                    </View>
-                </View>
-            </Modal>
-            <Modal
-                visible={iapItem !== null}
-                transparent
-                animationType="fade"
-                onRequestClose={handleIAPCancel}
-            >
-                <View style={styles.iapModalBackdrop}>
-                    <View style={styles.iapModalCard}>
-                        <Text style={styles.iapTitle}>{iapItem?.name}</Text>
-                        {iapItem?.summary ? (
-                            <Text style={styles.iapSummary}>{iapItem.summary}</Text>
-                        ) : null}
-                        <Text style={styles.iapPrice}>
-                            {iapItem?.priceUsd != null ? `$${iapItem.priceUsd.toFixed(2)} USD` : 'Coming Soon'}
-                        </Text>
-
-                        <Text style={styles.iapSectionLabel}>Pay with</Text>
-                        <View style={styles.iapRailRow}>
-                            {IAP_TOKENS.map((tk) => (
-                                <TouchableOpacity
-                                    key={tk}
-                                    style={[
-                                        styles.iapRailBtn,
-                                        iapToken === tk && styles.iapRailBtnActive,
-                                    ]}
-                                    onPress={() => setIapToken(tk)}
-                                    disabled={iapPurchasing}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.iapRailText,
-                                            iapToken === tk && styles.iapRailTextActive,
-                                        ]}
-                                    >
-                                        {tk}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-
-                        {!signer ? (
-                            <Text style={styles.iapNote}>
-                                Connect a wallet to purchase. Embedded users can also top up
-                                with card via the button below.
-                            </Text>
-                        ) : (
-                            <Text style={styles.iapNote}>
-                                Signing wallet: {walletSource ?? 'unknown'} ·{' '}
-                                {publicKey ? publicKey.slice(0, 4) + '…' + publicKey.slice(-4) : '—'}
-                            </Text>
-                        )}
-
-                        {walletSource === 'embedded' && (
-                            <TouchableOpacity
-                                style={styles.iapTopUpBtn}
-                                onPress={handleFiatTopUp}
-                                disabled={iapPurchasing}
-                            >
-                                <Text style={styles.iapTopUpText}>
-                                    Top up with card (USDC)
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-
-                        <View style={styles.iapButtonRow}>
-                            <TouchableOpacity
-                                style={[styles.iapBtn, styles.iapCancelBtn]}
-                                onPress={handleIAPCancel}
-                                disabled={iapPurchasing}
-                            >
-                                <Text style={styles.iapBtnText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[
-                                    styles.iapBtn,
-                                    styles.iapBuyBtn,
-                                    (!signer || iapPurchasing) && styles.iapBtnDisabled,
-                                ]}
-                                onPress={handleIAPPurchase}
-                                disabled={!signer || iapPurchasing}
-                            >
-                                <Text style={styles.iapBtnText}>
-                                    {iapPurchasing ? 'Processing…' : `Buy with ${iapToken}`}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
-            <Modal
-                visible={confirmItem !== null}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setConfirmItem(null)}
-            >
-                <View style={styles.confirmBackdrop}>
-                    <View style={styles.confirmCard}>
-                        <Text style={styles.confirmTitle}>{confirmItem?.name}</Text>
-                        {confirmItem?.summary ? (
-                            <Text style={styles.confirmSummary}>{confirmItem.summary}</Text>
-                        ) : null}
-                        <View style={styles.confirmPriceRow}>
-                            {confirmItem?.id === 'daily-spin' ||
-                            confirmItem?.id === 'hackathon-special' ? (
-                                <Text style={styles.confirmPrice}>FREE</Text>
-                            ) : (
-                                <>
-                                    <Image
-                                        source={Stars.fragment}
-                                        style={styles.confirmPriceIcon}
-                                        resizeMode="contain"
-                                    />
-                                    <Text style={styles.confirmPrice}>
-                                        {confirmItem?.priceStarFragments ?? 0}
-                                    </Text>
-                                </>
-                            )}
-                        </View>
-                        <View style={styles.confirmButtonRow}>
-                            <TouchableOpacity
-                                style={[styles.confirmBtn, styles.confirmCancelBtn]}
-                                onPress={() => setConfirmItem(null)}
-                                disabled={purchasing}
-                            >
-                                <Text style={styles.confirmBtnText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[
-                                    styles.confirmBtn,
-                                    styles.confirmBuyBtn,
-                                    purchasing && styles.confirmBtnDisabled,
-                                ]}
-                                onPress={handleConfirmPurchase}
-                                disabled={purchasing}
-                            >
-                                <Text style={[styles.confirmBtnText, styles.confirmBuyBtnText]}>
-                                    {purchasing ? 'Processing…' : 'Buy'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
+            <SpinModal
+                phase={spinPhase}
+                reward={spinReward}
+                reelTranslateX={reelTranslateX}
+                revealScale={revealScale}
+                revealGlow={revealGlow}
+                onClose={closeSpinModal}
+            />
+            <IAPPurchaseModal
+                item={iapItem}
+                token={iapToken}
+                onSelectToken={setIapToken}
+                purchasing={iapPurchasing}
+                signerConnected={!!signer}
+                walletSource={walletSource}
+                publicKey={publicKey}
+                onCancel={handleIAPCancel}
+                onPurchase={handleIAPPurchase}
+                onFiatTopUp={handleFiatTopUp}
+            />
+            <ConfirmPurchaseModal
+                item={confirmItem}
+                purchasing={purchasing}
+                onCancel={() => {
+                    if (purchasing) return;
+                    setConfirmItem(null);
+                }}
+                onConfirm={handleConfirmPurchase}
+            />
         </View>
     );
 };
@@ -1304,169 +1039,6 @@ const styles = StyleSheet.create({
     root: {
         flex: 1,
         backgroundColor: colors.purpleBg,
-    },
-    spinBackdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-    },
-    spinCard: {
-        backgroundColor: '#f5eed6',
-        borderWidth: 3,
-        borderColor: '#3a2a1a',
-        padding: 20,
-        alignItems: 'center',
-        minWidth: 320,
-        maxWidth: 380,
-    },
-    spinTitle: {
-        fontFamily: 'Monaco',
-        fontSize: 30,
-        color: '#3a2a1a',
-        marginBottom: 12,
-    },
-    spinPoolLabel: {
-        fontFamily: 'Monaco',
-        fontSize: 21,
-        color: '#5a4a3a',
-        marginBottom: 6,
-    },
-    spinPoolGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        marginBottom: 14,
-        maxWidth: 340,
-    },
-    spinPoolTile: {
-        width: 44,
-        height: 44,
-        borderWidth: 2,
-        backgroundColor: '#fdfaee',
-        margin: 3,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    spinPoolIcon: {
-        width: 28,
-        height: 28,
-    },
-    spinPoolText: {
-        fontFamily: 'Monaco',
-        fontSize: 18,
-        color: '#3a2a1a',
-        marginTop: -2,
-    },
-    reelViewport: {
-        height: REEL_TILE_SIZE + 16,
-        width: REEL_TILE_SIZE * 3 + REEL_TILE_GAP * 2 + 8,
-        overflow: 'hidden',
-        borderWidth: 2,
-        borderColor: '#3a2a1a',
-        backgroundColor: '#fdfaee',
-        marginBottom: 10,
-        justifyContent: 'center',
-    },
-    reelPointer: {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: '50%',
-        marginLeft: -1,
-        width: 2,
-        backgroundColor: '#FF9800',
-        zIndex: 2,
-    },
-    reelTrack: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: REEL_TILE_GAP / 2,
-    },
-    reelTile: {
-        width: REEL_TILE_SIZE,
-        height: REEL_TILE_SIZE,
-        borderWidth: 2,
-        backgroundColor: '#f5eed6',
-        marginHorizontal: REEL_TILE_GAP / 2,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    reelTileIcon: {
-        width: 48,
-        height: 48,
-    },
-    reelTileText: {
-        fontFamily: 'Monaco',
-        fontSize: 21,
-        color: '#3a2a1a',
-        marginTop: 2,
-    },
-    spinStatus: {
-        fontFamily: 'Monaco',
-        fontSize: 21,
-        color: '#3a2a1a',
-        marginBottom: 10,
-    },
-    revealTile: {
-        width: 140,
-        height: 140,
-        borderWidth: 4,
-        backgroundColor: '#fdfaee',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginVertical: 10,
-        shadowColor: '#FF9800',
-        shadowOffset: { width: 0, height: 0 },
-        shadowRadius: 18,
-        elevation: 8,
-    },
-    revealIcon: {
-        width: 72,
-        height: 72,
-    },
-    revealText: {
-        fontFamily: 'Monaco',
-        fontSize: 24,
-        color: '#3a2a1a',
-        marginTop: 6,
-        textAlign: 'center',
-        paddingHorizontal: 4,
-    },
-    spinRewardRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 18,
-    },
-    spinRewardIcon: {
-        width: 48,
-        height: 48,
-        marginRight: 10,
-    },
-    spinRewardText: {
-        fontFamily: 'Monaco',
-        fontSize: 24,
-        color: '#3a2a1a',
-    },
-    spinCloseButton: {
-        backgroundColor: '#9ed5c5',
-        borderWidth: 2,
-        borderColor: '#3a2a1a',
-        paddingHorizontal: 18,
-        paddingVertical: 8,
-        marginTop: 6,
-    },
-    spinCloseText: {
-        fontFamily: 'Monaco',
-        fontSize: 21,
-        color: '#3a2a1a',
-    },
-    scrollClipper: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        overflow: 'hidden',
     },
     // Sized to match the bundle cluster's footprint so the box-card layout
     // (title + summary + price below) lines up identically whether we're
@@ -1486,12 +1058,12 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
         borderWidth: 2,
-        borderColor: '#003300',
+        borderColor: terminalGreen.bgMid,
         padding: 10,
-        borderTopColor: '#006600',
-        borderLeftColor: '#006600',
-        borderRightColor: '#001100',
-        borderBottomColor: '#001100',
+        borderTopColor: terminalGreen.accent,
+        borderLeftColor: terminalGreen.accent,
+        borderRightColor: terminalGreen.bgDeep,
+        borderBottomColor: terminalGreen.bgDeep,
     },
     balanceIcon: {
         width: 32,
@@ -1501,15 +1073,15 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     dustAmount: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 30,
-        color: '#003300',
+        color: terminalGreen.bgMid,
         textAlign: 'right',
     },
     walletLabel: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 21,
-        color: '#666',
+        color: colors.inkText,
         textAlign: 'right',
         marginBottom: 2,
     },
@@ -1521,49 +1093,49 @@ const styles = StyleSheet.create({
     tabButton: {
         flex: 1,
         marginHorizontal: 2,
-        backgroundColor: '#dbf3db',
-        borderColor: '#003300',
+        backgroundColor: colors.mintPale,
+        borderColor: terminalGreen.bgMid,
         borderWidth: 2,
         paddingVertical: 8,
         alignItems: 'center',
-        borderTopColor: '#006600',
-        borderLeftColor: '#006600',
-        borderRightColor: '#001100',
-        borderBottomColor: '#001100',
+        borderTopColor: terminalGreen.accent,
+        borderLeftColor: terminalGreen.accent,
+        borderRightColor: terminalGreen.bgDeep,
+        borderBottomColor: terminalGreen.bgDeep,
     },
     activeTab: {
         backgroundColor: '#b8e6b8',
-        borderTopColor: '#001100',
-        borderLeftColor: '#001100',
-        borderRightColor: '#006600',
-        borderBottomColor: '#006600',
+        borderTopColor: terminalGreen.bgDeep,
+        borderLeftColor: terminalGreen.bgDeep,
+        borderRightColor: terminalGreen.accent,
+        borderBottomColor: terminalGreen.accent,
     },
     tabButtonText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 24,
-        color: '#003300',
+        color: terminalGreen.bgMid,
     },
     itemsContainer: {
         borderWidth: 3,
-        borderColor: '#003300',
-        backgroundColor: '#f6fff6',
+        borderColor: terminalGreen.bgMid,
+        backgroundColor: colors.mintPale,
         padding: 8,
-        borderTopColor: '#001100',
-        borderLeftColor: '#001100',
-        borderRightColor: '#006600',
-        borderBottomColor: '#006600',
+        borderTopColor: terminalGreen.bgDeep,
+        borderLeftColor: terminalGreen.bgDeep,
+        borderRightColor: terminalGreen.accent,
+        borderBottomColor: terminalGreen.accent,
     },
     section: {
         marginBottom: 12,
     },
     sectionHeader: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 24,
-        color: '#003300',
+        color: terminalGreen.bgMid,
         marginBottom: 6,
         paddingBottom: 2,
         borderBottomWidth: 1,
-        borderBottomColor: '#003300',
+        borderBottomColor: terminalGreen.bgMid,
     },
     sectionGrid: {
         flexDirection: 'row',
@@ -1604,7 +1176,7 @@ const styles = StyleSheet.create({
         paddingTop: 8,
     },
     ingredientBoxTitle: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 24,
         lineHeight: 18,
         textAlign: 'center',
@@ -1627,14 +1199,14 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     itemName: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 21,
         lineHeight: 14,
         textAlign: 'center',
         color: '#2e2014',
     },
     itemRank: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 18,
         lineHeight: 8,
         textAlign: 'center',
@@ -1642,10 +1214,10 @@ const styles = StyleSheet.create({
         marginTop: -1,
     },
     itemSummary: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 18,
         lineHeight: 13,
-        color: '#3a2a1a',
+        color: colors.slotInk,
         textAlign: 'center',
         marginTop: 2,
         paddingHorizontal: 2,
@@ -1654,7 +1226,7 @@ const styles = StyleSheet.create({
         opacity: 0.55,
     },
     disabledText: {
-        color: '#999999',
+        color: colors.inkText,
     },
     insufficientOverlay: {
         position: 'absolute',
@@ -1662,9 +1234,9 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         textAlign: 'center',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 14,
-        color: '#cc0000',
+        color: terminalGreen.err,
     },
     priceContainer: {
         flexDirection: 'row',
@@ -1677,9 +1249,9 @@ const styles = StyleSheet.create({
         marginRight: 4,
     },
     itemPrice: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 21,
-        color: '#003300',
+        color: terminalGreen.bgMid,
     },
     comingSoonBadge: {
         position: 'absolute',
@@ -1692,195 +1264,17 @@ const styles = StyleSheet.create({
         borderColor: '#5a2f00',
     },
     comingSoonText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         color: 'white',
         fontSize: 15,
     },
     flashingCard: {
-        backgroundColor: '#e6ffe6',
+        backgroundColor: colors.mintPale,
         shadowColor: '#00ff00',
         shadowOpacity: 0.8,
         shadowRadius: 4,
         elevation: 8,
     },
-    confirmBackdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.65)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 24,
-    },
-    confirmCard: {
-        width: '100%',
-        maxWidth: 360,
-        backgroundColor: '#f6fff6',
-        borderWidth: 3,
-        borderColor: '#003300',
-        borderTopColor: '#006600',
-        borderLeftColor: '#006600',
-        borderRightColor: '#001100',
-        borderBottomColor: '#001100',
-        padding: 18,
-        alignItems: 'center',
-    },
-    confirmTitle: {
-        fontFamily: 'Monaco',
-        fontSize: 30,
-        color: '#003300',
-        textAlign: 'center',
-        marginBottom: 6,
-    },
-    confirmSummary: {
-        fontFamily: 'Monaco',
-        fontSize: 21,
-        color: '#3a2a1a',
-        textAlign: 'center',
-        marginBottom: 10,
-    },
-    confirmPriceRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 16,
-    },
-    confirmPriceIcon: {
-        width: 22,
-        height: 22,
-        marginRight: 6,
-    },
-    confirmPrice: {
-        fontFamily: 'Monaco',
-        fontSize: 33,
-        color: '#003300',
-    },
-    confirmButtonRow: {
-        flexDirection: 'row',
-        gap: 8,
-        width: '100%',
-    },
-    confirmBtn: {
-        flex: 1,
-        paddingVertical: 12,
-        alignItems: 'center',
-        borderWidth: 2,
-    },
-    confirmCancelBtn: {
-        backgroundColor: '#dbf3db',
-        borderColor: '#003300',
-    },
-    confirmBuyBtn: {
-        backgroundColor: '#006600',
-        borderColor: '#003300',
-        borderTopColor: '#00aa00',
-        borderLeftColor: '#00aa00',
-        borderRightColor: '#004400',
-        borderBottomColor: '#002200',
-    },
-    confirmBtnDisabled: {
-        opacity: 0.5,
-    },
-    confirmBtnText: {
-        fontFamily: 'Monaco',
-        fontSize: 24,
-        color: '#003300',
-    },
-    confirmBuyBtnText: {
-        color: '#fff',
-    },
-    iapModalBackdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 24,
-    },
-    iapModalCard: {
-        width: '100%',
-        maxWidth: 380,
-        backgroundColor: colors.purpleBg,
-        borderColor: '#9C27B0',
-        borderWidth: 2,
-        borderRadius: 12,
-        padding: 20,
-    },
-    iapTitle: {
-        fontFamily: 'Monaco',
-        color: '#fff',
-        fontSize: 33,
-        textAlign: 'center',
-        marginBottom: 4,
-    },
-    iapSummary: {
-        fontFamily: 'Monaco',
-        color: '#cfc4e6',
-        fontSize: 24,
-        textAlign: 'center',
-        marginBottom: 8,
-    },
-    iapPrice: {
-        fontFamily: 'Monaco',
-        color: '#FFD54F',
-        fontSize: 39,
-        textAlign: 'center',
-        marginBottom: 16,
-    },
-    iapSectionLabel: {
-        fontFamily: 'Monaco',
-        color: '#bba8d6',
-        fontSize: 21,
-        marginBottom: 6,
-        textTransform: 'uppercase',
-    },
-    iapRailRow: {
-        flexDirection: 'row',
-        gap: 8,
-        marginBottom: 12,
-    },
-    iapRailBtn: {
-        flex: 1,
-        paddingVertical: 10,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#3d2a5e',
-        alignItems: 'center',
-    },
-    iapRailBtnActive: {
-        borderColor: '#FFD54F',
-        backgroundColor: colors.purpleBg,
-    },
-    iapRailText: { color: '#bba8d6', fontFamily: 'Monaco' },
-    iapRailTextActive: { color: '#FFD54F' },
-    iapNote: {
-        fontFamily: 'Monaco',
-        color: '#a99fc4',
-        fontSize: 21,
-        textAlign: 'center',
-        marginVertical: 10,
-    },
-    iapButtonRow: {
-        flexDirection: 'row',
-        gap: 8,
-        marginTop: 12,
-    },
-    iapBtn: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 8,
-        alignItems: 'center',
-    },
-    iapCancelBtn: { backgroundColor: '#3d2a5e' },
-    iapBuyBtn: { backgroundColor: '#7B3FB8' },
-    iapBtnDisabled: { opacity: 0.5 },
-    iapBtnText: { color: '#fff', fontFamily: 'Monaco' },
-    iapTopUpBtn: {
-        marginTop: 8,
-        paddingVertical: 10,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#FFD54F',
-        alignItems: 'center',
-    },
-    iapTopUpText: { color: '#FFD54F', fontFamily: 'Monaco', fontSize: 24 },
 });
 
 export default Shop;

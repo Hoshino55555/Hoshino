@@ -26,7 +26,8 @@ import {
 } from '../../services/RecipeCatalog';
 import type { CookResponse, IngredientCounts } from '../../services/GameStateService';
 import { Backgrounds, Cooking, getIngredientArt, getRecipeArt, RecipeCards, Frames } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
+import { scrollClipperFill } from '../../styles/primitives';
 
 // Tier rule for the recipe-card background art: any rare/ultra_rare ingredient
 // promotes to RARE (rainbow), any uncommon promotes to INTERMEDIATE (yellow),
@@ -53,7 +54,7 @@ function renderMonacoTitle(text: string, baseFontSize: number) {
         part === '&' ? (
             <Text
                 key={i}
-                style={{ fontFamily: '04b03', fontSize: fallbackSize }}
+                style={{ fontFamily: fonts.pixelAlt, fontSize: fallbackSize }}
             >
                 {part}
             </Text>
@@ -409,7 +410,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
             testID="feeding-screen"
             overlays={shellOverlays}
         >
-                <View style={styles.scrollClipper}>
+                <View style={scrollClipperFill}>
                 <ScrollView
                     contentContainerStyle={scrollContentStyle}
                 >
@@ -794,6 +795,18 @@ const ManualCookModal: React.FC<ManualCookModalProps> = ({
                     style={modalStyles.sheet}
                     onLayout={measureSheet}
                 >
+                    {/* Painted background sits in its own clip layer so we
+                        can shift the image up to hide cooking-bg-base.png's
+                        transparent top strip without affecting the sheet's
+                        overflow:visible (needed for the pot-toss animation
+                        to arc out of the modal). */}
+                    <View pointerEvents="none" style={modalStyles.sheetBgClip}>
+                        <Image
+                            source={Backgrounds.cooking}
+                            style={modalStyles.sheetBgImage}
+                            resizeMode="contain"
+                        />
+                    </View>
                     <Text style={modalStyles.title}>
                         {recipe ? recipe.name.toUpperCase() : 'MANUAL COOK'}
                     </Text>
@@ -1066,14 +1079,6 @@ const ManualCookModal: React.FC<ManualCookModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-    scrollClipper: {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        overflow: 'hidden',
-    },
     scrollBody: {
         paddingHorizontal: 16,
     },
@@ -1087,8 +1092,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     manualTitle: {
-        color: '#FFD700',
-        fontFamily: 'PressStart2P',
+        color: colors.goldBright,
+        fontFamily: fonts.pixel,
         fontSize: 12,
         marginBottom: 4,
     },
@@ -1099,7 +1104,7 @@ const styles = StyleSheet.create({
     },
     sectionHeading: {
         color: colors.mintPale,
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         fontSize: 10,
         marginBottom: 8,
     },
@@ -1141,7 +1146,7 @@ const styles = StyleSheet.create({
         left: '7%',
         maxWidth: '88%',
         color: colors.white,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 20,
         letterSpacing: 0.5,
         textShadowColor: colors.purpleText,
@@ -1155,7 +1160,7 @@ const styles = StyleSheet.create({
         top: '23%',
         left: '5%',
         color: colors.white,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 20,
         textShadowColor: colors.purpleText,
         textShadowOffset: { width: 1, height: 1 },
@@ -1206,7 +1211,7 @@ const styles = StyleSheet.create({
     },
     ingredientCount: {
         color: colors.purpleText,
-        fontFamily: '04b03',
+        fontFamily: fonts.pixelAlt,
         fontSize: 13,
         // 04b03's glyph baseline reads a hair low against the 15dp icon
         // even with flex-center; lift by 1px so the cap-height visually
@@ -1223,7 +1228,7 @@ const styles = StyleSheet.create({
         minWidth: '14%',
         textAlign: 'center',
         color: colors.white,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 24,
         textShadowColor: colors.purpleText,
         textShadowOffset: { width: 1, height: 1 },
@@ -1240,8 +1245,8 @@ const styles = StyleSheet.create({
         marginTop: 14,
     },
     lastResultTitle: {
-        color: '#FFD700',
-        fontFamily: 'PressStart2P',
+        color: colors.goldBright,
+        fontFamily: fonts.pixel,
         fontSize: 10,
         marginBottom: 4,
     },
@@ -1254,7 +1259,7 @@ const styles = StyleSheet.create({
     },
     lastResultDiscovery: {
         color: '#8dd68d',
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         fontSize: 9,
         marginTop: 6,
     },
@@ -1265,27 +1270,57 @@ const modalStyles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.75)',
         justifyContent: 'center',
-        padding: 18,
+        padding: 8,
     },
     sheet: {
-        backgroundColor: '#1a1f36',
+        // Backstop tint behind the painted background; shows if the image
+        // ever fails to load (and keeps the painted edges from bleeding the
+        // backdrop through the rounded corners during the fade-in frame).
+        backgroundColor: colors.purpleBg,
         borderRadius: 12,
         borderWidth: 2,
         borderColor: colors.gold,
         padding: 16,
-        maxHeight: '92%',
+        maxHeight: '100%',
         overflow: 'visible',
     },
+    // Absolute clip layer for the painted cooking-bg-base. Hosts the image
+    // under content; rounded + overflow:hidden so the image clips to the
+    // sheet's corners even though the sheet itself stays overflow:visible
+    // (the flying pot-toss arcs out of the sheet bounds).
+    sheetBgClip: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    // cooking-bg-base.png is the full device-aperture art (1200×2670, mostly
+    // portrait). resizeMode="contain" preserves its native aspect so bricks
+    // render at the same relative scale as on the FeedingPage — the modal
+    // ends up with purpleBg side bars (the sheet's backstop) instead of a
+    // cover-cropped zoomed-in brick band.
+    sheetBgImage: {
+        position: 'absolute',
+        top: -380,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '105%',
+        height: '190%',
+    },
     title: {
-        color: '#FFD700',
-        fontFamily: 'Monaco',
+        color: colors.goldBright,
+        fontFamily: fonts.body,
         fontSize: 30,
         textAlign: 'center',
         marginBottom: 12,
     },
     section: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 24,
         marginTop: 6,
         marginBottom: 12,
@@ -1320,23 +1355,23 @@ const modalStyles = StyleSheet.create({
         borderColor: colors.purpleBg,
     },
     potCountBadgeFull: {
-        backgroundColor: '#e87a7a',
+        backgroundColor: colors.error,
     },
     potCountText: {
         color: colors.purpleBg,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 20,
     },
     potHint: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 16,
         opacity: 0.75,
         marginTop: 4,
     },
     potEmpty: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 13,
         opacity: 0.7,
         fontStyle: 'italic',
@@ -1349,20 +1384,18 @@ const modalStyles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'flex-start',
-        paddingBottom: 6,
+        // Stop wrap-rows from cross-axis stretching to the tallest sibling —
+        // otherwise aspectRatio gets overridden and the painted slot art
+        // cover-crops top/bottom. Same pattern as the inventory grid.
+        alignItems: 'flex-start'
     },
-    // 4 cards per row: width 21% + marginRight 2% = 23% per slot, ×4 = 92%
-    // (8% headroom keeps Yoga's % rounding from wrapping a card to the next
-    // row). Explicit pixel height (not aspectRatio) — aspectRatio with a %
-    // width is unreliable on Android Yoga and can blow up the card height
-    // past the screen. 68 is close to the slot PNG's 320:360 shape so
-    // resizeMode="cover" only crops a sliver. Padding lives on the
-    // ImageBackground inner so the painted tile fills the full card box.
+    // 4 cards per row: width 23% × 4 = 92% (8% headroom split as right margin
+    // keeps Yoga's % rounding from wrapping a card to the next row). The box
+    // matches the 320:360 slot PNG exactly so resizeMode="cover" has nothing
+    // to crop.
     ingredientCard: {
-        width: '23%',
-        height: 68,
-        marginRight: '2%',
-        marginBottom: 6,
+        width: '25%',
+        aspectRatio: 320 / 360,
     },
     // ImageBackground sizes its outer wrapper via `style` and the inner image
     // via `imageStyle`. Outer fills the Pressable; image fills the outer.
@@ -1390,7 +1423,7 @@ const modalStyles = StyleSheet.create({
         right: 0,
         bottom: 0,
         borderWidth: 2,
-        borderColor: '#e87a7a',
+        borderColor: colors.error,
         borderRadius: 8,
     },
     minBadge: {
@@ -1405,7 +1438,7 @@ const modalStyles = StyleSheet.create({
     },
     minBadgeText: {
         color: colors.purpleBg,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 9,
     },
     // No name text on pantry tiles — the icon is distinctive enough at this
@@ -1419,20 +1452,20 @@ const modalStyles = StyleSheet.create({
     // 2dp leftward translate on the foreground elements re-centers the
     // perceived layout without touching the painted slot or the padding.
     ingredientCardIcon: {
-        width: 30,
-        height: 30,
-        marginTop: 2,
+        width: 34,
+        height: 34,
+        marginTop: 4,
         transform: [{ translateX: -2 }],
     },
     ingredientCardCount: {
         position: 'absolute',
         left: 0,
         right: 0,
-        bottom: '18%',
+        bottom: '24%',
         textAlign: 'center',
-        color: '#3a2a1a',
-        fontFamily: 'Monaco',
-        fontSize: 14,
+        color: colors.slotInk,
+        fontFamily: fonts.body,
+        fontSize: 22,
         transform: [{ translateX: -2 }],
     },
     actions: {
@@ -1446,11 +1479,11 @@ const modalStyles = StyleSheet.create({
         backgroundColor: 'rgba(232, 122, 122, 0.2)',
         borderRadius: 6,
         borderWidth: 1,
-        borderColor: '#e87a7a',
+        borderColor: colors.error,
     },
     cancelText: {
-        color: '#e87a7a',
-        fontFamily: 'Monaco',
+        color: colors.error,
+        fontFamily: fonts.body,
         fontSize: 18,
     },
     clear: {
@@ -1463,7 +1496,7 @@ const modalStyles = StyleSheet.create({
     },
     clearText: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 18,
     },
     cook: {
@@ -1475,7 +1508,7 @@ const modalStyles = StyleSheet.create({
     cookDisabled: { opacity: 0.4 },
     cookText: {
         color: colors.purpleBg,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 18,
     },
     flyingItem: {

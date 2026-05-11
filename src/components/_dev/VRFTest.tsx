@@ -5,7 +5,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { useWallet } from '../../contexts/WalletContext';
 import { VRF_RUNTIME_CONFIG } from '../../config/vrf';
 import { MagicBlockVRFService, type VRFContext } from '../../services/VRFService';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 
 interface Props {
     onClose: () => void;
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         color: '#111827',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     closeButton: {
         backgroundColor: '#111827',
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     },
     closeButtonText: {
         color: '#f9fafb',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     content: {
         paddingBottom: 32,
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     cardTitle: {
         fontSize: 24,
         color: '#111827',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     cardText: {
         color: '#374151',
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     actionButtonText: {
         color: '#f9fafb',
         textAlign: 'center',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     secondaryButton: {
         backgroundColor: '#e5e7eb',
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     secondaryButtonText: {
         color: '#111827',
         textAlign: 'center',
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     resultText: {
         color: '#111827',
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     errorText: {
         color: '#b91c1c',
         fontSize: 20,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
 });
 

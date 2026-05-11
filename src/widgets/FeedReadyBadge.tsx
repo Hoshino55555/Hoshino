@@ -5,6 +5,7 @@
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import { FONT_PIXEL } from './assets';
+import { colors } from '../styles/tokens';
 
 interface Props {
     compact?: boolean;
@@ -20,7 +21,7 @@ const FeedReadyBadge: React.FC<Props> = ({ compact = false, characterId }) => {
             clickActionData={{ uri: feedUri }}
             style={{
                 backgroundColor: '#FFB347',
-                borderColor: '#3A225E',
+                borderColor: colors.purpleDark,
                 borderWidth: 1,
                 borderRadius: compact ? 10 : 13,
                 paddingHorizontal: compact ? 7 : 10,
@@ -32,7 +33,7 @@ const FeedReadyBadge: React.FC<Props> = ({ compact = false, characterId }) => {
             <TextWidget
                 text="FEED"
                 style={{
-                    color: '#3A225E',
+                    color: colors.purpleDark,
                     fontFamily: FONT_PIXEL,
                     fontSize: compact ? 7 : 10,
                 }}

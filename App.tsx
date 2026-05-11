@@ -30,6 +30,8 @@ import { Logos } from './src/assets';
 import { Connection } from '@solana/web3.js';
 
 import { ENABLE_VRF_DEV_SCREEN } from './src/config/vrf';
+import { Z } from './src/styles/zLayers';
+import { colors } from './src/styles/tokens';
 import { FirebaseAuthProvider, useFirebaseAuth } from './src/contexts/FirebaseAuthContext';
 import { GameStateProvider, useGameStateContext } from './src/contexts/GameStateContext';
 import { useAppNavigationTransition } from './src/hooks/useAppNavigationTransition';
@@ -308,7 +310,7 @@ function App() {
                     own routes. DeviceButtons, WalletButton (1000),
                     notifications, and the iris layers all sit above. */}
                 <View
-                    style={[StyleSheet.absoluteFill, { zIndex: 20, elevation: 20 }]}
+                    style={[StyleSheet.absoluteFill, { zIndex: Z.casing, elevation: Z.casing }]}
                     pointerEvents="none"
                 >
                     <DeviceCasing />
@@ -388,7 +390,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
     },
     vrfDevButtonText: {
-        color: '#fff',
+        color: colors.white,
         fontSize: 11,
         fontWeight: '700',
     },

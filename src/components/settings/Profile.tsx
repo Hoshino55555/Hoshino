@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FooterBackButton, { FOOTER_BACK_BUTTON_OFFSET_Y } from '../chrome/FooterBackButton';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 
 interface Props {
     onBack: () => void;
@@ -149,13 +149,13 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 38,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         textAlign: 'center',
         marginBottom: 18,
     },
     section: {
         marginBottom: 16,
-        backgroundColor: '#f0fff0',
+        backgroundColor: colors.mintPale,
         borderRadius: 8,
         padding: 14,
         borderWidth: 2,
@@ -164,13 +164,13 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 24,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         marginBottom: 10,
     },
     fieldLabel: {
         fontSize: 20,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         opacity: 0.75,
         marginBottom: 4,
     },
@@ -180,13 +180,13 @@ const styles = StyleSheet.create({
     valueText: {
         fontSize: 24,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         lineHeight: 15,
     },
     addressText: {
         fontSize: 15,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         lineHeight: 14,
     },
     nameRow: {
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         color: colors.forestDark,
         fontSize: 24,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         marginRight: 8,
     },
     saveButton: {
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     saveButtonText: {
         color: colors.mintPale,
         fontSize: 21,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     logoutButton: {
         backgroundColor: '#8B2E2E',
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     logoutButtonText: {
         color: colors.mintPale,
         fontSize: 24,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
 });
 

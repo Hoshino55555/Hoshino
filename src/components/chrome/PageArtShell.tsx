@@ -100,5 +100,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export type { PageArtOverlay };
 export default PageArtShell;

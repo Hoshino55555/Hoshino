@@ -19,7 +19,36 @@ import Svg, {
     Stop,
 } from 'react-native-svg';
 import InnerScreen from '../chrome/InnerScreen';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
+
+// File-local palette — ring carnival has a saturated set of one-off hues
+// (rainbow rings, painted tank gradients, peg/lacquer greens) that don't
+// recur in the rest of the app. Kept inline so the arcade game owns its
+// own color story without polluting global tokens.
+const PALETTE = {
+    // Rainbow ring set — sits alongside colors.goldWarm as the first ring hue.
+    ringOrange: '#EE964B',
+    ringRed: '#F95738',
+    ringSky: '#5BC0EB',
+    ringLime: '#9BC53D',
+    ringViolet: '#C77DFF',
+    ringPink: '#F15BB5',
+    ringTeal: '#2EC4B6',
+    // Painted tank water gradient.
+    waterTop: '#A9E4ED',
+    waterMid: '#5BB7C2',
+    waterDeep: '#2C7A85',
+    // Foam / highlight gradients on the tank surface.
+    foamHi: '#F7FDFF',
+    foamMid: '#D8F3F6',
+    foamGlow: '#E9FDFF',
+    // Peg lacquer + frame stroke (painted greens).
+    pegStroke: '#0A2A28',
+    pegMid: '#3C7460',
+    pegDark: '#1F4438',
+    // Hooked ring badge highlight.
+    badgeHi: '#FFF6CC',
+} as const;
 
 interface WaterRingTossProps {
     onBack: () => void;
@@ -117,14 +146,14 @@ const HOOKED_PULSE_GAIN = 1.0;
 // just bobs them, but mashing accumulates.
 const HOOKED_KICK = 0.2;
 const RING_COLORS = [
-    '#F4D35E',
-    '#EE964B',
-    '#F95738',
-    '#5BC0EB',
-    '#9BC53D',
-    '#C77DFF',
-    '#F15BB5',
-    '#2EC4B6',
+    colors.goldWarm,
+    PALETTE.ringOrange,
+    PALETTE.ringRed,
+    PALETTE.ringSky,
+    PALETTE.ringLime,
+    PALETTE.ringViolet,
+    PALETTE.ringPink,
+    PALETTE.ringTeal,
 ];
 
 // Tilt-to-bias gravity strength (in g-units). Even a fully sideways phone
@@ -751,22 +780,22 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                     >
                             <Defs>
                                 <LinearGradient id="water" x1="0" y1="0" x2="0" y2="1">
-                                    <Stop offset="0" stopColor="#A9E4ED" />
-                                    <Stop offset="0.5" stopColor="#5BB7C2" />
-                                    <Stop offset="1" stopColor="#2C7A85" />
+                                    <Stop offset="0" stopColor={PALETTE.waterTop} />
+                                    <Stop offset="0.5" stopColor={PALETTE.waterMid} />
+                                    <Stop offset="1" stopColor={PALETTE.waterDeep} />
                                 </LinearGradient>
                                 <LinearGradient id="surface" x1="0" y1="0" x2="0" y2="1">
-                                    <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.78" />
-                                    <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+                                    <Stop offset="0" stopColor={colors.white} stopOpacity="0.78" />
+                                    <Stop offset="1" stopColor={colors.white} stopOpacity="0" />
                                 </LinearGradient>
                                 <LinearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
-                                    <Stop offset="0" stopColor="#F7FDFF" stopOpacity="0.4" />
-                                    <Stop offset="0.5" stopColor="#FFFFFF" stopOpacity="0" />
-                                    <Stop offset="1" stopColor="#D8F3F6" stopOpacity="0.14" />
+                                    <Stop offset="0" stopColor={PALETTE.foamHi} stopOpacity="0.4" />
+                                    <Stop offset="0.5" stopColor={colors.white} stopOpacity="0" />
+                                    <Stop offset="1" stopColor={PALETTE.foamMid} stopOpacity="0.14" />
                                 </LinearGradient>
                                 <RadialGradient id="jetGlow" cx="0.5" cy="1" rx="0.5" ry="0.7">
-                                    <Stop offset="0" stopColor="#E9FDFF" stopOpacity="0.85" />
-                                    <Stop offset="1" stopColor="#E9FDFF" stopOpacity="0" />
+                                    <Stop offset="0" stopColor={PALETTE.foamGlow} stopOpacity="0.85" />
+                                    <Stop offset="1" stopColor={PALETTE.foamGlow} stopOpacity="0" />
                                 </RadialGradient>
                             </Defs>
 
@@ -815,7 +844,7 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                                             cx={cx}
                                             cy={cy}
                                             r={r}
-                                            stroke="#0A2A28"
+                                            stroke={PALETTE.pegStroke}
                                             strokeWidth="8"
                                             opacity="0.45"
                                             fill="none"
@@ -830,7 +859,7 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                                         />
                                         <Path
                                             d={`M ${cx - r * 0.55} ${cy - r * 0.7} A ${r} ${r} 0 0 1 ${cx + r * 0.18} ${cy - r * 0.95}`}
-                                            stroke="#FFFFFF"
+                                            stroke={colors.white}
                                             strokeWidth="2.5"
                                             strokeLinecap="round"
                                             fill="none"
@@ -857,13 +886,13 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                                             width={6}
                                             height={baseY - tipY}
                                             rx="2.5"
-                                            fill="#3C7460"
-                                            stroke="#1F4438"
+                                            fill={PALETTE.pegMid}
+                                            stroke={PALETTE.pegDark}
                                             strokeWidth="1.4"
                                         />
                                         <Path
                                             d={`M ${x - 1.8} ${tipY + 2} L ${x - 1.8} ${baseY - 2}`}
-                                            stroke="#FFFFFF"
+                                            stroke={colors.white}
                                             strokeWidth="1"
                                             opacity="0.32"
                                             strokeLinecap="round"
@@ -892,7 +921,7 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                                             width={24}
                                             height={16}
                                             rx="5"
-                                            fill="#1F4438"
+                                            fill={PALETTE.pegDark}
                                         />
                                         <Rect
                                             x={x - 8}
@@ -900,7 +929,7 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                                             width={16}
                                             height={5}
                                             rx="2"
-                                            fill="#3C7460"
+                                            fill={PALETTE.pegMid}
                                         />
                                         {showStream && (
                                             <>
@@ -917,7 +946,7 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                                                         Q ${x - 2} ${(apex + VIEWBOX_HEIGHT) / 2} ${x} ${apex + 8}
                                                         Q ${x + 2} ${(apex + VIEWBOX_HEIGHT) / 2} ${x + streamWidth * 0.5} ${VIEWBOX_HEIGHT - 28}
                                                         Z`}
-                                                    fill="#FFFFFF"
+                                                    fill={colors.white}
                                                     opacity={Math.min(0.55, 0.2 + intensity * 0.2)}
                                                 />
                                             </>
@@ -955,7 +984,7 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                                         <G key={ring.id}>
                                             <Path
                                                 d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${cx + r} ${cy}`}
-                                                stroke="#0A2A28"
+                                                stroke={PALETTE.pegStroke}
                                                 strokeWidth="8"
                                                 opacity="0.45"
                                                 fill="none"
@@ -985,7 +1014,7 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                                                 cy={0}
                                                 r={RING_RADIUS}
                                                 fill="none"
-                                                stroke="#0A2A28"
+                                                stroke={PALETTE.pegStroke}
                                                 strokeWidth="8"
                                                 opacity="0.45"
                                             />
@@ -1001,7 +1030,7 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                                         <Path
                                             d={`M ${cx - RING_RADIUS * 0.55} ${cy - RING_RADIUS * 0.7}
                                                 A ${RING_RADIUS} ${RING_RADIUS} 0 0 1 ${cx + RING_RADIUS * 0.18} ${cy - RING_RADIUS * 0.95}`}
-                                            stroke="#FFFFFF"
+                                            stroke={colors.white}
                                             strokeWidth="2.5"
                                             strokeLinecap="round"
                                             fill="none"
@@ -1024,15 +1053,15 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                                             cx={x}
                                             cy={tipY}
                                             r="4.5"
-                                            fill="#F4D35E"
-                                            stroke="#1F4438"
+                                            fill={colors.goldWarm}
+                                            stroke={PALETTE.pegDark}
                                             strokeWidth="1.4"
                                         />
                                         <Circle
                                             cx={x - 1.3}
                                             cy={tipY - 1.3}
                                             r="1.4"
-                                            fill="#FFF6CC"
+                                            fill={PALETTE.badgeHi}
                                             opacity="0.85"
                                         />
                                     </G>
@@ -1050,7 +1079,7 @@ const WaterRingToss: React.FC<WaterRingTossProps> = ({ onBack, onGameEnd }) => {
                             />
                             <Path
                                 d={`M 12 22 C 18 ${VIEWBOX_HEIGHT * 0.4} 16 ${VIEWBOX_HEIGHT * 0.7} 9 ${VIEWBOX_HEIGHT - 22}`}
-                                stroke="#FFFFFF"
+                                stroke={colors.white}
                                 strokeWidth="5"
                                 opacity="0.3"
                                 strokeLinecap="round"
@@ -1095,7 +1124,7 @@ const styles = StyleSheet.create({
         flex: 1,
         alignSelf: 'stretch',
         position: 'relative',
-        backgroundColor: '#0A2A28',
+        backgroundColor: PALETTE.pegStroke,
     },
     hudOverlay: {
         position: 'absolute',
@@ -1112,7 +1141,7 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         backgroundColor: 'rgba(31, 68, 56, 0.85)',
         borderWidth: 1,
-        borderColor: '#F4D35E',
+        borderColor: colors.goldWarm,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1125,14 +1154,14 @@ const styles = StyleSheet.create({
         height: 22,
     },
     hudButtonText: {
-        color: '#F4D35E',
-        fontFamily: 'Monaco',
+        color: colors.goldWarm,
+        fontFamily: fonts.body,
         fontSize: 14,
         transform: [{ translateY: Platform.OS === 'android' ? -1 : 0 }],
     },
     hudScore: {
-        color: '#F4D35E',
-        fontFamily: 'Monaco',
+        color: colors.goldWarm,
+        fontFamily: fonts.body,
         fontSize: 16,
         textShadowColor: 'rgba(10, 42, 40, 0.85)',
         textShadowOffset: { width: 0, height: 1 },
@@ -1148,20 +1177,20 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(10, 42, 40, 0.88)',
     },
     banner: {
-        color: '#F4D35E',
-        fontFamily: 'Monaco',
+        color: colors.goldWarm,
+        fontFamily: fonts.body,
         fontSize: 28,
         textAlign: 'center',
     },
     bannerSub: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 14,
         marginTop: 2,
     },
     bannerHint: {
-        color: '#A9E4ED',
-        fontFamily: 'Monaco',
+        color: PALETTE.waterTop,
+        fontFamily: fonts.body,
         fontSize: 12,
         marginTop: 6,
         opacity: 0.85,

@@ -8,7 +8,25 @@ import {
     Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
+import { Z } from '../../styles/zLayers';
+import { colors, fonts } from '../../styles/tokens';
+
+// File-local palette — toast tones (success/info/warning/error) plus the
+// shared deep-navy panel & ice-text the toasts use. These are notification
+// specific and don't recur elsewhere, so they stay grouped here.
+const PALETTE = {
+    successAccent: '#7ce0a4',
+    successSoft: 'rgba(124, 224, 164, 0.22)',
+    infoAccent: '#8be2ff',
+    infoSoft: 'rgba(139, 226, 255, 0.20)',
+    warningAccent: '#ffd27c',
+    warningSoft: 'rgba(255, 210, 124, 0.22)',
+    errorAccent: '#ff8a8a',
+    errorSoft: 'rgba(255, 138, 138, 0.22)',
+    panelBg: '#101a2c',
+    bodyText: '#f0f7ff',
+    metaText: '#9bb4c7',
+} as const;
 
 interface NotificationProps {
     message: string;
@@ -35,10 +53,10 @@ type ToneStyle = {
 };
 
 const TONES: Record<NotificationProps['type'], ToneStyle> = {
-    success: { accent: '#7ce0a4', accentSoft: 'rgba(124, 224, 164, 0.22)', glyph: '+' },
-    info:    { accent: '#8be2ff', accentSoft: 'rgba(139, 226, 255, 0.20)', glyph: 'i' },
-    warning: { accent: '#ffd27c', accentSoft: 'rgba(255, 210, 124, 0.22)', glyph: '!' },
-    error:   { accent: '#ff8a8a', accentSoft: 'rgba(255, 138, 138, 0.22)', glyph: 'x' },
+    success: { accent: PALETTE.successAccent, accentSoft: PALETTE.successSoft, glyph: '+' },
+    info:    { accent: PALETTE.infoAccent,    accentSoft: PALETTE.infoSoft,    glyph: 'i' },
+    warning: { accent: PALETTE.warningAccent, accentSoft: PALETTE.warningSoft, glyph: '!' },
+    error:   { accent: PALETTE.errorAccent,   accentSoft: PALETTE.errorSoft,   glyph: 'x' },
 };
 
 const Notification: React.FC<NotificationProps> = ({
@@ -135,83 +153,21 @@ const Notification: React.FC<NotificationProps> = ({
     );
 };
 
-export const DeploymentStatusBanner: React.FC<{
-    isVisible: boolean;
-    status: string;
-    onDismiss: () => void;
-}> = ({ isVisible, status, onDismiss }) => {
-    if (!isVisible) return null;
-
-    const getStatusInfo = (status: string) => {
-        if (status.includes('Custom programs deployed')) {
-            return {
-                type: 'success' as const,
-                icon: '🚀',
-                title: 'Enhanced Mode Active',
-                description: 'Custom Solana programs deployed - All features optimized!',
-            };
-        } else if (status.includes('enhanced fallback')) {
-            return {
-                type: 'info' as const,
-                icon: '⏳',
-                title: 'Enhanced Fallback Mode',
-                description: 'All features working perfectly with programmable NFTs',
-            };
-        } else {
-            return {
-                type: 'warning' as const,
-                icon: '❓',
-                title: 'Status Unknown',
-                description: 'Game should work normally',
-            };
-        }
-    };
-
-    const statusInfo = getStatusInfo(status);
-
-    return (
-        <LinearGradient
-            colors={['#9333ea', '#2563eb']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.bannerContainer}
-        >
-            <View style={styles.bannerRow}>
-                <View style={styles.bannerContentRow}>
-                    <Text style={styles.bannerIcon}>{statusInfo.icon}</Text>
-                    <View>
-                        <Text style={styles.bannerTitle}>{statusInfo.title}</Text>
-                        <Text style={styles.bannerDescription}>{statusInfo.description}</Text>
-                        {statusInfo.type === 'info' && (
-                            <Text style={styles.bannerTip}>
-                                💡 Custom programs can be deployed later for enhanced features
-                            </Text>
-                        )}
-                    </View>
-                </View>
-                <TouchableOpacity onPress={onDismiss} style={styles.bannerCloseButton}>
-                    <Text style={styles.bannerCloseText}>✕</Text>
-                </TouchableOpacity>
-            </View>
-        </LinearGradient>
-    );
-};
-
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
         left: 12,
         right: 12,
-        zIndex: 9999,
-        backgroundColor: '#101a2c',
+        zIndex: Z.notification,
+        elevation: Z.notification,
+        backgroundColor: PALETTE.panelBg,
         borderWidth: 2,
         borderRadius: 6,
         overflow: 'hidden',
-        shadowColor: '#000',
+        shadowColor: colors.black,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.35,
         shadowRadius: 10,
-        elevation: 6,
     },
     accentStripe: {
         position: 'absolute',
@@ -237,7 +193,7 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
     glyphText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 24,
         lineHeight: 13,
     },
@@ -245,15 +201,15 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     message: {
-        color: '#f0f7ff',
-        fontFamily: 'Monaco',
+        color: PALETTE.bodyText,
+        fontFamily: fonts.body,
         fontSize: 20,
         lineHeight: 14,
     },
     statusText: {
         marginTop: 4,
-        color: '#9bb4c7',
-        fontFamily: 'Monaco',
+        color: PALETTE.metaText,
+        fontFamily: fonts.body,
         fontSize: 21,
     },
     closeButton: {
@@ -262,62 +218,10 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
     },
     closeText: {
-        color: '#9bb4c7',
+        color: PALETTE.metaText,
         fontSize: 24,
         lineHeight: 18,
-        fontFamily: 'Monaco',
-    },
-    bannerContainer: {
-        position: 'absolute',
-        bottom: 4,
-        left: 4,
-        right: 4,
-        zIndex: 40,
-        borderRadius: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
-        padding: 16,
-    },
-    bannerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    bannerContentRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    bannerIcon: {
-        fontSize: 24,
-        marginRight: 12,
-    },
-    bannerTitle: {
-        fontSize: 24,
-        color: 'white',
-        fontFamily: 'Monaco',
-    },
-    bannerDescription: {
-        fontSize: 14,
-        color: 'white',
-        opacity: 0.9,
-    },
-    bannerTip: {
-        fontSize: 12,
-        marginTop: 4,
-        color: 'white',
-        opacity: 0.75,
-    },
-    bannerCloseButton: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 999,
-        padding: 8,
-    },
-    bannerCloseText: {
-        color: 'white',
-        fontSize: 16,
+        fontFamily: fonts.body,
     },
 });
 

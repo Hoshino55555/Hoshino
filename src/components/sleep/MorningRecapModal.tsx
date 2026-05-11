@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { getCharacterSleep, Backgrounds, getIngredientArt } from '../../assets';
 import type { ForagedItem } from '../../services/GameStateService';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 
 export interface MorningRecapDeltas {
     energyGained: number;
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     heroTitle: {
         position: 'absolute',
         top: 12,
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         fontSize: 14,
         color: colors.white,
         letterSpacing: 1,
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     windowHeaderText: {
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         fontSize: 11,
         color: colors.purpleText,
         letterSpacing: 1,
@@ -333,13 +333,13 @@ const styles = StyleSheet.create({
         borderBottomColor: 'rgba(45, 27, 105, 0.15)',
     },
     tallyLabel: {
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         fontSize: 11,
         color: colors.purpleText,
         letterSpacing: 0.5,
     },
     tallyValue: {
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         fontSize: 13,
         color: colors.purpleText,
         letterSpacing: 0.5,
@@ -359,13 +359,13 @@ const styles = StyleSheet.create({
     },
     itemLabel: {
         flex: 1,
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         fontSize: 10,
         color: colors.purpleText,
         textTransform: 'capitalize',
     },
     itemCount: {
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         fontSize: 12,
         color: colors.purpleText,
     },
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
         ...PIXEL_SHADOW,
     },
     dismissText: {
-        fontFamily: 'PressStart2P',
+        fontFamily: fonts.pixel,
         fontSize: 12,
         color: colors.purpleText,
         letterSpacing: 1,

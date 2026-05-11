@@ -10,7 +10,7 @@ import {
     View,
 } from 'react-native';
 import { getIngredientArt } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 import {
     INGREDIENT_TIER,
     ingredientLabel,
@@ -323,13 +323,13 @@ const styles = StyleSheet.create({
     },
     title: {
         color: colors.gold,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 24,
         flexShrink: 1,
     },
     counter: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 18,
         opacity: 0.7,
         marginLeft: 8,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     },
     tapHint: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 20,
         marginTop: 14,
         textAlign: 'center',
@@ -380,8 +380,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(20,30,25,0.6)',
     },
     cardBack: {
-        color: '#666',
-        fontFamily: 'Monaco',
+        color: colors.inkText,
+        fontFamily: fonts.body,
         fontSize: 54,
     },
     cardImage: {
@@ -390,14 +390,14 @@ const styles = StyleSheet.create({
     },
     cardName: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 18,
         marginTop: 4,
         textAlign: 'center',
     },
     cardCount: {
-        color: '#FFD700',
-        fontFamily: 'Monaco',
+        color: colors.goldBright,
+        fontFamily: fonts.body,
         fontSize: 20,
         marginTop: 2,
     },
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     },
     skipText: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 18,
     },
 });

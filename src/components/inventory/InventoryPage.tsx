@@ -27,7 +27,8 @@ import { SHOP_CATALOG } from '../../data/shopCatalog';
 import type { ActiveCamp } from '../../services/StarFragmentService';
 import { newRequestId } from '../../services/requestId';
 import { Backgrounds, getIngredientArt, ShopItems, Frames } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, terminalGreen, fonts } from '../../styles/tokens';
+import { scrollClipperFill } from '../../styles/primitives';
 
 type InventoryTab = 'ingredients' | 'consumables' | 'accessories';
 
@@ -197,7 +198,7 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
             testID="inventory-screen"
             overlays={shellOverlays}
         >
-                <View style={styles.scrollClipper}>
+                <View style={scrollClipperFill}>
                     <ScrollView
                         contentContainerStyle={scrollContentStyle}
                         showsVerticalScrollIndicator={false}
@@ -355,14 +356,6 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
 };
 
 const styles = StyleSheet.create({
-    scrollClipper: {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        overflow: 'hidden',
-    },
     scrollBody: {
         paddingHorizontal: 16,
     },
@@ -374,31 +367,31 @@ const styles = StyleSheet.create({
     tabButton: {
         flex: 1,
         marginHorizontal: 2,
-        backgroundColor: '#dbf3db',
-        borderColor: '#003300',
+        backgroundColor: colors.mintPale,
+        borderColor: terminalGreen.bgMid,
         borderWidth: 2,
         paddingVertical: 8,
         alignItems: 'center',
-        borderTopColor: '#006600',
-        borderLeftColor: '#006600',
-        borderRightColor: '#001100',
-        borderBottomColor: '#001100',
+        borderTopColor: terminalGreen.accent,
+        borderLeftColor: terminalGreen.accent,
+        borderRightColor: terminalGreen.bgDeep,
+        borderBottomColor: terminalGreen.bgDeep,
     },
     activeTab: {
         backgroundColor: '#b8e6b8',
-        borderTopColor: '#001100',
-        borderLeftColor: '#001100',
-        borderRightColor: '#006600',
-        borderBottomColor: '#006600',
+        borderTopColor: terminalGreen.bgDeep,
+        borderLeftColor: terminalGreen.bgDeep,
+        borderRightColor: terminalGreen.accent,
+        borderBottomColor: terminalGreen.accent,
     },
     tabButtonText: {
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 21,
-        color: '#003300',
+        color: terminalGreen.bgMid,
     },
     sectionHeading: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 21,
         marginBottom: 10,
     },
@@ -414,16 +407,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
+        // Stop wrap-rows from stretching cards cross-axis to the tallest
+        // sibling (long item names wrapping to 2 lines). Without this each
+        // card's aspectRatio:320/360 gets overridden and the painted slot
+        // art cover-crops top/bottom.
+        alignItems: 'flex-start',
     },
     card: {
-        width: '31%',
+        width: '32.5%',
         aspectRatio: 320 / 360,
-        minHeight: 130,
-        paddingTop: 8,
-        paddingBottom: 8,
-        paddingLeft: 2,
-        paddingRight: 14,
-        marginBottom: 10,
         alignItems: 'center',
         justifyContent: 'flex-start',
     },
@@ -435,14 +427,14 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     itemImage: {
-        width: 44,
-        height: 44,
-        marginTop: 2,
+        width: 45,
+        height: 45,
+        marginTop: 10,
         marginBottom: 2,
     },
     itemName: {
-        color: '#3a2a1a',
-        fontFamily: 'Monaco',
+        color: colors.slotInk,
+        fontFamily: fonts.body,
         fontSize: 18,
         textAlign: 'center',
     },
@@ -454,11 +446,9 @@ const styles = StyleSheet.create({
     // than the geometric card box.
     countText: {
         position: 'absolute',
-        left: 0,
-        right: 12,
-        bottom: '28%',
-        color: '#3a2a1a',
-        fontFamily: 'Monaco',
+        bottom: '18%',
+        color: colors.slotInk,
+        fontFamily: fonts.body,
         fontSize: 22,
         textAlign: 'center',
     },

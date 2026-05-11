@@ -7,6 +7,7 @@ import FooterBackBar from '../chrome/FooterBackBar';
 import Room from './Room';
 import RoomEditor from './RoomEditor';
 import { type RoomLayout, STARTER_ROOM_LAYOUT } from '../../services/RoomLayout';
+import { colors } from '../../styles/tokens';
 
 // Single shared room for the local-only MVP. Switch to per-character keying
 // (`room:layout:${characterId}`) when the editor moves to a per-moonoko home.
@@ -111,7 +112,7 @@ const Gallery: React.FC<Props> = ({ onBack }) => {
 
 const styles = StyleSheet.create({
     fullscreen: {
-        backgroundColor: '#000',
+        backgroundColor: colors.black,
     },
 });
 

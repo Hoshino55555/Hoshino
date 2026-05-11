@@ -11,7 +11,7 @@ import {
 import type { ImageStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Backgrounds, Sleep, getCharacterSleep } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 
 const SLEEP_REQUIRED_MS = 8 * 60 * 60 * 1000;
 
@@ -178,13 +178,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
     },
     clock: {
-        fontFamily: '04b03',
+        fontFamily: fonts.pixelAlt,
         fontSize: 64,
         color: colors.white,
         letterSpacing: 2,
     },
     subtitle: {
-        fontFamily: '04b03',
+        fontFamily: fonts.pixelAlt,
         fontSize: 18,
         color: colors.white,
         marginTop: 6,
@@ -229,12 +229,12 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     alarmLabel: {
-        fontFamily: '04b03',
+        fontFamily: fonts.pixelAlt,
         fontSize: 22,
         color: colors.white,
     },
     alarmTime: {
-        fontFamily: '04b03',
+        fontFamily: fonts.pixelAlt,
         fontSize: 24,
         color: colors.white,
         letterSpacing: 1,

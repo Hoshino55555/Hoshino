@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
 
 interface StarburstProps {
     onBack: () => void;
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     },
     topButtonText: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 21,
     },
     content: {
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 33,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         marginBottom: 8,
     },
     scoreContainer: {
@@ -426,13 +426,13 @@ const styles = StyleSheet.create({
     scoreLabel: {
         fontSize: 21,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         marginRight: 8,
     },
     scoreValue: {
         fontSize: 30,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     messageContainer: {
         backgroundColor: colors.forestDark,
@@ -445,12 +445,12 @@ const styles = StyleSheet.create({
     winMessage: {
         fontSize: 24,
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     loseMessage: {
         fontSize: 24,
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     gameBoard: {
         alignItems: 'center',
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
     cornerCell: {
     },
     hintCell: {
-        backgroundColor: '#D4E8D4',
+        backgroundColor: colors.mintPale,
         borderWidth: 2,
         borderColor: colors.forestDark,
         borderRadius: 4,
@@ -477,12 +477,12 @@ const styles = StyleSheet.create({
     hintSum: {
         fontSize: 21,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     hintStar: {
         fontSize: 18,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     cell: {
         borderWidth: 2,
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
     cellText: {
         fontSize: 30,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
     },
     notesGrid: {
         flex: 1,
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
     noteText: {
         fontSize: 18,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         textAlign: 'center',
         minWidth: 8,
     },
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
     modeButton: {
         paddingVertical: 8,
         paddingHorizontal: 10,
-        backgroundColor: '#D4E8D4',
+        backgroundColor: colors.mintPale,
         borderWidth: 2,
         borderColor: colors.forestDark,
         borderRadius: 6,
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     },
     modeButtonText: {
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 21,
     },
     modeButtonTextActive: {
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     instructionText: {
         fontSize: 18,
         color: colors.forestDark,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         textAlign: 'center',
         marginTop: 4,
     },
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
     },
     newGameButtonText: {
         color: colors.mintPale,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         fontSize: 30,
         textAlign: 'center',
     },

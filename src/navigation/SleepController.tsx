@@ -11,6 +11,7 @@ import { cancelSleepAlarm, scheduleSleepAlarm } from '../services/AlarmService';
 import { SLEEP_REQUIRED_MS } from '../services/GameStateService';
 import type { ForagedItem } from '../services/GameStateService';
 import MusicService from '../services/MusicService';
+import { Z } from '../styles/zLayers';
 import type {
     AppCharacter,
     AppNotificationHandler,
@@ -307,7 +308,7 @@ export default function SleepController({
                     key="overlay-layer"
                     style={[
                         StyleSheet.absoluteFill,
-                        { zIndex: 50, elevation: 50 },
+                        { zIndex: Z.fullScreenRoute, elevation: Z.fullScreenRoute },
                     ]}
                     pointerEvents="box-none"
                 >

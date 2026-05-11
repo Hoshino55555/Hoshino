@@ -236,8 +236,6 @@ const MoonokoSelection: React.FC<Props> = ({
                 leftButtonDisabled={true}
                 isSelectionPage={true}
                 overlayMode={true}
-                showCloseButton={true}
-                onCloseButtonPress={onBack}
             >
             {/* Main Display Area */}
             <View style={styles.mainDisplayArea}>
@@ -459,25 +457,34 @@ const styles = StyleSheet.create({
         fontFamily: 'Monaco',
     },
     spinControls: {
-        marginTop: 20,
-        marginBottom: 20,
+        marginTop: 24,
+        marginBottom: 28,
         alignItems: 'center',
     },
     spinButton: {
-        backgroundColor: colors.mintPale,
-        padding: 10,
-        borderRadius: 8,
+        backgroundColor: colors.forestDark,
+        paddingVertical: 14,
+        paddingHorizontal: 44,
+        borderRadius: 10,
         borderWidth: 3,
-        borderColor: colors.forestDark,
+        borderTopColor: '#4A7A5A',
+        borderLeftColor: '#4A7A5A',
+        borderRightColor: '#1d3a28',
+        borderBottomColor: '#1d3a28',
         alignItems: 'center',
         justifyContent: 'center',
-        minWidth: 80,
+        minWidth: 200,
+        shadowColor: colors.black,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.35,
+        shadowRadius: 4,
+        elevation: 6,
     },
     spinText: {
-        color: colors.forestDark,
-        fontSize: 14,
+        color: colors.mintPale,
+        fontSize: 30,
         fontFamily: 'Monaco',
-        transform: [{ translateX: 1 }, { translateY: 4 }],
+        letterSpacing: 3,
     },
 
     // Modal styles

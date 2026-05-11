@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ImageBackground, StyleSheet } from 'react-native';
 import { Frames } from '../../assets';
-import { colors } from '../../styles/tokens';
+import { colors, fonts } from '../../styles/tokens';
+import { Z } from '../../styles/zLayers';
 
 interface WalletButtonProps {
     connected: boolean;
@@ -65,7 +66,8 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 40,
         right: 20,
-        zIndex: 90,
+        zIndex: Z.wallet,
+        elevation: Z.wallet,
     },
     connectButton: {
         backgroundColor: colors.forestDark,
@@ -74,7 +76,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         borderWidth: 1,
         borderColor: colors.mintPale,
-        shadowColor: '#000',
+        shadowColor: colors.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 4,
@@ -83,7 +85,7 @@ const styles = StyleSheet.create({
     connectText: {
         color: colors.mintPale,
         fontSize: 13,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         transform: [{ translateY: 3 }],
     },
     connectedPill: {
@@ -101,7 +103,7 @@ const styles = StyleSheet.create({
         color: colors.forestDark,
         fontSize: 24,
         lineHeight: 17,
-        fontFamily: 'Monaco',
+        fontFamily: fonts.body,
         textAlign: 'center',
         textAlignVertical: 'center',
         includeFontPadding: false,

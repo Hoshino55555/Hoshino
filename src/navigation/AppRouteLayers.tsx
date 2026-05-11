@@ -21,6 +21,7 @@ import Starburst from '../components/games/Starburst';
 import WaterRingToss from '../components/games/WaterRingToss';
 import WelcomeScreen from '../components/welcome/WelcomeScreen';
 import { useGameStateContext } from '../contexts/GameStateContext';
+import { Z } from '../styles/zLayers';
 import type {
     AppCharacter,
     AppNotificationHandler,
@@ -140,6 +141,19 @@ export default function AppRouteLayers({
         }
     };
 
+    // Water Ring Toss renders BELOW the casing (z 20) so the painted frame
+    // becomes part of the gag — the water tank visibly sits inside the
+    // device cavity. Other arcade games (Starburst) and full-screen routes
+    // (Shop/Inventory/Settings/...) paint over the casing on their own.
+    const renderCavityRoute = () => {
+        switch (currentView) {
+            case 'water-ring-toss':
+                return <WaterRingTossView onBack={() => transitionTo('arcade')} />;
+            default:
+                return null;
+        }
+    };
+
     const renderFullScreenRoute = () => {
         switch (currentView) {
             case 'feeding':
@@ -168,8 +182,6 @@ export default function AppRouteLayers({
                 );
             case 'starburst':
                 return <StarburstView onBack={() => transitionTo('arcade')} />;
-            case 'water-ring-toss':
-                return <WaterRingTossView onBack={() => transitionTo('arcade')} />;
             case 'inventory':
                 return <InventoryPage onBack={() => transitionTo('interaction')} />;
             case 'settings':
@@ -207,9 +219,19 @@ export default function AppRouteLayers({
     };
 
     const fullScreenRoute = renderFullScreenRoute();
+    const cavityRoute = renderCavityRoute();
 
     return (
         <>
+            {cavityRoute && (
+                <View
+                    key="cavity-layer"
+                    style={StyleSheet.absoluteFill}
+                    pointerEvents="box-none"
+                >
+                    {cavityRoute}
+                </View>
+            )}
             {currentView === 'interaction' && (
                 <View
                     key="interaction-layer"
@@ -249,7 +271,7 @@ export default function AppRouteLayers({
                     {fullScreenRoute}
                 </FullScreenRouteSurface>
             )}
-            {!fullScreenRoute && currentView !== 'interaction' && renderRootRoute()}
+            {!fullScreenRoute && !cavityRoute && currentView !== 'interaction' && renderRootRoute()}
         </>
     );
 }
@@ -303,8 +325,8 @@ function WaterRingTossView({ onBack }: { onBack: () => void }) {
 
 const styles = StyleSheet.create({
     fullScreenRouteSurface: {
-        zIndex: 50,
-        elevation: 50,
+        zIndex: Z.fullScreenRoute,
+        elevation: Z.fullScreenRoute,
     },
     noCharacterContainer: {
         flex: 1,
