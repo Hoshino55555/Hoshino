@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useChromeConfig } from '../contexts/ChromeContext';
+import FooterBackBar from './FooterBackBar';
 import Room from './Room';
 import RoomEditor from './RoomEditor';
 import { type RoomLayout, STARTER_ROOM_LAYOUT } from '../services/RoomLayout';
-import { Frames } from '../assets';
 
 // Single shared room for the local-only MVP. Switch to per-character keying
 // (`room:layout:${characterId}`) when the editor moves to a per-moonoko home.
@@ -14,7 +14,6 @@ const ROOM_LAYOUT_STORAGE_KEY = 'room:layout:default';
 
 interface Props {
     onBack: () => void;
-    onCloseStart?: () => void;
 }
 
 // "Gallery" is the legacy file/route name; the page itself is the Room — a
@@ -25,16 +24,17 @@ interface Props {
 // authored with its own portrait frame at the device aspect ratio. Fitting
 // it into the in-cavity 88x65% window cropped the painted wall and stretched
 // proportions; edge-to-edge lets the artwork breathe and matches the mockup.
-const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
+const Gallery: React.FC<Props> = ({ onBack }) => {
     const insets = useSafeAreaInsets();
-    const [isClosing, setIsClosing] = useState(false);
-    const scale = useRef(new Animated.Value(0.6)).current;
-    const opacity = useRef(new Animated.Value(0)).current;
+    const { height } = useWindowDimensions();
+    const footerInset = insets.bottom + height * 0.01;
+    const footerTopPadding = height * 0.005;
     // Editable room layout. Hydrate from AsyncStorage; fall back to the
     // hand-tuned starter mockup so first-time users see a furnished room.
     // `hydrated` gates the persistence effect — saving the placeholder layout
     // before the load resolves would clobber a real saved room.
     const [layout, setLayout] = useState<RoomLayout>(STARTER_ROOM_LAYOUT);
+    const [draggedRoomItemId, setDraggedRoomItemId] = useState<string | null>(null);
     const hydratedRef = useRef(false);
 
     useEffect(() => {
@@ -61,41 +61,8 @@ const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
         );
     }, [layout]);
 
-    useEffect(() => {
-        Animated.parallel([
-            Animated.spring(scale, {
-                toValue: 1,
-                tension: 22,
-                friction: 5.5,
-                useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-                toValue: 1,
-                duration: 520,
-                easing: Easing.out(Easing.quad),
-                useNativeDriver: true,
-            }),
-        ]).start();
-    }, [opacity, scale]);
-
     const handleClose = () => {
-        if (isClosing) return;
-        setIsClosing(true);
-        onCloseStart?.();
-        Animated.parallel([
-            Animated.timing(scale, {
-                toValue: 0.6,
-                duration: 560,
-                easing: Easing.in(Easing.back(1.8)),
-                useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-                toValue: 0,
-                duration: 500,
-                easing: Easing.in(Easing.quad),
-                useNativeDriver: true,
-            }),
-        ]).start(() => onBack());
+        onBack();
     };
 
     // Standard back affordance for expanded views: the chrome's left
@@ -116,16 +83,12 @@ const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
     });
 
     return (
-        <Animated.View
-            style={[
-                StyleSheet.absoluteFill,
-                styles.fullscreen,
-                { opacity, transform: [{ scale }] },
-            ]}
+        <View
+            style={[StyleSheet.absoluteFill, styles.fullscreen]}
             testID="gallery-screen"
         >
             <View style={StyleSheet.absoluteFill}>
-                <Room layout={layout} />
+                <Room layout={layout} hiddenItemId={draggedRoomItemId} />
             </View>
             {/* Editor overlay — its grid + palette only paint in edit mode,
                 but the Edit/Done chip lives inside it always. Sit it above
@@ -134,53 +97,21 @@ const Gallery: React.FC<Props> = ({ onBack, onCloseStart }) => {
             <RoomEditor
                 layout={layout}
                 onChange={(next) => setLayout(next)}
+                onDragItemChange={setDraggedRoomItemId}
                 bottomInset={insets.bottom}
             />
-            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]} pointerEvents="box-none">
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={handleClose}
-                    hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                >
-                    <Image
-                        source={Frames.backButton}
-                        style={styles.backButtonImage}
-                        resizeMode="contain"
-                    />
-                    <Text style={styles.backButtonLabel}>Back</Text>
-                </TouchableOpacity>
-            </View>
-        </Animated.View>
+            <FooterBackBar
+                onBack={handleClose}
+                paddingBottom={footerInset}
+                style={{ paddingTop: footerTopPadding }}
+            />
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     fullscreen: {
         backgroundColor: '#000',
-    },
-    bottomBar: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingHorizontal: 16,
-        paddingTop: 4,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        padding: 4,
-        alignItems: 'center',
-    },
-    backButtonImage: {
-        width: 56,
-        height: 46,
-    },
-    backButtonLabel: {
-        color: '#e84a4a',
-        fontFamily: 'Monaco',
-        fontSize: 14,
-        marginTop: 1,
     },
 });
 

@@ -1,10 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, ImageBackground, TouchableOpacity, Modal, StyleSheet, Dimensions, Animated, Easing, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { View, Text, Image, ImageBackground, TouchableOpacity, StyleSheet, Animated, Easing, useWindowDimensions } from 'react-native';
 import type { ImageStyle } from 'react-native';
-import Shop from './Shop';
-import Gallery from './Gallery';
 import InnerScreen from './InnerScreen';
-import Settings from './Settings';
 import SettingsService, { MenuButton } from '../services/SettingsService';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import ForagePopOut, { computeForageStaggerMs, FORAGE_FLIGHT_MS } from './ForagePopOut';
@@ -15,10 +12,105 @@ import { Backgrounds, Menu, Stars, Frames, Forage, getCharacterAnim } from '../a
 
 const WIDGET_ACTION_TTL_MS = 60_000;
 
-const { height } = Dimensions.get('window');
-
-
 const getImageSource = (imageName: string) => getCharacterAnim(imageName);
+
+// Per-character vertical nudge as a fraction of characterSize. Lifts the
+// sprite without touching its GIF — keeps the shared baseline in the asset
+// so layout math stays uniform.
+const CHARACTER_LIFT_FRACTION: Record<string, number> = {
+    ARO: 0.025,
+};
+
+const IMAGE_SOURCES = {
+    background: Backgrounds.screen,
+    feed: Menu.feed,
+    chat: Menu.chat,
+    games: Menu.games,
+    sleep: Menu.sleep,
+    shop: Menu.shop,
+    inventory: Menu.inventory,
+    gallery: Menu.gallery,
+    settings: Menu.settings,
+} as const;
+
+const MENU_ICON_FOR_NAME = (iconName: string) => {
+    switch (iconName) {
+        case 'feed': return IMAGE_SOURCES.feed;
+        case 'chat': return IMAGE_SOURCES.chat;
+        case 'games': return IMAGE_SOURCES.games;
+        case 'sleep': return IMAGE_SOURCES.sleep;
+        case 'shop': return IMAGE_SOURCES.shop;
+        case 'inventory': return IMAGE_SOURCES.inventory;
+        case 'gallery': return IMAGE_SOURCES.gallery;
+        case 'settings': return IMAGE_SOURCES.settings;
+        default: return IMAGE_SOURCES.settings;
+    }
+};
+
+// Stats bar — 3× ImageBackground frames + 15 star Images. Memoized so a
+// foragedItems tick doesn't rebuild this whole subtree; only mood/hunger/
+// energy invalidate it.
+interface StatsBarProps {
+    mood: number;
+    hunger: number;
+    energy: number;
+}
+const StatsBar = React.memo(({ mood, hunger, energy }: StatsBarProps) => (
+    <>
+        <ImageBackground
+            source={Frames.statBack}
+            style={styles.statItem}
+            imageStyle={styles.statBackImage as ImageStyle}
+            resizeMode="stretch"
+        >
+            <Text style={styles.statLabel}>Mood</Text>
+            <View style={styles.starContainer}>
+                {[0, 1, 2, 3, 4].map((index) => (
+                    <Image
+                        key={`mood-${index}`}
+                        source={index < mood ? Stars.lifeFilled : Stars.lifeEmpty}
+                        style={styles.starImage as ImageStyle}
+                    />
+                ))}
+            </View>
+        </ImageBackground>
+        <ImageBackground
+            source={Frames.statBack}
+            style={styles.statItem}
+            imageStyle={styles.statBackImage as ImageStyle}
+            resizeMode="stretch"
+        >
+            <Text style={styles.statLabel}>Hunger</Text>
+            <View style={styles.starContainer}>
+                {[0, 1, 2, 3, 4].map((index) => (
+                    <Image
+                        key={`hunger-${index}`}
+                        source={index < hunger ? Stars.lifeFilled : Stars.lifeEmpty}
+                        style={styles.starImage as ImageStyle}
+                    />
+                ))}
+            </View>
+        </ImageBackground>
+        <ImageBackground
+            source={Frames.statBack}
+            style={styles.statItem}
+            imageStyle={styles.statBackImage as ImageStyle}
+            resizeMode="stretch"
+        >
+            <Text style={styles.statLabel}>Energy</Text>
+            <View style={styles.starContainer}>
+                {[0, 1, 2, 3, 4].map((index) => (
+                    <Image
+                        key={`energy-${index}`}
+                        source={index < energy ? Stars.lifeFilled : Stars.lifeEmpty}
+                        style={styles.starImage as ImageStyle}
+                    />
+                ))}
+            </View>
+        </ImageBackground>
+    </>
+));
+StatsBar.displayName = 'StatsBar';
 
 interface Character {
     id: string;
@@ -80,24 +172,36 @@ const MoonokoInteraction: React.FC<Props> = ({
     // ratios tuned against Seeker's default scale (400dp wide × 890dp tall):
     //   - character ≈ 62% of screen width or 42% of height, whichever fits
     //   - exclamation badge floats ~40% of character height above the head
-    //   - menu icons ~13% of screen width, capped so big tablets don't get
-    //     cartoonishly large icons
+    //   - menu icons follow width and height so wider aspect ratios do not
+    //     blow up the controls relative to the character stage
     const { width: winW, height: winH } = useWindowDimensions();
-    const characterSize = Math.min(winW * 0.62, winH * 0.42);
-    const characterMarginTop = -characterSize * 0.48;
+    // Shrink rendered sprites so Zaniah (the tallest) doesn't crowd the menu.
+    // Math: Zaniah's feet sit at canvas y=1011 of 1024; Aro's pre-baseline-shift
+    // feet sat at y=959. Scaling 959/1011 lifts the feet to that prior-Aro
+    // position. The head stays anchored because we compensate marginTop by
+    // half the size delta — without that, shrinking would also re-center the
+    // canvas and pull the head down.
+    const CHARACTER_SCALE = 959 / 1011;
+    const baseCharacterSize = Math.min(winW * 0.62, winH * 0.42);
+    const characterSize = baseCharacterSize * CHARACTER_SCALE;
+    const characterMarginTop =
+        -baseCharacterSize * 0.48 + (characterSize - baseCharacterSize) / 2;
     const badgeOffset = -characterSize * 0.5;
-    const badgeFontSize = Math.max(40, Math.min(64, winW * 0.13));
-    const menuIconSize = Math.min(winW * 0.10, 44);
-    const currentStats = {
-        mood: gameState?.mood ?? 3,
-        hunger: gameState?.hunger ?? 5,
-        energy: gameState?.energy ?? 3,
-    };
-    const allPendingFinds = gameState?.foragedItems ?? [];
+    const characterIdKey = selectedCharacter?.image.split('.')[0]?.toUpperCase() ?? '';
+    const characterLift = (CHARACTER_LIFT_FRACTION[characterIdKey] ?? 0) * characterSize;
+    const badgeFontSize = Math.min(winW * 0.13, winH * 0.065);
+    const menuIconSize = Math.min(winW * 0.10, winH * 0.052);
+    const menuIconHitSize = menuIconSize * 1.36;
+    const moodVal = gameState?.mood ?? 3;
+    const hungerVal = gameState?.hunger ?? 5;
+    const energyVal = gameState?.energy ?? 3;
     // Sleep-tagged finds are surfaced through the Morning Recap modal, not the
     // standard forage pop-out — splitting here keeps the daytime tap path
     // unchanged while preventing a duplicate animation right after wake.
-    const pendingFinds = allPendingFinds.filter((f) => f.source !== 'sleep');
+    const pendingFinds = useMemo(
+        () => (gameState?.foragedItems ?? []).filter((f) => f.source !== 'sleep'),
+        [gameState?.foragedItems],
+    );
     const hasPendingFinds = pendingFinds.length > 0;
 
     const [popOutItems, setPopOutItems] = useState<ForagedItem[] | null>(null);
@@ -108,7 +212,7 @@ const MoonokoInteraction: React.FC<Props> = ({
     const [bagEmpty, setBagEmpty] = useState(false);
     const drainInFlightRef = useRef(false);
 
-    const handleCharacterLongPress = () => {
+    const handleCharacterLongPress = useCallback(() => {
         if (!__DEV__) return;
         if (popOutItems) return;
         const tiers: Array<{
@@ -146,7 +250,7 @@ const MoonokoInteraction: React.FC<Props> = ({
             }
             return tiers[0];
         };
-        const count = 10;
+        const count = 50;
         const now = Date.now();
         const fake: ForagedItem[] = Array.from({ length: count }, (_, i) => {
             const t = pickTier();
@@ -162,9 +266,9 @@ const MoonokoInteraction: React.FC<Props> = ({
             };
         });
         setPopOutItems(fake);
-    };
+    }, [popOutItems]);
 
-    const handleCharacterPress = () => {
+    const handleCharacterPress = useCallback(() => {
         if (drainInFlightRef.current || popOutItems) return;
         if (!hasPendingFinds) return;
         // Play the animation immediately from the cached finds — the drain
@@ -196,7 +300,7 @@ const MoonokoInteraction: React.FC<Props> = ({
             .finally(() => {
                 drainInFlightRef.current = false;
             });
-    };
+    }, [popOutItems, hasPendingFinds, pendingFinds, drainForaged, onNotification]);
 
     // Widget deep-link → auto-drain. Wait until gameState has resolved so
     // foragedItems is real, then validate the action targets the active
@@ -221,7 +325,7 @@ const MoonokoInteraction: React.FC<Props> = ({
             handleCharacterPress();
         }
         onWidgetActionConsumed?.();
-    }, [pendingWidgetAction, gameState, hasPendingFinds]);
+    }, [pendingWidgetAction, gameState, hasPendingFinds, popOutItems, handleCharacterPress, onWidgetActionConsumed]);
 
     // Push the home-screen widget a fresh snapshot whenever the state that
     // drives its rendering changes. The widget runs in the launcher process
@@ -245,8 +349,7 @@ const MoonokoInteraction: React.FC<Props> = ({
             energy: scale(gameState.energy),
             level: gameState.level,
             // Player-wide currency lives outside gameState; for now we omit
-            // it (widget shows 0). Wiring GlobalPointSystem here is a
-            // follow-up — the forage interaction doesn't depend on it.
+            // it (widget shows 0). The forage interaction doesn't depend on it.
             fragments: 0,
             isSleeping: gameState.sleepStartedAt != null,
             foragedCount: pendingFinds.length,
@@ -304,37 +407,13 @@ const MoonokoInteraction: React.FC<Props> = ({
         }
     }, [shouldFadeIn]);
 
-    const [showSettings, setShowSettings] = useState(false);
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
     const [selectedMenuIndex, setSelectedMenuIndex] = useState(0);
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuBarLayout, setMenuBarLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
-    const bobAnim = useRef(new Animated.Value(0)).current;
     const excBobAnim = useRef(new Animated.Value(0)).current;
     const bagSqueezeAnim = useRef(new Animated.Value(0)).current;
     const bagFadeAnim = useRef(new Animated.Value(1)).current;
-
-    // Gentle up/down loop for the bag (and any other smooth floaters).
-    useEffect(() => {
-        const loop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(bobAnim, {
-                    toValue: 1,
-                    duration: 1400,
-                    easing: Easing.inOut(Easing.sin),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(bobAnim, {
-                    toValue: 0,
-                    duration: 1400,
-                    easing: Easing.inOut(Easing.sin),
-                    useNativeDriver: true,
-                }),
-            ])
-        );
-        loop.start();
-        return () => loop.stop();
-    }, [bobAnim]);
 
     // Exclamation float — matches ARO-anim.gif cadence (7 frames × 300ms =
     // 2100ms cycle). Frame y-offsets in source-px: [0, +12, 0, 0, 0, -13, 0]
@@ -436,50 +515,24 @@ const MoonokoInteraction: React.FC<Props> = ({
     // center button activates the highlighted icon. Direct icon taps still
     // work — this is an alternate input path for one-handed / physical-button
     // use without overriding the existing tap UX.
-    const moveSelection = (delta: number) => {
-        if (menuButtons.length === 0) return;
+    const moveLeft = useCallback(() => {
         setSelectedMenuIndex((i) => {
             const len = menuButtons.length;
-            return ((i + delta) % len + len) % len;
+            if (len === 0) return i;
+            return ((i - 1) % len + len) % len;
         });
-    };
+    }, [menuButtons.length]);
 
-    const confirmSelection = () => {
-        const btn = menuButtons[selectedMenuIndex];
-        if (btn) handleMenuButtonAction(btn.action);
-    };
-
-    // Load menu buttons from settings
-    useEffect(() => {
-        const loadMenuButtons = async () => {
-            await settingsService.initialize();
-            const buttons = settingsService.getMenuButtons();
-            setMenuButtons(buttons);
-        };
-        loadMenuButtons();
-    }, [settingsService]);
-
-    // Reload menu buttons when returning from settings
-    useEffect(() => {
-        if (!showSettings) {
-            const loadMenuButtons = async () => {
-                const buttons = settingsService.getMenuButtons();
-                setMenuButtons(buttons);
-            };
-            loadMenuButtons();
-        }
-    }, [showSettings, settingsService]);
-
-    // Keep the selection cursor inside bounds if the menu list shrinks
-    // (e.g. user disabled a button in Settings).
-    useEffect(() => {
-        if (menuButtons.length > 0 && selectedMenuIndex >= menuButtons.length) {
-            setSelectedMenuIndex(0);
-        }
-    }, [menuButtons.length, selectedMenuIndex]);
+    const moveRight = useCallback(() => {
+        setSelectedMenuIndex((i) => {
+            const len = menuButtons.length;
+            if (len === 0) return i;
+            return ((i + 1) % len + len) % len;
+        });
+    }, [menuButtons.length]);
 
     // Handle menu button actions
-    const handleMenuButtonAction = async (action: string) => {
+    const handleMenuButtonAction = useCallback(async (action: string) => {
         if (!selectedCharacter && action !== 'settings' && action !== 'shop') {
             onNotification?.('❌ Please select a character first', 'error');
             return;
@@ -526,37 +579,44 @@ const MoonokoInteraction: React.FC<Props> = ({
             default:
                 onNotification?.(`Unknown action: ${action}`, 'error');
         }
-    };
+    }, [selectedCharacter, onFeed, onSleepRequest, onShop, onInventory, onChat, onArcade, onGallery, onSettings, onNotification]);
 
-    const imageSources = {
-        background: Backgrounds.screen,
-        feed: Menu.feed,
-        chat: Menu.chat,
-        games: Menu.games,
-        sleep: Menu.sleep,
-        shop: Menu.shop,
-        inventory: Menu.inventory,
-        gallery: Menu.gallery,
-        settings: Menu.settings,
-    };
+    const confirmSelection = useCallback(() => {
+        const btn = menuButtons[selectedMenuIndex];
+        if (btn) handleMenuButtonAction(btn.action);
+    }, [menuButtons, selectedMenuIndex, handleMenuButtonAction]);
+
+    // Load menu buttons from settings
+    useEffect(() => {
+        const loadMenuButtons = async () => {
+            await settingsService.initialize();
+            const buttons = settingsService.getMenuButtons();
+            setMenuButtons(buttons);
+        };
+        loadMenuButtons();
+    }, [settingsService]);
+
+    // Keep the selection cursor inside bounds if the menu list shrinks
+    // (e.g. user disabled a button in Settings).
+    useEffect(() => {
+        if (menuButtons.length > 0 && selectedMenuIndex >= menuButtons.length) {
+            setSelectedMenuIndex(0);
+        }
+    }, [menuButtons.length, selectedMenuIndex]);
+
+    // Stabilize callbacks passed to child components so they don't force
+    // re-renders. onLayout only stores the first measurement (see body),
+    // so memoizing with [] is safe.
+    const handlePopOutComplete = useCallback(() => setPopOutItems(null), []);
+    const handleMenuBarLayout = useCallback((e: { nativeEvent: { layout: { x: number; y: number; width: number; height: number } } }) => {
+        const next = e.nativeEvent.layout;
+        setMenuBarLayout(prev => (prev.width === 0 ? next : prev));
+    }, []);
 
     // Render menu button. `index` is the absolute position in `menuButtons`
     // (not the slice index) so the selection highlight matches the cursor.
-    const renderMenuButton = (button: MenuButton, index: number) => {
-        const getImageSource = (iconName: string) => {
-            switch (iconName) {
-                case 'feed': return imageSources.feed;
-                case 'chat': return imageSources.chat;
-                case 'games': return imageSources.games;
-                case 'sleep': return imageSources.sleep;
-                case 'shop': return imageSources.shop;
-                case 'inventory': return imageSources.inventory;
-                case 'gallery': return imageSources.gallery;
-                case 'settings': return imageSources.settings;
-                default: return imageSources.settings;
-            }
-        };
-
+    const renderMenuButton = useCallback((button: MenuButton, index: number) => {
+        const iconSource = MENU_ICON_FOR_NAME(button.icon);
         const isSelected = index === selectedMenuIndex;
 
         return (
@@ -569,13 +629,13 @@ const MoonokoInteraction: React.FC<Props> = ({
                     source={isSelected ? Frames.iconSelect : Frames.iconSelectDim}
                     style={[
                         styles.menuIconSelectImage as ImageStyle,
-                        { width: menuIconSize + 16, height: menuIconSize + 16 },
+                        { width: menuIconHitSize, height: menuIconHitSize },
                     ]}
                     resizeMode="stretch"
                 />
 
                 <Image
-                    source={getImageSource(button.icon)}
+                    source={iconSource}
                     style={[
                         styles.menuImage as ImageStyle,
                         { width: menuIconSize, height: menuIconSize },
@@ -584,7 +644,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                 />
             </View>
         );
-    };
+    }, [selectedMenuIndex, menuIconHitSize, menuIconSize]);
 
     return (
         <>
@@ -592,71 +652,17 @@ const MoonokoInteraction: React.FC<Props> = ({
             showStatsBar={true}
             isTransitioning={isTransitioning}
             transitionOpacity={transitionOpacity}
-            statsBarContent={
-                <>
-                    <ImageBackground
-                        source={Frames.statBack}
-                        style={styles.statItem}
-                        imageStyle={styles.statBackImage as ImageStyle}
-                        resizeMode="stretch"
-                    >
-                        <Text style={styles.statLabel}>Mood</Text>
-                        <View style={styles.starContainer}>
-                            {[...Array(5)].map((_, index) => (
-                                <Image
-                                    key={`mood-${index}`}
-                                    source={index < currentStats.mood ? Stars.lifeFilled : Stars.lifeEmpty}
-                                    style={styles.starImage as ImageStyle}
-                                />
-                            ))}
-                        </View>
-                    </ImageBackground>
-                    <ImageBackground
-                        source={Frames.statBack}
-                        style={styles.statItem}
-                        imageStyle={styles.statBackImage as ImageStyle}
-                        resizeMode="stretch"
-                    >
-                        <Text style={styles.statLabel}>Hunger</Text>
-                        <View style={styles.starContainer}>
-                            {[...Array(5)].map((_, index) => (
-                                <Image
-                                    key={`hunger-${index}`}
-                                    source={index < currentStats.hunger ? Stars.lifeFilled : Stars.lifeEmpty}
-                                    style={styles.starImage as ImageStyle}
-                                />
-                            ))}
-                        </View>
-                    </ImageBackground>
-                    <ImageBackground
-                        source={Frames.statBack}
-                        style={styles.statItem}
-                        imageStyle={styles.statBackImage as ImageStyle}
-                        resizeMode="stretch"
-                    >
-                        <Text style={styles.statLabel}>Energy</Text>
-                        <View style={styles.starContainer}>
-                            {[...Array(5)].map((_, index) => (
-                                <Image
-                                    key={`energy-${index}`}
-                                    source={index < currentStats.energy ? Stars.lifeFilled : Stars.lifeEmpty}
-                                    style={styles.starImage as ImageStyle}
-                                />
-                            ))}
-                        </View>
-                    </ImageBackground>
-                </>
-            }
-            onLeftButtonPress={() => moveSelection(-1)}
+            statsBarContent={<StatsBar mood={moodVal} hunger={hungerVal} energy={energyVal} />}
+            onLeftButtonPress={moveLeft}
             onCenterButtonPress={confirmSelection}
-            onRightButtonPress={() => moveSelection(1)}
+            onRightButtonPress={moveRight}
             leftButtonText=""
             centerButtonText=""
             rightButtonText=""
         >
             {/* Main Display Area */}
             <View style={styles.mainDisplayArea}>
-                <Image source={imageSources.background} style={styles.backgroundImage as ImageStyle} resizeMode="cover" />
+                <Image source={IMAGE_SOURCES.background} style={styles.backgroundImage as ImageStyle} resizeMode="cover" />
                 {selectedCharacter ? (
                     <TouchableOpacity
                         activeOpacity={hasPendingFinds ? 0.7 : 1}
@@ -670,14 +676,19 @@ const MoonokoInteraction: React.FC<Props> = ({
                             source={getImageSource(selectedCharacter.image)}
                             style={[
                                 styles.characterImage as ImageStyle,
-                                { width: characterSize, height: characterSize, marginTop: characterMarginTop },
+                                {
+                                    width: characterSize,
+                                    height: characterSize,
+                                    marginTop: characterMarginTop,
+                                    transform: [{ translateY: -characterLift }],
+                                },
                             ]}
                         />
                         {hasPendingFinds && !popOutItems && (
                             <Animated.View
                                 style={[
                                     styles.exclamationBadge,
-                                    { top: badgeOffset + 12 },
+                                    { top: badgeOffset - 8 },
                                     {
                                         transform: [
                                             { translateX: 70 },
@@ -763,7 +774,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                         // from the touch's horizontal center.
                         launchOffsetX={-characterSize * 0.22}
                         launchOffsetY={characterSize * 0.30}
-                        onComplete={() => setPopOutItems(null)}
+                        onComplete={handlePopOutComplete}
                     />
                 )}
             </View>
@@ -773,10 +784,7 @@ const MoonokoInteraction: React.FC<Props> = ({
             {menuButtons.length > 0 && (
                 <View
                     style={styles.integratedMenuBar}
-                    onLayout={(e) => {
-                        const next = e.nativeEvent.layout;
-                        setMenuBarLayout(prev => (prev.width === 0 ? next : prev));
-                    }}
+                    onLayout={handleMenuBarLayout}
                 >
                     <View style={styles.integratedMenuBarInner}>
                         <View style={styles.menuRow}>

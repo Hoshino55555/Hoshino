@@ -39,9 +39,9 @@ const STUB_IMAGE: ImageSourcePropType = Ingredients.pinkSugar;
 
 const dealsItems: ShopItem[] = [
     {
-        id: 'season-pass',
-        name: 'Season Pass',
-        description: 'AI chat credits, dream diary, accessories, 1 exclusive Moonoko',
+        id: 'lunar-pass',
+        name: 'Lunar Pass',
+        description: 'Ride the moon cycle!',
         imageUrl: '',
         category: ItemCategory.UTILITY,
         rarity: ItemRarity.LEGENDARY,
@@ -54,7 +54,7 @@ const dealsItems: ShopItem[] = [
         priceUsd: 9.99,
         status: 'iap-pending',
         image: ShopItems.seasonPass,
-        summary: 'AI credits · diary · exclusive Moonoko',
+        summary: 'Ride the moon cycle!',
     },
     {
         id: 'bundle-starter',
@@ -71,22 +71,6 @@ const dealsItems: ShopItem[] = [
         currency: 'usd',
         status: 'iap-pending',
         image: ShopItems.starterPack,
-    },
-    {
-        id: 'bundle-themed',
-        name: 'Themed Bundle',
-        description: 'Rotating themed bundle',
-        imageUrl: '',
-        category: ItemCategory.UTILITY,
-        rarity: ItemRarity.EPIC,
-        priceSOL: 0,
-        priceStarFragments: 0,
-        inStock: true,
-        tab: 'deals',
-        subcategory: 'Bundles',
-        currency: 'usd',
-        status: 'iap-pending',
-        image: ShopItems.promoPack,
     },
     {
         id: 'bundle-bargain',
@@ -400,9 +384,9 @@ const accessoriesItems: ShopItem[] = [
         image: STUB_IMAGE,
     },
     {
-        id: 'furniture-placemat',
-        name: 'Placemat',
-        description: 'A placemat for your room',
+        id: 'furniture-carpet',
+        name: 'Carpet',
+        description: 'A carpet for your room',
         imageUrl: '',
         category: ItemCategory.COSMETIC,
         rarity: ItemRarity.COMMON,

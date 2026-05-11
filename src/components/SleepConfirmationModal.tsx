@@ -6,10 +6,8 @@ import {
     StyleSheet,
     Animated,
     Modal,
-    Dimensions,
+    useWindowDimensions,
 } from 'react-native';
-
-const { width } = Dimensions.get('window');
 
 const DIGIT_ROW_HEIGHT = 56;
 const DIGIT_FONT_SIZE = 38;
@@ -164,6 +162,7 @@ const SleepConfirmationModal: React.FC<Props> = ({
     onCancel,
     onSmokeTest,
 }) => {
+    const { width } = useWindowDimensions();
     const [parts, setParts] = useState<WakeParts>(() => partsFromMs(defaultWakeAtMs));
     const [hourDir, setHourDir] = useState<1 | -1>(1);
     const [minuteDir, setMinuteDir] = useState<1 | -1>(1);
@@ -254,7 +253,16 @@ const SleepConfirmationModal: React.FC<Props> = ({
     return (
         <Modal transparent visible={visible} animationType="none" onRequestClose={onCancel}>
             <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
-                <Animated.View style={[styles.modalContainer, { transform: [{ scale: scaleAnim }] }]}>
+                <Animated.View
+                    style={[
+                        styles.modalContainer,
+                        {
+                            width: width * 0.85,
+                            maxWidth: width * 0.92,
+                            transform: [{ scale: scaleAnim }],
+                        },
+                    ]}
+                >
                     <View style={styles.windowHeader}>
                         <Text style={styles.titleText}>SLEEP MODE</Text>
                     </View>
@@ -414,8 +422,6 @@ const styles = StyleSheet.create({
     modalContainer: {
         backgroundColor: '#e5dcf5',
         borderRadius: 4,
-        width: width * 0.85,
-        maxWidth: 380,
         borderWidth: 3,
         borderColor: '#000000',
         shadowColor: '#000000',

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface StarburstProps {
@@ -46,12 +46,27 @@ const GRID_SIZE = 5;
 
 const Starburst: React.FC<StarburstProps> = ({ onBack, onGameEnd }) => {
     const insets = useSafeAreaInsets();
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
     const [grid, setGrid] = useState<GridCell[][]>([]);
     const [rowHints, setRowHints] = useState<RowHint[]>([]);
     const [colHints, setColHints] = useState<RowHint[]>([]);
     const [score, setScore] = useState<number>(1);
     const [gameStatus, setGameStatus] = useState<GameStatus>('playing');
     const [inputMode, setInputMode] = useState<InputMode>('flip');
+    // Board sizing follows the actual viewport shape instead of a tablet cap:
+    // width-constrained on narrow phones, height-constrained on short layouts.
+    const boardWidth = Math.min(screenWidth * 0.9, screenHeight * 0.5);
+    const cellMargin = boardWidth * 0.006;
+    const cellSize =
+        (boardWidth - cellMargin * 2 * (GRID_SIZE + 1)) / (GRID_SIZE + 1);
+    const cellSizeStyle = useMemo(
+        () => ({ width: cellSize, height: cellSize }),
+        [cellSize],
+    );
+    const cellMarginStyle = useMemo(
+        () => ({ marginHorizontal: cellMargin }),
+        [cellMargin],
+    );
 
     const generateGrid = useCallback((): GridCell[][] => {
         const newGrid: GridCell[][] = [];
@@ -247,17 +262,17 @@ const Starburst: React.FC<StarburstProps> = ({ onBack, onGameEnd }) => {
 
     const getCellStyle = (cell: GridCell) => {
         if (!cell.flipped) {
-            return [styles.cell, styles.cellHidden];
+            return [styles.cell, cellSizeStyle, cellMarginStyle, styles.cellHidden];
         }
         if (cell.value === 0) {
-            return [styles.cell, styles.cellStar];
+            return [styles.cell, cellSizeStyle, cellMarginStyle, styles.cellStar];
         }
-        return [styles.cell, styles.cellFlipped];
+        return [styles.cell, cellSizeStyle, cellMarginStyle, styles.cellFlipped];
     };
 
     return (
         <View style={[StyleSheet.absoluteFill, styles.screenBg]}>
-            <View style={[styles.content, { paddingBottom: insets.bottom + 60 }]}>
+            <View style={[styles.content, { paddingBottom: insets.bottom + screenHeight * 0.07 }]}>
                 <Text style={styles.title}>Starburst</Text>
 
                 <View style={styles.scoreContainer}>
@@ -279,9 +294,9 @@ const Starburst: React.FC<StarburstProps> = ({ onBack, onGameEnd }) => {
 
                 <View style={styles.gameBoard}>
                     <View style={styles.hintRow}>
-                        <View style={styles.cornerCell} />
+                        <View style={[styles.cornerCell, cellSizeStyle, cellMarginStyle]} />
                         {colHints.map((hint, idx) => (
-                            <View key={idx} style={styles.hintCell}>
+                            <View key={idx} style={[styles.hintCell, cellSizeStyle, cellMarginStyle]}>
                                 <Text style={styles.hintSum}>{hint.sum}</Text>
                                 <Text style={styles.hintStar}>{hint.starCount}</Text>
                             </View>
@@ -290,7 +305,7 @@ const Starburst: React.FC<StarburstProps> = ({ onBack, onGameEnd }) => {
 
                     {grid.map((row, rowIdx) => (
                         <View key={rowIdx} style={styles.gridRow}>
-                            <View style={styles.hintCell}>
+                            <View style={[styles.hintCell, cellSizeStyle, cellMarginStyle]}>
                                 <Text style={styles.hintSum}>{rowHints[rowIdx]?.sum || 0}</Text>
                                 <Text style={styles.hintStar}>{rowHints[rowIdx]?.starCount || 0}</Text>
                             </View>
@@ -345,7 +360,7 @@ const Starburst: React.FC<StarburstProps> = ({ onBack, onGameEnd }) => {
                 </TouchableOpacity>
             </View>
 
-            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + screenHeight * 0.01 }]}>
                 <TouchableOpacity
                     style={styles.topButton}
                     onPress={handleBack}
@@ -357,12 +372,6 @@ const Starburst: React.FC<StarburstProps> = ({ onBack, onGameEnd }) => {
         </View>
     );
 };
-
-const { width } = Dimensions.get('window');
-// Board grows to fill the fullscreen overlay instead of the old InnerScreen
-// cavity — cap at 64px so tablets don't get a giant grid, otherwise let phones
-// use the whole width minus margins.
-const CELL_SIZE = Math.min((width - 48) / (GRID_SIZE + 1), 64);
 
 const styles = StyleSheet.create({
     // Solid backdrop so the game doesn't bleed onto the prior route's art —
@@ -455,19 +464,14 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     cornerCell: {
-        width: CELL_SIZE,
-        height: CELL_SIZE,
     },
     hintCell: {
-        width: CELL_SIZE,
-        height: CELL_SIZE,
         backgroundColor: '#D4E8D4',
         borderWidth: 2,
         borderColor: '#2E5A3E',
         borderRadius: 4,
         justifyContent: 'center',
         alignItems: 'center',
-        marginHorizontal: 2,
     },
     hintSum: {
         fontSize: 21,
@@ -480,14 +484,11 @@ const styles = StyleSheet.create({
         fontFamily: 'Monaco',
     },
     cell: {
-        width: CELL_SIZE,
-        height: CELL_SIZE,
         borderWidth: 2,
         borderColor: '#2E5A3E',
         borderRadius: 4,
         justifyContent: 'center',
         alignItems: 'center',
-        marginHorizontal: 2,
     },
     cellHidden: {
         backgroundColor: '#B8D4B8',

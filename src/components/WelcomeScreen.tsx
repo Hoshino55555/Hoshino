@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, TextInput } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import Frame from './Frame';
 import { useWallet } from '../contexts/WalletContext';
 import InnerScreen from './InnerScreen';
 import { Logos, Misc } from '../assets';
-
-// Get screen dimensions for responsive sizing
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const isTablet = screenWidth > 768; // Common tablet breakpoint
 
 interface Props {
     onContinue: (playerName?: string) => void;
@@ -40,6 +36,11 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [transitionOpacity, setTransitionOpacity] = useState(0);
     const [dialogContainerWidth, setDialogContainerWidth] = useState(0);
+    const dialogFrameWidth = dialogContainerWidth * 0.86;
+    const dialogFrameHeight = dialogContainerWidth * 0.2;
+    const dialogFrameLeft = dialogContainerWidth * 0.07;
+    const dialogFrameTop = -dialogFrameHeight * 0.48;
+    const dialogFramePixelSize = dialogContainerWidth * 0.0057;
 
     
     // Use refs to track current state in intervals
@@ -607,12 +608,12 @@ const WelcomeScreen: React.FC<Props> = ({ onContinue, onGoToInteraction, onGoToS
                         >
                             {dialogContainerWidth > 0 && (
                             <Frame
-                                width={dialogContainerWidth - 50}
-                                height={70}
-                                top={-34}
-                                left={25}
+                                width={dialogFrameWidth}
+                                height={dialogFrameHeight}
+                                top={dialogFrameTop}
+                                left={dialogFrameLeft}
                                 position="absolute"
-                                pixelSize={2}
+                                pixelSize={dialogFramePixelSize}
                             >
                                 <View style={styles.dialogContentContainer}>
                                     <View style={styles.dialogTextContainer}>
@@ -752,9 +753,8 @@ const styles = StyleSheet.create({
         padding: 0, // Remove padding to create pixelated border effect
         borderRadius: 0, // Remove rounded corners for pixelated look
         borderWidth: 0, // Remove CSS border - we'll use pixelated borders
-        // Fixed size dialog box
-        width: isTablet ? 400 : 300,
-        height: isTablet ? 140 : 120,
+        width: '78%',
+        aspectRatio: 2.35,
         alignSelf: 'center',
         position: 'relative',
         overflow: 'visible', // Allow pixelated borders to show
@@ -807,25 +807,26 @@ const styles = StyleSheet.create({
         fontFamily: 'Monaco',
     },
     starCharacterSection: {
-        height: isTablet ? 450 : 350,
+        flex: 1,
+        width: '100%',
         justifyContent: 'center',
         alignItems: 'center',
     },
     starCharacterImage: {
-        width: isTablet ? 250 : 200,
-        height: isTablet ? 250 : 200,
+        width: '58%',
+        aspectRatio: 1,
         resizeMode: 'contain',
         marginLeft: 0,
     },
     eyesSection: {
-        height: isTablet ? 60 : 40,
+        height: '18%',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 5,
     },
     eyesImage: {
-        width: isTablet ? 150 : 100,
-        height: isTablet ? 75 : 50,
+        width: '36%',
+        aspectRatio: 2,
         resizeMode: 'contain',
     },
     nameInputSection: {
@@ -842,7 +843,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     namePrompt: {
-        fontSize: isTablet ? 16 : 13,
+        fontSize: 14,
         marginBottom: 2,
         textAlign: 'center',
         color: '#2E5A3E', // Same dark green as the input text
@@ -857,12 +858,12 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     nameDisplay: {
-        fontSize: isTablet ? 28 : 14,
+        fontSize: 18,
         textAlign: 'center',
         color: '#2E5A3E', // Dark green text to match border
         letterSpacing: 2,
         width: '100%',
-        lineHeight: isTablet ? 28 : 24,
+        lineHeight: 24,
         includeFontPadding: false,
         textAlignVertical: 'center',
         fontFamily: 'Monaco',
@@ -887,12 +888,12 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     welcomePlayer: {
-        fontSize: isTablet ? 28 : 24,
+        fontSize: 24,
         marginBottom: 10,
         fontFamily: 'Monaco',
     },
     transitionText: {
-        fontSize: isTablet ? 18 : 16,
+        fontSize: 16,
         fontFamily: 'Monaco',
     },
     nameInputOuterBox: {

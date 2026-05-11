@@ -1,11 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image, Keyboard, Animated, Easing } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Easing } from 'react-native';
 import { useChromeConfig } from '../contexts/ChromeContext';
 import { Backgrounds } from '../assets';
-
-// Get screen dimensions for responsive sizing
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const isTablet = screenWidth > 768; // Common tablet breakpoint
 
 interface InnerScreenProps {
     children: React.ReactNode;
@@ -236,21 +232,23 @@ const styles = StyleSheet.create({
     },
     shadowContainer: {
         position: 'absolute',
-        top: isTablet ? '20%' : '22%',
-        width: isTablet ? '75%' : '78%',
-        height: isTablet ? '65%' : '51%',
+        // Slightly bleed under the transparent aperture in the 1200x2670
+        // chrome art. Exact-fit values can expose a 1-2px hairline where
+        // Android rounds layout percentages against the antialiased lip.
+        top: '22.0%',
+        left: '10.9%',
+        width: '78.3%',
+        height: '51.0%',
         overflow: 'visible', // Allow shadows to show outside
-        marginRight: isTablet ? 11 : 0, // Reduced by 5px to move right
-        marginBottom: isTablet ? 16 : 12,
     },
     shadowContainerLarge: {
         position: 'absolute',
-        top: isTablet ? '15%' : '17%',
-        width: isTablet ? '85%' : '88%',
-        height: isTablet ? '75%' : '65%',
+        top: '16%',
+        width: '88%',
+        height: '68%',
         overflow: 'visible',
-        marginRight: isTablet ? 11 : 0,
-        marginBottom: isTablet ? 16 : 12,
+        marginRight: '1%',
+        marginBottom: '1.5%',
     },
     innerScreen: {
         width: '100%',
@@ -308,9 +306,6 @@ const styles = StyleSheet.create({
         zIndex: 50,
     },
     innerScreenLarge: {
-        // Remove direct width/height since they're handled by shadowContainer
-        // Keep only the margin adjustment
-        marginTop: isTablet ? -10 : -20,
         shadowColor: 'transparent',
         shadowOpacity: 0,
         shadowRadius: 0,
@@ -325,14 +320,11 @@ const styles = StyleSheet.create({
         elevation: 10,
     },
     innerScreenWithKeyboard: {
-        height: isTablet ? '60%' : '80%',
+        height: '72%',
     },
     innerScreenAllowOverflow: {
         overflow: 'visible',
         paddingBottom: 80, // Add padding to accommodate menu bar
-    },
-    darkenedButtons: {
-        opacity: 0.3,
     },
     innerBackground: {
         position: 'absolute',
@@ -450,75 +442,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         zIndex: 2,
         overflow: 'visible', // Allow Frame shadows to show
-    },
-    bottomButtonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        width: '100%',
-        paddingHorizontal: isTablet ? 40 : 55,
-        position: 'absolute',
-        bottom: isTablet ? 20 : 100,
-    },
-    bottomButton: {
-        width: isTablet ? 80 : 75,
-        height: isTablet ? 80 : 75,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: isTablet ? 40 : 30,
-        overflow: 'hidden',
-        position: 'relative',
-    },
-    left: {
-        marginRight: 'auto',
-    },
-    center: {
-        marginTop: isTablet ? 10 : 30, // 10px lower
-    },
-    right: {
-        marginLeft: 'auto',
-    },
-    disabled: {
-        opacity: 0.3,
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    },
-    buttonText: {
-        color: '#2E5A3E', // Dark green for better contrast
-        fontSize: 24,
-        fontFamily: 'Monaco',
-    },
-    buttonImage: {
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        borderRadius: isTablet ? 40 : 30,
-    },
-    deviceButton: {
-        position: 'absolute',
-        width: 50,
-        height: 50,
-        backgroundColor: 'transparent',
-        borderRadius: 25,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    leftPhysical: {
-        bottom: 20,
-        left: 20,
-    },
-    centerPhysical: {
-        bottom: 20,
-        left: '50%',
-        transform: [{ translateX: -25 }],
-    },
-    rightPhysical: {
-        bottom: 20,
-        right: 20,
-    },
-    yesButtonText: {
-        color: '#4CAF50', // Softer green
-    },
-    noButtonText: {
-        color: '#F44336', // Softer red
     },
     closeButton: {
         position: 'absolute',

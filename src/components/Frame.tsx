@@ -1,9 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-
-// Get screen dimensions for responsive sizing
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const isTablet = screenWidth > 768; // Common tablet breakpoint
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 
 interface FrameProps {
     children: React.ReactNode;
@@ -21,9 +17,9 @@ interface FrameProps {
 
 const Frame: React.FC<FrameProps> = ({
     children,
-    width = isTablet ? '75%' : '78%',
-    height = isTablet ? '65%' : '51%',
-    top = isTablet ? '20%' : '22%',
+    width = '78%',
+    height = '56%',
+    top = '21%',
     left = '50%',
     position = 'absolute',
     showBackgroundImage = true,
@@ -31,6 +27,7 @@ const Frame: React.FC<FrameProps> = ({
     pixelSize: customPixelSize,
 
 }) => {
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
     const resolveAxis = (value: string | number, axis: 'width' | 'height'): number => {
         if (typeof value === 'number') return value;
         if (typeof value === 'string' && value.includes('%')) {
@@ -47,7 +44,7 @@ const Frame: React.FC<FrameProps> = ({
     const frameLeft = 0;
     const frameTop = 0;
 
-    const pixelSize = customPixelSize || 4;
+    const pixelSize = customPixelSize || frameWidth * 0.012;
     const pixels: React.ReactNode[] = [];
 
     // Border configuration object with all the perfected calculations
@@ -317,13 +314,33 @@ const Frame: React.FC<FrameProps> = ({
 
             {/* Background image */}
             {showBackgroundImage && (
-                <View style={styles.backgroundContainer}>
+                <View
+                    style={[
+                        styles.backgroundContainer,
+                        {
+                            top: pixelSize * 6,
+                            left: pixelSize * 6,
+                            right: pixelSize * 6,
+                            bottom: pixelSize * 6,
+                        },
+                    ]}
+                >
                     {/* Background would go here if needed */}
                 </View>
             )}
 
             {/* Content area */}
-            <View style={styles.contentArea}>
+            <View
+                style={[
+                    styles.contentArea,
+                    {
+                        top: pixelSize * 0.5,
+                        left: pixelSize * 1.5,
+                        right: pixelSize * 1.5,
+                        bottom: pixelSize * 1.5,
+                    },
+                ]}
+            >
                 {children}
             </View>
         </View>
@@ -338,19 +355,11 @@ const styles = StyleSheet.create({
     },
     backgroundContainer: {
         position: 'absolute',
-        top: isTablet ? 16 : 12,
-        left: isTablet ? 16 : 12,
-        right: isTablet ? 16 : 12,
-        bottom: isTablet ? 16 : 12,
         zIndex: 1,
         overflow: 'hidden',
     },
     contentArea: {
         position: 'absolute',
-        top: isTablet ? 2 : 1,
-        left: isTablet ? 4 : 3,
-        right: isTablet ? 4 : 3,
-        bottom: isTablet ? 4 : 3,
         zIndex: 2,
         justifyContent: 'flex-start',
         alignItems: 'center',

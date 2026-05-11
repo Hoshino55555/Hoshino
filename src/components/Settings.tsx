@@ -10,13 +10,14 @@ import {
     Image,
     PanResponder,
     Animated,
-    ImageBackground,
-    Dimensions,
+    useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FooterBackBar from './FooterBackBar';
+import PageArtShell from './PageArtShell';
 import SettingsService, { MenuButton, type SoundLevel } from '../services/SettingsService';
 import MusicService from '../services/MusicService';
-import { Menu, Backgrounds, Frames } from '../assets';
+import { Menu, Backgrounds } from '../assets';
 
 interface Props {
     onBack: () => void;
@@ -26,9 +27,10 @@ interface Props {
 
 const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }) => {
     const insets = useSafeAreaInsets();
-    const screenHeight = Dimensions.get('window').height;
+    const { height: screenHeight } = useWindowDimensions();
     const bannerReserve = screenHeight * 0.27;
     const bottomBarReserve = screenHeight * 0.10;
+    const contentBottomPadding = insets.bottom + bottomBarReserve * 0.16;
     const [settingsService] = useState(() => SettingsService.getInstance());
     const [menuButtons, setMenuButtons] = useState<MenuButton[]>([]);
     const [soundLevel, setSoundLevelState] = useState<SoundLevel>(3);
@@ -103,8 +105,11 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
-            <ImageBackground source={Backgrounds.settings} style={styles.bg} resizeMode="cover" testID="settings-screen">
+        <PageArtShell
+            background={Backgrounds.settings}
+            backgroundColor="#1a1033"
+            testID="settings-screen"
+        >
                 <View
                     style={[
                         styles.scrollClipper,
@@ -118,7 +123,7 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
                     style={styles.content}
                     contentContainerStyle={[
                         styles.scrollContent,
-                        { paddingBottom: insets.bottom + 16 },
+                        { paddingBottom: contentBottomPadding },
                     ]}
                     showsVerticalScrollIndicator={false}
                 >
@@ -306,61 +311,19 @@ const Settings: React.FC<Props> = ({ onBack, onNotification, onSettingsChanged }
                 </ScrollView>
                 </View>
 
-                <View
-                    style={[
-                        styles.bottomBar,
-                        { height: bottomBarReserve, paddingBottom: insets.bottom },
-                    ]}
-                    pointerEvents="box-none"
-                >
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={onBack}
-                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                    >
-                        <Image
-                            source={Frames.backButton}
-                            style={styles.backButtonImage}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.backButtonLabel}>Back</Text>
-                    </TouchableOpacity>
-                </View>
-            </ImageBackground>
-        </View>
+                <FooterBackBar
+                    onBack={onBack}
+                    height={bottomBarReserve}
+                    bottomInset={insets.bottom}
+                />
+        </PageArtShell>
     );
 };
 
 const styles = StyleSheet.create({
-    bg: {
-        flex: 1,
-    },
     scrollClipper: {
         flex: 1,
         overflow: 'hidden',
-    },
-    bottomBar: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        paddingHorizontal: 16,
-    },
-    backButton: {
-        padding: 4,
-        alignItems: 'center',
-    },
-    backButtonImage: {
-        width: 56,
-        height: 46,
-    },
-    backButtonLabel: {
-        color: '#e84a4a',
-        fontFamily: 'Monaco',
-        fontSize: 14,
-        marginTop: 1,
     },
     content: {
         flex: 1,

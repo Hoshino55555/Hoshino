@@ -20,9 +20,12 @@ import {
     ingredientLabel,
     type IngredientTier,
 } from '../services/RecipeCatalog';
+import FooterBackBar from './FooterBackBar';
+import PageArtShell from './PageArtShell';
 import type { BoosterSkuId } from '../services/GameStateService';
 import { SHOP_CATALOG } from '../data/shopCatalog';
 import type { ActiveCamp } from '../services/StarFragmentService';
+import { newRequestId } from '../services/requestId';
 import { Backgrounds, getIngredientArt, ShopItems, Frames } from '../assets';
 
 type InventoryTab = 'ingredients' | 'consumables' | 'accessories';
@@ -79,11 +82,6 @@ const callGetStarFragments = httpsCallable<
     { boosters?: Record<string, number>; activeCamp?: ActiveCamp | null }
 >(functions, 'getStarFragments');
 
-const newRequestId = (prefix: string) =>
-    `${prefix}-${Date.now().toString(36)}-${Math.random()
-        .toString(36)
-        .slice(2, 10)}`;
-
 const TIER_ORDER: IngredientTier[] = ['ultra_rare', 'rare', 'uncommon', 'common'];
 
 interface Props {
@@ -99,6 +97,9 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
     // inventory-bg-top.png is 1200×790, inventory-bg-bottom.png is 1200×278.
     const bannerReserve = screenWidth * (790 / 1200);
     const bottomBarReserve = screenWidth * (278 / 1200);
+    const contentTopPadding = bannerReserve * 0.955 + insets.top;
+    const contentBottomPadding =
+        bottomBarReserve * 1.17 + insets.bottom;
 
     const [boosters, setBoosters] = useState<Record<string, number>>({});
     const [activeCamp, setActiveCamp] = useState<ActiveCamp | null>(null);
@@ -171,13 +172,25 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
     const totalCount = owned.reduce((s, e) => s + e.count, 0);
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
-            <ImageBackground
-                source={Backgrounds.inventory}
-                style={styles.bg}
-                resizeMode="cover"
-                testID="inventory-screen"
-            >
+        <PageArtShell
+            background={Backgrounds.inventory}
+            backgroundColor="#1a1033"
+            testID="inventory-screen"
+            overlays={[
+                {
+                    key: 'bottom',
+                    source: Backgrounds.inventoryBottom,
+                    edge: 'bottom',
+                    height: bottomBarReserve,
+                },
+                {
+                    key: 'banner',
+                    source: Backgrounds.inventoryBanner,
+                    edge: 'top',
+                    height: bannerReserve,
+                },
+            ]}
+        >
                 <View
                     style={[
                         styles.scrollClipper,
@@ -188,8 +201,8 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                         contentContainerStyle={[
                             styles.scrollBody,
                             {
-                                paddingTop: bannerReserve + insets.top - 12,
-                                paddingBottom: bottomBarReserve + insets.bottom + 16,
+                                paddingTop: contentTopPadding,
+                                paddingBottom: contentBottomPadding,
                             },
                         ]}
                         showsVerticalScrollIndicator={false}
@@ -346,101 +359,21 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                     </ScrollView>
                 </View>
 
-                <View
-                    pointerEvents="none"
-                    style={[styles.bottomOverlay, { height: bottomBarReserve }]}
-                >
-                    <Image
-                        source={Backgrounds.inventoryBottom}
-                        style={styles.overlayImage}
-                        resizeMode="contain"
-                    />
-                </View>
-                <View
-                    pointerEvents="none"
-                    style={[styles.bannerOverlay, { top: 0, height: bannerReserve }]}
-                >
-                    <Image
-                        source={Backgrounds.inventoryBanner}
-                        style={styles.overlayImage}
-                        resizeMode="contain"
-                    />
-                </View>
-
-                <View
-                    style={[
-                        styles.bottomBar,
-                        { height: bottomBarReserve, paddingBottom: insets.bottom },
-                    ]}
-                    pointerEvents="box-none"
-                >
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={onBack}
-                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                    >
-                        <Image
-                            source={Frames.backButton}
-                            style={styles.backButtonImage}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.backButtonLabel}>Back</Text>
-                    </TouchableOpacity>
-                </View>
-            </ImageBackground>
-        </View>
+                <FooterBackBar
+                    onBack={onBack}
+                    height={bottomBarReserve}
+                    bottomInset={insets.bottom}
+                />
+        </PageArtShell>
     );
 };
 
 const styles = StyleSheet.create({
-    bg: { flex: 1, width: '100%', height: '100%' },
-    bottomBar: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingHorizontal: 16,
-        zIndex: 2,
-    },
-    backButton: {
-        padding: 4,
-        alignItems: 'center',
-    },
-    backButtonImage: {
-        width: 56,
-        height: 46,
-    },
-    backButtonLabel: {
-        color: '#e84a4a',
-        fontFamily: 'Monaco',
-        fontSize: 14,
-        marginTop: 1,
-    },
     scrollClipper: {
         position: 'absolute',
         left: 0,
         right: 0,
         overflow: 'hidden',
-    },
-    bannerOverlay: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 1,
-    },
-    bottomOverlay: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1,
-    },
-    overlayImage: {
-        width: '100%',
-        height: '100%',
     },
     scrollBody: {
         paddingHorizontal: 16,

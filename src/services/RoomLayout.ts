@@ -16,27 +16,29 @@ import { Rooms } from '../assets';
 export type RoomBand = 'wall' | 'floor';
 
 // Asset keys are dotted strings into the Rooms namespace. Two disjoint sets:
-//   - BackgroundAssetKey: rendered as full-canvas layers (frame, wall paint).
-//     Authored at the room's full pixel size so transparent regions handle
-//     framing without per-band cropping.
+//   - BackgroundAssetKey: rendered as full-canvas layers. The new baseroom
+//     paints both wall + floor in one bitmap so there is only one entry now.
 //   - RoomItemAssetKey: placeable cosmetics that live inside a band's grid.
 //
 // Keeping them disjoint at the type level prevents `RoomItem.asset =
 // 'frame.default'` typos from compiling, which would otherwise paint the
 // frame on top of itself inside the wall band.
-export type BackgroundAssetKey = 'frame.default' | 'walls.blue';
+export type BackgroundAssetKey = 'frame.default';
 
 export type RoomItemAssetKey =
-    | 'decals.cobweb'
-    | 'decals.porthole'
-    | 'decals.bloodsplatter'
-    | 'floor.placemat'
+    | 'decals.poster1'
+    | 'decals.poster2'
+    | 'decals.window'
+    | 'floor.carpet'
+    | 'floor.bed'
+    | 'floor.desk'
+    | 'floor.plant'
     | 'minis.aro';
 
 export type RoomAssetKey = BackgroundAssetKey | RoomItemAssetKey;
 
 export interface RoomItem {
-    /** Stable instance id — distinct from asset key so two cobwebs can coexist. */
+    /** Stable instance id — distinct from asset key so two posters can coexist. */
     id: string;
     asset: RoomItemAssetKey;
     band: RoomBand;
@@ -77,11 +79,13 @@ export function gridFor(band: RoomBand) {
 //     prototype-chain properties like `toString`.
 const ASSET_RECORD: Record<RoomAssetKey, ReturnType<typeof require>> = {
     'frame.default': Rooms.frame.default,
-    'walls.blue': Rooms.walls.blue,
-    'decals.cobweb': Rooms.decals.cobweb,
-    'decals.porthole': Rooms.decals.porthole,
-    'decals.bloodsplatter': Rooms.decals.bloodsplatter,
-    'floor.placemat': Rooms.floor.placemat,
+    'decals.poster1': Rooms.decals.poster1,
+    'decals.poster2': Rooms.decals.poster2,
+    'decals.window': Rooms.decals.window,
+    'floor.carpet': Rooms.floor.carpet,
+    'floor.bed': Rooms.floor.bed,
+    'floor.desk': Rooms.floor.desk,
+    'floor.plant': Rooms.floor.plant,
     'minis.aro': Rooms.minis.aro,
 };
 
@@ -89,10 +93,10 @@ const ASSET_TABLE = new Map<string, ReturnType<typeof require>>(
     Object.entries(ASSET_RECORD),
 );
 
-// Fallback for unknown keys — paints the cobweb so a missing cosmetic shows
+// Fallback for unknown keys — paints poster1 so a missing cosmetic shows
 // as a clearly placeholder shape rather than rendering nothing (which can
 // look like a broken sprite or a dropped item).
-const FALLBACK_ASSET = Rooms.decals.cobweb;
+const FALLBACK_ASSET = Rooms.decals.poster1;
 
 export function resolveRoomAsset(key: string) {
     return ASSET_TABLE.get(key) ?? FALLBACK_ASSET;
@@ -129,9 +133,12 @@ export function itemPixelRect(
 // release — the editor will mutate this array (or a per-user copy) once it
 // lands. Order in the array matches paint order for ties on `z`.
 export const STARTER_ROOM_LAYOUT: RoomLayout = [
-    { id: 'cobweb-1', asset: 'decals.cobweb', band: 'wall', gx: 2, gy: 2, span: { w: 2, h: 2 } },
-    { id: 'porthole-1', asset: 'decals.porthole', band: 'wall', gx: 7, gy: 2, span: { w: 1, h: 2 } },
-    { id: 'bloodsplatter-1', asset: 'decals.bloodsplatter', band: 'wall', gx: 9, gy: 2, span: { w: 2, h: 2 } },
+    { id: 'poster1-1', asset: 'decals.poster1', band: 'wall', gx: 2, gy: 2, span: { w: 2, h: 2 } },
+    { id: 'window-1', asset: 'decals.window', band: 'wall', gx: 7, gy: 2, span: { w: 1, h: 2 } },
+    { id: 'poster2-1', asset: 'decals.poster2', band: 'wall', gx: 9, gy: 2, span: { w: 2, h: 2 } },
+    { id: 'carpet-1', asset: 'floor.carpet', band: 'floor', gx: 4, gy: 4, span: { w: 4, h: 4 } },
+    { id: 'bed-1', asset: 'floor.bed', band: 'floor', gx: 0, gy: 5, span: { w: 3, h: 4 } },
+    { id: 'desk-1', asset: 'floor.desk', band: 'floor', gx: 9, gy: 5, span: { w: 3, h: 3 } },
+    { id: 'plant-1', asset: 'floor.plant', band: 'floor', gx: 9, gy: 1, span: { w: 1, h: 2 } },
     { id: 'aro-1', asset: 'minis.aro', band: 'floor', gx: 5, gy: 1, span: { w: 2, h: 3 } },
-    { id: 'placemat-1', asset: 'floor.placemat', band: 'floor', gx: 4, gy: 4, span: { w: 4, h: 4 } },
 ];

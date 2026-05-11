@@ -349,16 +349,16 @@ export const Rooms = {
     frame: {
         default: require('../../assets/images/rooms/room-bg.png'),
     },
-    walls: {
-        blue: require('../../assets/images/rooms/backwall.png'),
-    },
     decals: {
-        cobweb: require('../../assets/images/rooms/cobweb.png'),
-        porthole: require('../../assets/images/rooms/porthole-window.png'),
-        bloodsplatter: require('../../assets/images/rooms/bloodsplatter.png'),
+        poster1: require('../../assets/images/rooms/poster1.png'),
+        poster2: require('../../assets/images/rooms/poster2.png'),
+        window: require('../../assets/images/rooms/window.png'),
     },
     floor: {
-        placemat: require('../../assets/images/rooms/placemat.png'),
+        carpet: require('../../assets/images/rooms/carpet.png'),
+        bed: require('../../assets/images/rooms/bed.png'),
+        desk: require('../../assets/images/rooms/desk.png'),
+        plant: require('../../assets/images/rooms/plant.png'),
     },
     minis: {
         aro: require('../../assets/images/rooms/aro-mini.png'),

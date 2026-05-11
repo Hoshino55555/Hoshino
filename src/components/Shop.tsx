@@ -7,12 +7,14 @@ import {
     ScrollView,
     Image,
     ImageBackground,
-    Dimensions,
     Animated,
     Easing,
+    useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Modal } from 'react-native';
+import FooterBackBar from './FooterBackBar';
+import PageArtShell from './PageArtShell';
 import { MarketplaceItem, ItemRarity } from '../services/MarketplaceService';
 import StarFragmentService, {
     type DailySpinReward,
@@ -45,6 +47,7 @@ import { ItemCategory } from '../services/MarketplaceService';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import type { BoosterSkuId } from '../services/GameStateService';
 import BoxRevealModal, { type BoxReveal } from './BoxRevealModal';
+import { newRequestId } from '../services/requestId';
 
 // Per-line dispatch result. Drives the post-checkout reveal queue:
 // boxes open via BoxRevealModal (TCG pack-style), spin replays the reel
@@ -54,28 +57,11 @@ type LineResult =
     | { kind: 'box'; reveal: BoxReveal }
     | { kind: 'instant'; line: string };
 
-// Per-tap idempotency token. Server validates `[A-Za-z0-9_-]{1,128}` and
-// dedups inside a Firestore tx so retries / double-taps don't double-spend.
-const newRequestId = (prefix: string) =>
-    `${prefix}-${Date.now().toString(36)}-${Math.random()
-        .toString(36)
-        .slice(2, 10)}`;
-
 const BOOSTER_SKU_IDS = new Set<BoosterSkuId>([
     'booster-mood',
     'booster-sleep',
     'booster-hunger',
 ]);
-// Cart qty rule. Stackable SKUs go through a single qty-aware callable
-// (boosters, ingredients) or loop a per-unit callable (ingredient boxes).
-// SF packs and IAP bundles become qty>=N in Phase 3 (cart-shaped IAP intents).
-const isStackableSku = (item: ShopItem): boolean => {
-    if (item.id.startsWith('box-ingredients-')) return true;
-    if (item.id in INGREDIENT_TIER) return true;
-    if (BOOSTER_SKU_IDS.has(item.id as BoosterSkuId)) return true;
-    return false;
-};
-
 // Catalog ShopItem → onItemsPurchased payload shape. The legacy
 // MarketplaceItem fields are a strict subset of ShopItem, so this is a
 // straight projection — pulled out as a helper because the cart dispatcher
@@ -100,9 +86,8 @@ interface ShopProps {
     onItemsPurchased?: (items: MarketplaceItem[]) => void;
 }
 
-// Wallet address fed to StarFragmentService when the user isn't connected.
-// Matches the placeholder used elsewhere (GameContainer's IngredientSelection)
-// so balances persist across the same local profile pre-Privy.
+// Wallet address fed to StarFragmentService when the user isn't connected,
+// so local balances persist across the same profile pre-Privy.
 const FALLBACK_WALLET = 'demo-wallet';
 
 // Daily-spin reel preview pool. Mirrors backend SPIN_POOL — every distinct
@@ -139,7 +124,7 @@ const REEL_STEP = REEL_TILE_SIZE + REEL_TILE_GAP;
 const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItemsPurchased }) => {
     const insets = useSafeAreaInsets();
     const { publicKey, walletSource, signer } = useWallet();
-    const screenWidth = Dimensions.get('window').width;
+    const { width: screenWidth } = useWindowDimensions();
     // Banner is 1200×773 (transparent shadow stripped); size to native aspect.
     const bannerReserve = screenWidth * (773 / 1200);
     // Shadow PNG is 1200×790; sits BEHIND the banner so its bottom 17px peaks
@@ -147,6 +132,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     const bannerShadowReserve = screenWidth * (790 / 1200);
     // Bottom strip is 1200×284 with the shadow built into its top edge.
     const bottomBarReserve = screenWidth * (284 / 1200);
+    const contentTopPadding = bannerShadowReserve * 1.01;
+    const contentBottomPadding = bottomBarReserve * 0.96;
 
     const walletKey = publicKey ?? FALLBACK_WALLET;
     const starFragmentService = useMemo(() => new StarFragmentService(connection), [connection]);
@@ -154,7 +141,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 
     const [selectedTab, setSelectedTab] = useState<ShopTab>('deals');
     const [balance, setBalance] = useState<number>(0);
-    const [cart, setCart] = useState<{ item: ShopItem; quantity: number }[]>([]);
+    const [confirmItem, setConfirmItem] = useState<ShopItem | null>(null);
     const [flashingItem, setFlashingItem] = useState<string | null>(null);
     const [spinAvailable, setSpinAvailable] = useState(false);
     const [spinNextAtMs, setSpinNextAtMs] = useState(0);
@@ -170,9 +157,9 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     const [caps, setCaps] = useState<ServerCaps | null>(null);
     const [capLimits, setCapLimits] = useState<ServerCapLimits | null>(null);
     const [activeCamp, setActiveCamp] = useState<ActiveCamp | null>(null);
-    // IAP modal state — opened when checkout reaches an iap-pending line
-    // (SF packs, season pass, bundles). One modal per item; iapQueue holds
-    // the pending ones so we walk them sequentially once SF dispatch is done.
+    // IAP modal state — opened directly from a tile tap on iap-pending items
+    // (SF packs, season pass, bundles). iapQueue is retained for the reveal
+    // chain so a multi-grant SF checkout can defer an IAP modal to the end.
     const [iapItem, setIapItem] = useState<ShopItem | null>(null);
     const [iapQueue, setIapQueue] = useState<ShopItem[]>([]);
     // Reveal queue — populated at the end of dispatch, walked one stage at
@@ -267,9 +254,9 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         });
     }, [reelTranslateX, revealScale, revealGlow]);
 
-    // Re-throws on failure so the cart dispatcher can leave the line in
-    // cart for retry. Each error path also surfaces a toast directly so the
-    // user sees the cause regardless of who's awaiting.
+    // Re-throws on failure so the reveal queue advances past the spin stage
+    // even when the spin fails. Each error path also surfaces a toast
+    // directly so the user sees the cause regardless of who's awaiting.
     const handleDailySpin = useCallback(async () => {
         if (spinning || !spinAvailable) return;
         setSpinning(true);
@@ -311,9 +298,9 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         stopReelAndReveal,
     ]);
 
-    // Walks the post-checkout reveal queue one stage at a time. Called from
+    // Walks the post-purchase reveal queue one stage at a time. Called from
     // each stage's close handler so overlays don't stack; populated by
-    // handleCheckout via pendingRevealsRef. Stages: spin → box reveals →
+    // purchaseItem via pendingRevealsRef. Stages: spin → box reveals →
     // instant summary toast → IAP modal walker. The ref lives outside React
     // state so close handlers don't need to be in the render closure.
     const runNextReveal = useCallback(() => {
@@ -415,15 +402,12 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     'success'
                 );
             } else if (res.granted?.kind === 'seasonPass') {
-                onNotification?.('Season Pass active — enjoy!', 'success');
+                onNotification?.('Lunar Pass active — enjoy!', 'success');
             } else if (res.granted?.kind === 'bundle') {
                 onNotification?.(`Bundle unlocked — contents pending grant.`, 'success');
             } else {
                 onNotification?.('Purchase complete.', 'success');
             }
-            // Drop the carted line + advance to the next IAP item, if any.
-            const justPurchasedId = iapItem.id;
-            setCart((prev) => prev.filter((c) => c.item.id !== justPurchasedId));
             setIapQueue((prev) => {
                 const [next, ...rest] = prev;
                 setIapItem(next ?? null);
@@ -437,8 +421,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         }
     }, [iapItem, iapToken, iapPurchasing, signer, onNotification, refreshBalance]);
 
-    // Cancel the IAP modal — drops the queue so the user can retry from the
-    // cart. Cancelled IAP lines stay in cart for retry.
+    // Cancel the IAP modal — drops the queue so the user can re-tap the tile
+    // to retry. Per-tap purchase, no cart to fall back on.
     const handleIAPCancel = useCallback(() => {
         if (iapPurchasing) return;
         setIapItem(null);
@@ -463,15 +447,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         onClose();
     };
 
-    const cartTotal = useMemo(
-        () => cart.reduce((sum, c) => sum + c.item.priceStarFragments * c.quantity, 0),
-        [cart]
-    );
-    const cartUsdTotal = useMemo(
-        () => cart.reduce((sum, c) => sum + (c.item.priceUsd ?? 0) * c.quantity, 0),
-        [cart]
-    );
-    const remainingBalance = balance - cartTotal;
+    const remainingBalance = balance;
 
     const sections = useMemo(
         () => groupBySubcategory(itemsForTab(selectedTab)),
@@ -580,14 +556,17 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         );
     };
 
-    const addToCart = (item: ShopItem) => {
+    // Tap → validate → open confirm modal (or IAP modal directly for paid
+    // SKUs, since their token-pick modal is already a confirm step). One
+    // purchase per tap; no cart accumulation.
+    const requestPurchase = (item: ShopItem) => {
         if (item.status === 'effect-pending') {
             onNotification?.("Coming soon — this item's effect is being wired up.", 'info');
             return;
         }
         // Per-SKU "already-active / cooldown" guards. Server is source of
-        // truth, but surfacing here stops the cart from queueing an
-        // obviously-failing line.
+        // truth; surfacing here gives an immediate explanation instead of a
+        // failed roundtrip.
         if (
             item.id === 'sleeping-camp' &&
             activeCamp &&
@@ -615,268 +594,174 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             }
         }
 
-        const stackable = isStackableSku(item);
-        const existing = cart.find((c) => c.item.id === item.id);
-        if (existing && !stackable) {
-            onNotification?.('Already in cart.', 'info');
+        if (item.currency === 'starFragments' && item.priceStarFragments > balance) {
+            onNotification?.(
+                `Not enough Shards — need ${item.priceStarFragments}, have ${balance}.`,
+                'error'
+            );
             return;
         }
-
-        // Balance check applies only to SF-priced items. IAP items are
-        // paid in USD at checkout, so they don't reserve SF balance.
-        if (item.currency === 'starFragments') {
-            const projected = cartTotal + item.priceStarFragments;
-            if (projected > balance) {
-                onNotification?.(
-                    `Not enough Shards — need ${projected}, have ${balance}.`,
-                    'error'
-                );
-                return;
-            }
-        }
-
-        setCart((prev) => {
-            const found = prev.find((c) => c.item.id === item.id);
-            if (found) {
-                return prev.map((c) =>
-                    c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
-                );
-            }
-            return [...prev, { item, quantity: 1 }];
-        });
 
         setFlashingItem(item.id);
         setTimeout(() => setFlashingItem(null), 300);
-    };
 
-    const removeFromCart = (itemId: string) => {
-        setCart((prev) => prev.filter((c) => c.item.id !== itemId));
-    };
-
-    const clearCart = () => {
-        if (cart.length === 0) return;
-        setCart([]);
-        onNotification?.('Cart cleared.', 'info');
-    };
-
-    // Project the SF cart into the server's CartLine shape. Loose
-    // ingredients collapse into a single 'ingredients' line; everything else
-    // maps 1:1 onto a typed line kind. Unknown SKUs throw so a stale catalog
-    // entry surfaces immediately instead of silently dropping a line the
-    // user paid for.
-    const buildCheckoutLines = (
-        cartItems: { item: ShopItem; quantity: number }[]
-    ): CartLine[] => {
-        const ingredientCounts: Record<string, number> = {};
-        const lines: CartLine[] = [];
-        for (const c of cartItems) {
-            const id = c.item.id;
-            if (id in INGREDIENT_TIER) {
-                ingredientCounts[id] = (ingredientCounts[id] || 0) + c.quantity;
-            } else if (id.startsWith('box-ingredients-')) {
-                lines.push({
-                    kind: 'box',
-                    boxId: id as IngredientBoxId,
-                    qty: c.quantity,
-                });
-            } else if (id === 'upgrade-carry') {
-                lines.push({ kind: 'upgrade-carry' });
-            } else if (id === 'upgrade-inventory') {
-                lines.push({ kind: 'upgrade-inventory' });
-            } else if (id === 'sleeping-camp') {
-                lines.push({ kind: 'camp', campId: 'sleeping-camp' });
-            } else if (id === 'hackathon-special') {
-                lines.push({ kind: 'hackathon' });
-            } else if (BOOSTER_SKU_IDS.has(id as BoosterSkuId)) {
-                lines.push({ kind: 'booster', skuId: id, qty: c.quantity });
-            } else {
-                throw new Error(`Unknown SF SKU: ${id}`);
-            }
-        }
-        if (Object.keys(ingredientCounts).length > 0) {
-            lines.push({ kind: 'ingredients', counts: ingredientCounts });
-        }
-        return lines;
-    };
-
-    const handleCheckout = async () => {
-        if (purchasing) return;
-        if (cart.length === 0) {
-            onNotification?.('Your cart is empty!', 'warning');
+        if (item.currency === 'usd') {
+            // IAP modal handles its own confirmation (token select + Buy).
+            setIapItem(item);
             return;
         }
 
-        // Split the cart by rail. Daily-spin keeps its dedicated callable
-        // because the reel animation owns its UX; everything else runs
-        // through the atomic checkoutStarFragments resolver. IAP lines walk
-        // through the funding modal one at a time post-checkout.
-        const sfCart = cart.filter((c) => c.item.currency === 'starFragments');
-        const iapLines = cart.filter((c) => c.item.currency === 'usd');
-        const spinLines = sfCart.filter((c) => c.item.id === 'daily-spin');
-        const checkoutCart = sfCart.filter((c) => c.item.id !== 'daily-spin');
+        setConfirmItem(item);
+    };
 
-        const sfTotal = checkoutCart.reduce(
-            (s, c) => s + c.item.priceStarFragments * c.quantity,
-            0
-        );
-        if (sfTotal > balance) {
-            onNotification?.('Insufficient Shards for the SF items in cart.', 'error');
+    // Project a single ShopItem into the server's CartLine shape. Unknown
+    // SKUs throw so a stale catalog entry surfaces immediately instead of
+    // silently dropping a line the user paid for.
+    const buildCheckoutLine = (item: ShopItem): CartLine => {
+        const id = item.id;
+        if (id in INGREDIENT_TIER) {
+            return { kind: 'ingredients', counts: { [id]: 1 } };
+        }
+        if (id.startsWith('box-ingredients-')) {
+            return { kind: 'box', boxId: id as IngredientBoxId, qty: 1 };
+        }
+        if (id === 'upgrade-carry') return { kind: 'upgrade-carry' };
+        if (id === 'upgrade-inventory') return { kind: 'upgrade-inventory' };
+        if (id === 'sleeping-camp') return { kind: 'camp', campId: 'sleeping-camp' };
+        if (id === 'hackathon-special') return { kind: 'hackathon' };
+        if (BOOSTER_SKU_IDS.has(id as BoosterSkuId)) {
+            return { kind: 'booster', skuId: id, qty: 1 };
+        }
+        throw new Error(`Unknown SF SKU: ${id}`);
+    };
+
+    // Single-item purchase. Daily-spin keeps its dedicated callable (the
+    // reel animation owns its UX); IAP items never reach here (their modal
+    // handles purchase directly). Everything else runs through the atomic
+    // checkoutStarFragments resolver — same one the cart used, just with a
+    // one-line array.
+    const purchaseItem = async (item: ShopItem) => {
+        if (purchasing) return;
+
+        // Daily spin: free + animated. Skip checkout, queue the spin reveal.
+        if (item.id === 'daily-spin') {
+            pendingRevealsRef.current = {
+                spin: true,
+                boxes: [],
+                instants: [],
+                iapItems: [],
+                purchased: [],
+            };
+            runNextReveal();
+            return;
+        }
+
+        let line: CartLine;
+        try {
+            line = buildCheckoutLine(item);
+        } catch (err: any) {
+            onNotification?.(err?.message || 'Unknown item.', 'error');
             return;
         }
 
         setPurchasing(true);
-        const succeededIds = new Set<string>();
-        const purchased: MarketplaceItem[] = [];
         const lineResults: LineResult[] = [];
+        const purchased: MarketplaceItem[] = [];
 
         try {
-            if (checkoutCart.length > 0) {
-                let lines: CartLine[];
-                try {
-                    lines = buildCheckoutLines(checkoutCart);
-                } catch (err: any) {
-                    onNotification?.(err?.message || 'Cart contains an unknown item.', 'error');
-                    return;
-                }
-
-                try {
-                    const res = await starFragmentService.checkout(
-                        lines,
-                        newRequestId('checkout')
-                    );
-                    setBalance(res.newBalance);
-                    if (res.caps) setCaps(res.caps);
-                    setActiveCamp(res.activeCamp);
-                    if (
-                        Object.keys(res.granted.ingredients).length > 0 ||
-                        res.granted.boxes.length > 0
-                    ) {
-                        await refreshPantry();
-                    }
-
-                    // Atomic checkout: every line either succeeded or the
-                    // whole call threw. Mark everything in checkoutCart as
-                    // settled so the cart UI clears those lines.
-                    for (const c of checkoutCart) {
-                        succeededIds.add(c.item.id);
-                        for (let i = 0; i < c.quantity; i++) {
-                            purchased.push(toMarketplace(c.item));
-                        }
-                    }
-
-                    // Build reveal queue in display order. Ingredients first
-                    // (single summary toast), then box reveals in cart order,
-                    // then the rest as instant toasts.
-                    if (Object.keys(res.granted.ingredients).length > 0) {
-                        const summary = Object.entries(res.granted.ingredients)
-                            .map(([id, n]) => `${ingredientLabel(id)} ×${n}`)
-                            .join(', ');
-                        lineResults.push({
-                            kind: 'instant',
-                            line: `Ingredients: ${summary}`,
-                        });
-                    }
-                    for (const box of res.granted.boxes) {
-                        const item = checkoutCart.find(
-                            (c) => c.item.id === box.boxId
-                        )?.item;
-                        lineResults.push({
-                            kind: 'box',
-                            reveal: {
-                                itemName: item?.name ?? box.boxId,
-                                image: item?.image,
-                                granted: box.granted,
-                            },
-                        });
-                    }
-                    if (res.granted.upgrades.carryCap !== undefined) {
-                        const item = checkoutCart.find(
-                            (c) => c.item.id === 'upgrade-carry'
-                        )?.item;
-                        lineResults.push({
-                            kind: 'instant',
-                            line: `${item?.name ?? 'Carry Capacity'} → ${res.granted.upgrades.carryCap}`,
-                        });
-                    }
-                    if (res.granted.upgrades.inventoryCap !== undefined) {
-                        const item = checkoutCart.find(
-                            (c) => c.item.id === 'upgrade-inventory'
-                        )?.item;
-                        lineResults.push({
-                            kind: 'instant',
-                            line: `${item?.name ?? 'Inventory Size'} → ${res.granted.upgrades.inventoryCap}`,
-                        });
-                    }
-                    if (res.granted.activeCamp) {
-                        const item = checkoutCart.find(
-                            (c) => c.item.id === 'sleeping-camp'
-                        )?.item;
-                        lineResults.push({
-                            kind: 'instant',
-                            line: `${item?.name ?? 'Camp'} active — boost engaged`,
-                        });
-                    }
-                    if (res.granted.hackathonGranted > 0) {
-                        lineResults.push({
-                            kind: 'instant',
-                            line: `Hackathon Special +${res.granted.hackathonGranted.toLocaleString()} Shards`,
-                        });
-                    }
-                    if (Object.keys(res.granted.boosters).length > 0) {
-                        const parts: string[] = [];
-                        for (const [skuId, qty] of Object.entries(
-                            res.granted.boosters
-                        )) {
-                            const item = checkoutCart.find(
-                                (c) => c.item.id === skuId
-                            )?.item;
-                            const noun = qty === 1 ? 'charge' : 'charges';
-                            parts.push(`${item?.name ?? skuId} ×${qty} ${noun}`);
-                        }
-                        lineResults.push({
-                            kind: 'instant',
-                            line: `${parts.join(' · ')} — use from inventory`,
-                        });
-                    }
-                } catch (err: any) {
-                    onNotification?.(err?.message || 'Checkout failed.', 'error');
-                    await refreshBalance();
-                    return;
-                }
-            }
-
-            // Daily spin always queues post-checkout (free + animated).
-            for (const _ of spinLines) {
-                succeededIds.add('daily-spin');
-                lineResults.push({ kind: 'spin' });
-            }
-
-            // Drop succeeded lines from cart before reveals start so the
-            // cart UI mirrors what was actually paid for, even if the user
-            // dismisses the reveal modals mid-walk.
-            if (succeededIds.size > 0) {
-                setCart((prev) => prev.filter((c) => !succeededIds.has(c.item.id)));
-            }
-
-            // Build the reveal queue. runNextReveal pulls from this ref as
-            // each stage closes — the close handlers don't need to re-enter
-            // handleCheckout's closure, they just call runNextReveal.
-            const expandedIap = iapLines.flatMap((c) =>
-                Array.from({ length: c.quantity }, () => c.item)
+            const res = await starFragmentService.checkout(
+                [line],
+                newRequestId('checkout')
             );
+            setBalance(res.newBalance);
+            if (res.caps) setCaps(res.caps);
+            setActiveCamp(res.activeCamp);
+            if (
+                Object.keys(res.granted.ingredients).length > 0 ||
+                res.granted.boxes.length > 0
+            ) {
+                await refreshPantry();
+            }
+            purchased.push(toMarketplace(item));
+
+            if (Object.keys(res.granted.ingredients).length > 0) {
+                const summary = Object.entries(res.granted.ingredients)
+                    .map(([id, n]) => `${ingredientLabel(id)} ×${n}`)
+                    .join(', ');
+                lineResults.push({
+                    kind: 'instant',
+                    line: `Ingredients: ${summary}`,
+                });
+            }
+            for (const box of res.granted.boxes) {
+                lineResults.push({
+                    kind: 'box',
+                    reveal: {
+                        itemName: item.name,
+                        image: item.image,
+                        granted: box.granted,
+                    },
+                });
+            }
+            if (res.granted.upgrades.carryCap !== undefined) {
+                lineResults.push({
+                    kind: 'instant',
+                    line: `${item.name} → ${res.granted.upgrades.carryCap}`,
+                });
+            }
+            if (res.granted.upgrades.inventoryCap !== undefined) {
+                lineResults.push({
+                    kind: 'instant',
+                    line: `${item.name} → ${res.granted.upgrades.inventoryCap}`,
+                });
+            }
+            if (res.granted.activeCamp) {
+                lineResults.push({
+                    kind: 'instant',
+                    line: `${item.name} active — boost engaged`,
+                });
+            }
+            if (res.granted.hackathonGranted > 0) {
+                lineResults.push({
+                    kind: 'instant',
+                    line: `Hackathon Special +${res.granted.hackathonGranted.toLocaleString()} Shards`,
+                });
+            }
+            if (Object.keys(res.granted.boosters).length > 0) {
+                const parts: string[] = [];
+                for (const qty of Object.values(res.granted.boosters)) {
+                    const noun = qty === 1 ? 'charge' : 'charges';
+                    parts.push(`${item.name} ×${qty} ${noun}`);
+                }
+                lineResults.push({
+                    kind: 'instant',
+                    line: `${parts.join(' · ')} — use from inventory`,
+                });
+            }
+
             pendingRevealsRef.current = {
-                spin: lineResults.some((r) => r.kind === 'spin'),
+                spin: false,
                 boxes: lineResults.flatMap((r) => (r.kind === 'box' ? [r.reveal] : [])),
                 instants: lineResults.flatMap((r) =>
                     r.kind === 'instant' ? [r.line] : []
                 ),
-                iapItems: expandedIap,
+                iapItems: [],
                 purchased,
             };
             runNextReveal();
+        } catch (err: any) {
+            onNotification?.(err?.message || 'Checkout failed.', 'error');
+            await refreshBalance();
         } finally {
             setPurchasing(false);
         }
+    };
+
+    const handleConfirmPurchase = () => {
+        const item = confirmItem;
+        setConfirmItem(null);
+        if (!item) return;
+        purchaseItem(item);
     };
 
     const renderDailySpinCard = (item: ShopItem) => {
@@ -887,7 +772,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             title: item.name,
             description: ready ? 'Tap to spin!' : `Next: ${formatCooldown(remainingMs)}`,
             disabled: !ready || spinning,
-            onPress: () => addToCart(item),
+            onPress: () => requestPurchase(item),
             priceNode: (
                 <Text style={[styles.itemPrice, { color: ready ? '#2e5a3e' : '#888' }]}>
                     {ready ? 'FREE' : 'COOLDOWN'}
@@ -901,20 +786,20 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             item,
             title: item.name,
             description: item.summary,
-            onPress: () => addToCart(item),
+            onPress: () => requestPurchase(item),
             priceNode: (
                 <Text style={[styles.itemPrice, { color: '#2e5a3e' }]}>FREE</Text>
             ),
         });
 
     const renderBoxCard = (item: ShopItem) => {
-        const insufficient = balance - cartTotal < item.priceStarFragments;
+        const insufficient = balance < item.priceStarFragments;
         return renderCardShell({
             item,
             title: '',
             description: item.summary,
             disabled: insufficient,
-            onPress: () => addToCart(item),
+            onPress: () => requestPurchase(item),
             imageStyle: styles.boxImage,
             priceNode: (
                 <View style={styles.priceContainer}>
@@ -940,7 +825,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 ? capLimits?.carryCapMax ?? null
                 : capLimits?.inventoryCapMax ?? null;
         const atMax = current != null && max != null && current >= max;
-        const insufficient = balance - cartTotal < item.priceStarFragments;
+        const insufficient = balance < item.priceStarFragments;
         const disabled = atMax || insufficient;
         const summary =
             current != null && max != null
@@ -951,7 +836,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             title: item.name,
             description: summary,
             disabled,
-            onPress: () => addToCart(item),
+            onPress: () => requestPurchase(item),
             priceNode: (
                 <View style={styles.priceContainer}>
                     <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
@@ -969,7 +854,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
     const renderCampCard = (item: ShopItem, campId: CampId) => {
         const nowMs = Date.now();
         const isActive = !!activeCamp && activeCamp.id === campId && activeCamp.expiresAtMs > nowMs;
-        const insufficient = !isActive && balance - cartTotal < item.priceStarFragments;
+        const insufficient = !isActive && balance < item.priceStarFragments;
         const disabled = isActive || insufficient;
         let summary = item.summary || item.description;
         if (isActive) {
@@ -983,7 +868,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             title: item.name,
             description: summary,
             disabled,
-            onPress: () => addToCart(item),
+            onPress: () => requestPurchase(item),
             priceNode: (
                 <View style={styles.priceContainer}>
                     <Image source={Stars.fragment} style={styles.priceIcon} resizeMode="contain" />
@@ -1009,9 +894,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         // effect-pending stays as a hard "Coming Soon" lock.
         const isIap = item.status === 'iap-pending';
         const locked = item.status === 'effect-pending';
-        const projected = cartTotal + item.priceStarFragments;
         const insufficient =
-            !locked && item.currency === 'starFragments' && projected > balance;
+            !locked && item.currency === 'starFragments' && item.priceStarFragments > balance;
         const disabled = locked || insufficient;
 
         const description = item.durationLabel
@@ -1046,7 +930,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             title: item.name,
             description,
             disabled,
-            onPress: () => addToCart(item),
+            onPress: () => requestPurchase(item),
             priceNode,
             overlay,
             flashing: flashingItem === item.id,
@@ -1055,7 +939,30 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 
     return (
         <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
-            <ImageBackground source={Backgrounds.shop} style={styles.bg} resizeMode="cover" testID="shop-screen">
+            <PageArtShell
+                background={Backgrounds.shop}
+                testID="shop-screen"
+                overlays={[
+                    {
+                        key: 'bottom',
+                        source: Backgrounds.shopBottom,
+                        edge: 'bottom',
+                        height: bottomBarReserve,
+                    },
+                    {
+                        key: 'banner-shadow',
+                        source: Backgrounds.shopBannerShadow,
+                        edge: 'top',
+                        height: bannerShadowReserve,
+                    },
+                    {
+                        key: 'banner',
+                        source: Backgrounds.shopBanner,
+                        edge: 'top',
+                        height: bannerReserve,
+                    },
+                ]}
+            >
                 <View
                     style={[
                         styles.scrollClipper,
@@ -1066,8 +973,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     contentContainerStyle={[
                         styles.scrollBody,
                         {
-                            paddingTop: bannerShadowReserve + 8,
-                            paddingBottom: bottomBarReserve - 4,
+                            paddingTop: contentTopPadding,
+                            paddingBottom: contentBottomPadding,
                         },
                     ]}
                     showsVerticalScrollIndicator={false}
@@ -1077,9 +984,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                         <View style={styles.dustTextContainer}>
                             <Text style={styles.walletLabel}>WALLET</Text>
                             <Text style={styles.dustAmount}>{remainingBalance} Shards</Text>
-                            {cartTotal > 0 ? (
-                                <Text style={styles.walletSubLabel}>(−{cartTotal} in cart)</Text>
-                            ) : null}
                         </View>
                     </View>
 
@@ -1106,120 +1010,15 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                         ))}
                     </View>
 
-                    <View style={styles.cartContainer}>
-                        <View style={styles.cartHeader}>
-                            <Text style={styles.cartTitle}>CART ({cart.length})</Text>
-                            <View style={styles.cartHeaderRight}>
-                                {cartTotal > 0 && (
-                                    <View style={styles.cartTotal}>
-                                        <Image source={Stars.fragment} style={styles.cartTotalIcon} resizeMode="contain" />
-                                        <Text style={styles.cartTotalText}>{cartTotal}</Text>
-                                    </View>
-                                )}
-                                {cartUsdTotal > 0 && (
-                                    <View style={styles.cartTotal}>
-                                        <Text style={styles.cartTotalText}>${cartUsdTotal.toFixed(2)}</Text>
-                                    </View>
-                                )}
-                                {cart.length > 0 && (
-                                    <TouchableOpacity style={styles.clearCartButton} onPress={clearCart}>
-                                        <Text style={styles.clearCartText}>CLEAR</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
-
-                        {cart.length > 0 ? (
-                            <View style={styles.cartItems}>
-                                <View style={styles.cartItemsRow}>
-                                    {cart.map((cartItem) => (
-                                        <View key={cartItem.item.id} style={styles.cartItem}>
-                                            <TouchableOpacity
-                                                style={styles.removeButton}
-                                                onPress={() => removeFromCart(cartItem.item.id)}
-                                            >
-                                                <Text style={styles.removeButtonText}>×</Text>
-                                            </TouchableOpacity>
-                                            <Image
-                                                source={cartItem.item.image}
-                                                style={styles.cartItemImage}
-                                                resizeMode="contain"
-                                            />
-                                            <Text style={styles.cartItemQuantity}>x{cartItem.quantity}</Text>
-                                        </View>
-                                    ))}
-                                </View>
-                                <TouchableOpacity
-                                    style={[styles.checkoutButton, purchasing && styles.disabledItem]}
-                                    onPress={handleCheckout}
-                                    disabled={purchasing}
-                                >
-                                    <Text style={styles.checkoutButtonText}>
-                                        {purchasing ? 'PROCESSING…' : 'CHECKOUT'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <View style={styles.emptyCart}>
-                                <Text style={styles.emptyCartText}>Cart is empty</Text>
-                            </View>
-                        )}
-                    </View>
                 </ScrollView>
                 </View>
 
-                <View
-                    pointerEvents="none"
-                    style={[styles.shopBottomOverlay, { height: bottomBarReserve }]}
-                >
-                    <Image
-                        source={Backgrounds.shopBottom}
-                        style={styles.shopBannerImage}
-                        resizeMode="contain"
-                    />
-                </View>
-                <View
-                    pointerEvents="none"
-                    style={[styles.shopBannerOverlay, { top: 0, height: bannerShadowReserve }]}
-                >
-                    <Image
-                        source={Backgrounds.shopBannerShadow}
-                        style={styles.shopBannerImage}
-                        resizeMode="contain"
-                    />
-                </View>
-                <View
-                    pointerEvents="none"
-                    style={[styles.shopBannerOverlay, { top: 0, height: bannerReserve }]}
-                >
-                    <Image
-                        source={Backgrounds.shopBanner}
-                        style={styles.shopBannerImage}
-                        resizeMode="contain"
-                    />
-                </View>
-
-                <View
-                    style={[
-                        styles.bottomBar,
-                        { height: bottomBarReserve, paddingBottom: insets.bottom },
-                    ]}
-                    pointerEvents="box-none"
-                >
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={handleClose}
-                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                    >
-                        <Image
-                            source={Frames.backButton}
-                            style={styles.backButtonImage}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.backButtonLabel}>Back</Text>
-                    </TouchableOpacity>
-                </View>
-            </ImageBackground>
+                <FooterBackBar
+                    onBack={handleClose}
+                    height={bottomBarReserve}
+                    bottomInset={insets.bottom}
+                />
+            </PageArtShell>
             {revealBoxes.length > 0 && (
                 <BoxRevealModal boxes={revealBoxes} onClose={closeBoxReveal} />
             )}
@@ -1440,25 +1239,65 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     </View>
                 </View>
             </Modal>
+            <Modal
+                visible={confirmItem !== null}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setConfirmItem(null)}
+            >
+                <View style={styles.confirmBackdrop}>
+                    <View style={styles.confirmCard}>
+                        <Text style={styles.confirmTitle}>{confirmItem?.name}</Text>
+                        {confirmItem?.summary ? (
+                            <Text style={styles.confirmSummary}>{confirmItem.summary}</Text>
+                        ) : null}
+                        <View style={styles.confirmPriceRow}>
+                            {confirmItem?.id === 'daily-spin' ||
+                            confirmItem?.id === 'hackathon-special' ? (
+                                <Text style={styles.confirmPrice}>FREE</Text>
+                            ) : (
+                                <>
+                                    <Image
+                                        source={Stars.fragment}
+                                        style={styles.confirmPriceIcon}
+                                        resizeMode="contain"
+                                    />
+                                    <Text style={styles.confirmPrice}>
+                                        {confirmItem?.priceStarFragments ?? 0}
+                                    </Text>
+                                </>
+                            )}
+                        </View>
+                        <View style={styles.confirmButtonRow}>
+                            <TouchableOpacity
+                                style={[styles.confirmBtn, styles.confirmCancelBtn]}
+                                onPress={() => setConfirmItem(null)}
+                                disabled={purchasing}
+                            >
+                                <Text style={styles.confirmBtnText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.confirmBtn,
+                                    styles.confirmBuyBtn,
+                                    purchasing && styles.confirmBtnDisabled,
+                                ]}
+                                onPress={handleConfirmPurchase}
+                                disabled={purchasing}
+                            >
+                                <Text style={[styles.confirmBtnText, styles.confirmBuyBtnText]}>
+                                    {purchasing ? 'Processing…' : 'Buy'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    bg: { flex: 1, width: '100%', height: '100%' },
-    // Sits on top of the shopBottom strip overlay so the back button stays
-    // tappable above the painted strip art. zIndex tops the bottom overlay.
-    bottomBar: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingHorizontal: 16,
-        zIndex: 2,
-    },
     spinBackdrop: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.6)',
@@ -1616,42 +1455,11 @@ const styles = StyleSheet.create({
         fontSize: 21,
         color: '#3a2a1a',
     },
-    backButton: {
-        padding: 4,
-        alignItems: 'center',
-    },
-    backButtonImage: {
-        width: 56,
-        height: 46,
-    },
-    backButtonLabel: {
-        color: '#e84a4a',
-        fontFamily: 'Monaco',
-        fontSize: 14,
-        marginTop: 1,
-    },
     scrollClipper: {
         position: 'absolute',
         left: 0,
         right: 0,
         overflow: 'hidden',
-    },
-    shopBannerOverlay: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 1,
-    },
-    shopBottomOverlay: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1,
-    },
-    shopBannerImage: {
-        width: '100%',
-        height: '100%',
     },
     // Sized to match the bundle cluster's footprint so the box-card layout
     // (title + summary + price below) lines up identically whether we're
@@ -1697,13 +1505,6 @@ const styles = StyleSheet.create({
         color: '#666',
         textAlign: 'right',
         marginBottom: 2,
-    },
-    walletSubLabel: {
-        fontFamily: 'Monaco',
-        fontSize: 21,
-        color: '#a85d00',
-        textAlign: 'right',
-        marginTop: 2,
     },
     tabNavigation: {
         flexDirection: 'row',
@@ -1868,11 +1669,6 @@ const styles = StyleSheet.create({
         height: 12,
         marginRight: 4,
     },
-    cartTotalIcon: {
-        width: 14,
-        height: 14,
-        marginRight: 4,
-    },
     itemPrice: {
         fontFamily: 'Monaco',
         fontSize: 21,
@@ -1900,131 +1696,89 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 8,
     },
-    cartContainer: {
-        marginTop: 8,
+    confirmBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    confirmCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#f6fff6',
         borderWidth: 3,
         borderColor: '#003300',
-        backgroundColor: '#f6fff6',
-        marginBottom: 8,
-        borderTopColor: '#001100',
-        borderLeftColor: '#001100',
-        borderRightColor: '#006600',
-        borderBottomColor: '#006600',
-    },
-    cartHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+        borderTopColor: '#006600',
+        borderLeftColor: '#006600',
+        borderRightColor: '#001100',
+        borderBottomColor: '#001100',
+        padding: 18,
         alignItems: 'center',
-        padding: 8,
-        borderBottomWidth: 2,
-        borderBottomColor: '#003300',
-        backgroundColor: '#e9f5e9',
     },
-    cartHeaderRight: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    cartTitle: {
+    confirmTitle: {
         fontFamily: 'Monaco',
-        fontSize: 26,
+        fontSize: 30,
         color: '#003300',
-    },
-    cartTotal: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    cartTotalText: {
-        fontFamily: 'Monaco',
-        fontSize: 26,
-        color: '#003300',
-    },
-    clearCartButton: {
-        backgroundColor: '#ff6b6b',
-        borderWidth: 2,
-        borderColor: '#cc0000',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-    },
-    clearCartText: {
-        fontFamily: 'Monaco',
-        fontSize: 21,
-        color: 'white',
-    },
-    cartItems: {
-        padding: 8,
-    },
-    cartItemsRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    cartItem: {
-        alignItems: 'center',
-        marginRight: 12,
-        marginBottom: 8,
-        position: 'relative',
-    },
-    cartItemImage: {
-        width: 40,
-        height: 40,
-        borderWidth: 2,
-        borderColor: '#003300',
-        backgroundColor: '#f0fff0',
-    },
-    cartItemQuantity: {
-        fontFamily: 'Monaco',
-        fontSize: 21,
-        color: '#003300',
-        marginTop: 2,
         textAlign: 'center',
+        marginBottom: 6,
     },
-    removeButton: {
-        position: 'absolute',
-        top: -6,
-        right: -6,
-        backgroundColor: '#ff6b6b',
-        borderRadius: 10,
-        width: 16,
-        height: 16,
+    confirmSummary: {
+        fontFamily: 'Monaco',
+        fontSize: 21,
+        color: '#3a2a1a',
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    confirmPriceRow: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#cc0000',
-        zIndex: 1,
+        marginBottom: 16,
     },
-    removeButtonText: {
+    confirmPriceIcon: {
+        width: 22,
+        height: 22,
+        marginRight: 6,
+    },
+    confirmPrice: {
         fontFamily: 'Monaco',
-        color: 'white',
-        fontSize: 21,
-        lineHeight: 10,
+        fontSize: 33,
+        color: '#003300',
     },
-    emptyCart: {
-        padding: 20,
-        alignItems: 'center',
+    confirmButtonRow: {
+        flexDirection: 'row',
+        gap: 8,
+        width: '100%',
     },
-    emptyCartText: {
-        fontFamily: 'Monaco',
-        fontSize: 21,
-        color: '#666',
-    },
-    checkoutButton: {
-        marginTop: 8,
-        backgroundColor: '#006600',
-        padding: 10,
+    confirmBtn: {
+        flex: 1,
+        paddingVertical: 12,
         alignItems: 'center',
         borderWidth: 2,
+    },
+    confirmCancelBtn: {
+        backgroundColor: '#dbf3db',
+        borderColor: '#003300',
+    },
+    confirmBuyBtn: {
+        backgroundColor: '#006600',
         borderColor: '#003300',
         borderTopColor: '#00aa00',
         borderLeftColor: '#00aa00',
         borderRightColor: '#004400',
         borderBottomColor: '#002200',
     },
-    checkoutButtonText: {
+    confirmBtnDisabled: {
+        opacity: 0.5,
+    },
+    confirmBtnText: {
         fontFamily: 'Monaco',
-        color: 'white',
         fontSize: 26,
+        color: '#003300',
+    },
+    confirmBuyBtnText: {
+        color: '#fff',
     },
     iapModalBackdrop: {
         flex: 1,

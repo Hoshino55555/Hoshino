@@ -8,13 +8,11 @@ import {
     TouchableOpacity,
     Animated,
     Easing,
-    Dimensions,
     ScrollView,
+    useWindowDimensions,
 } from 'react-native';
 import { getCharacterSleep, Backgrounds, getIngredientArt } from '../assets';
 import type { ForagedItem } from '../services/GameStateService';
-
-const { width } = Dimensions.get('window');
 
 export interface MorningRecapDeltas {
     energyGained: number;
@@ -107,6 +105,8 @@ const MorningRecapModal: React.FC<Props> = ({
     playerName,
     onDismiss,
 }) => {
+    const { width } = useWindowDimensions();
+    const panelWidth = width * 0.85;
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const bobAnim = useRef(new Animated.Value(0)).current;
     const [itemsVisible, setItemsVisible] = useState(false);
@@ -163,7 +163,7 @@ const MorningRecapModal: React.FC<Props> = ({
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <View style={styles.heroPanel}>
+                    <View style={[styles.heroPanel, { width: panelWidth }]}>
                         <Image
                             source={Backgrounds.sleep}
                             style={styles.heroBg}
@@ -184,7 +184,7 @@ const MorningRecapModal: React.FC<Props> = ({
                     </View>
 
                     {deltas && (
-                        <View style={styles.window}>
+                        <View style={[styles.window, { width: panelWidth }]}>
                             <View style={styles.windowHeader}>
                                 <Text style={styles.windowHeaderText}>Sleep Recap</Text>
                             </View>
@@ -215,7 +215,7 @@ const MorningRecapModal: React.FC<Props> = ({
                     )}
 
                     {itemsVisible && aggregated.length > 0 && (
-                        <View style={styles.window}>
+                        <View style={[styles.window, { width: panelWidth }]}>
                             <View style={styles.windowHeader}>
                                 <Text style={styles.windowHeaderText}>While You Slept</Text>
                             </View>
@@ -271,8 +271,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     heroPanel: {
-        width: width * 0.85,
-        maxWidth: 380,
         height: 220,
         borderWidth: 3,
         borderColor: '#000000',
@@ -302,8 +300,6 @@ const styles = StyleSheet.create({
         textShadowRadius: 0,
     },
     window: {
-        width: width * 0.85,
-        maxWidth: 380,
         backgroundColor: '#e5dcf5',
         borderWidth: 3,
         borderColor: '#000000',

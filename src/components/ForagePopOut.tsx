@@ -229,11 +229,12 @@ const ForagePopOut: React.FC<Props> = ({
         liftPerItem: PILE_LIFT_PER_ITEM_REF * scale,
         liftCap: PILE_LIFT_CAP_REF * scale,
         // Items render with `left: '50%'` and a centered marginLeft, then
-        // get rotated up to ±28° (stragglers) or ±18° (pile). Rotation
-        // pushes the bounding box past itemSize/2 — worst case is the
-        // half-diagonal (itemSize × √2/2). Use that plus a safety pad so
-        // the rotated sprite never crosses the viewport edge.
-        maxX: winW / 2 - (itemSize * Math.SQRT2) / 2 - 12,
+        // get rotated up to ±28° (stragglers) or ±18° (pile). Reserve a
+        // full itemSize-worth of clearance plus a screen-scaled pad — the
+        // half-diagonal math is technically enough, but visually the
+        // rotated corners still kissed the edge on the wide pyramid bases
+        // we draw at high item counts.
+        maxX: winW / 2 - itemSize - 16 * scale,
     };
     const pileBaseGap = PILE_BASE_GAP_REF * scale;
     const arcPeakBase = ARC_PEAK_BASE_REF * scale;

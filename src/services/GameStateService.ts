@@ -93,7 +93,7 @@ export interface BoosterCounts {
 }
 
 const callApplyBooster = httpsCallable<
-    { skuId: BoosterSkuId; qty?: number; requestId?: string },
+    { skuId: BoosterSkuId; qty?: number; requestId: string },
     {
         newBalance: number;
         boosters: BoosterCounts;
@@ -106,7 +106,7 @@ const callApplyBooster = httpsCallable<
 >(functions, 'applyBooster');
 
 const callConsumeBooster = httpsCallable<
-    { characterId: string; skuId: BoosterSkuId; requestId?: string },
+    { characterId: string; skuId: BoosterSkuId; requestId: string },
     {
         boosters: BoosterCounts;
         state: GameState;
@@ -271,7 +271,7 @@ export const GameStateService = {
     async applyBooster(
         skuId: BoosterSkuId,
         qty: number = 1,
-        requestId?: string
+        requestId: string
     ): Promise<{
         newBalance: number;
         boosters: BoosterCounts;
@@ -288,7 +288,7 @@ export const GameStateService = {
     async consumeBooster(
         characterId: string,
         skuId: BoosterSkuId,
-        requestId?: string
+        requestId: string
     ): Promise<{
         boosters: BoosterCounts;
         state: GameState;

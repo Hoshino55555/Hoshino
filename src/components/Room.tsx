@@ -13,15 +13,14 @@ import { Rooms } from '../assets';
 interface Props {
     /** Layout to render. Defaults to the starter mockup until persistence + editor land. */
     layout?: RoomLayout;
+    /** Temporarily hidden while the editor renders the drag ghost for this item. */
+    hiddenItemId?: string | null;
 }
 
-// View-only Room renderer. Three layers from back to front:
-//   1) frame  — the brown phone-frame background, includes brick floor texture
-//   2) wall   — backwall painted at full canvas; the asset itself is authored
-//               with transparent regions so only the wall portion is visible
-//   3) items  — each layout entry positioned within its band's grid
-// Both background images cover the full root with the same geometry so the
-// painted regions of each align with the room's natural wall/floor split.
+// View-only Room renderer. Two layers from back to front:
+//   1) frame  — the new baseroom paints the wall band + brick floor in one
+//               full-canvas bitmap, so a separate wall layer is no longer needed
+//   2) items  — each layout entry positioned within its band's grid
 //
 // Item positioning happens inside band-clipped overlays (overflow: hidden)
 // so cosmetics with span overflow stay inside their own band rather than
@@ -29,7 +28,7 @@ interface Props {
 //
 // Grid → pixels is delegated to `itemPixelRect` from RoomLayout so the
 // future drag editor inverts the same math the renderer applies.
-const Room: React.FC<Props> = ({ layout = STARTER_ROOM_LAYOUT }) => {
+const Room: React.FC<Props> = ({ layout = STARTER_ROOM_LAYOUT, hiddenItemId = null }) => {
     const [size, setSize] = React.useState<{ w: number; h: number } | null>(null);
 
     const onLayout = (e: LayoutChangeEvent) => {
@@ -43,17 +42,20 @@ const Room: React.FC<Props> = ({ layout = STARTER_ROOM_LAYOUT }) => {
     const floorHeight = size ? size.h - wallHeight : 0;
     const bandWidth = size?.w ?? 0;
 
-    const wallItems = layout
+    const visibleLayout = hiddenItemId
+        ? layout.filter((it) => it.id !== hiddenItemId)
+        : layout;
+
+    const wallItems = visibleLayout
         .filter((it) => it.band === 'wall')
         .sort((a, b) => (a.z ?? 0) - (b.z ?? 0));
-    const floorItems = layout
+    const floorItems = visibleLayout
         .filter((it) => it.band === 'floor')
         .sort((a, b) => (a.z ?? 0) - (b.z ?? 0));
 
     return (
         <View style={styles.root} onLayout={onLayout}>
             <Image source={Rooms.frame.default} style={styles.fullCanvas} resizeMode="cover" />
-            <Image source={Rooms.walls.blue} style={styles.fullCanvas} resizeMode="cover" />
 
             {size && (
                 <View style={[styles.bandLayer, { top: 0, height: wallHeight }]} pointerEvents="none">

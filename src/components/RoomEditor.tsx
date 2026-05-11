@@ -3,6 +3,7 @@ import {
     View,
     Text,
     Image,
+    ScrollView,
     TouchableOpacity,
     StyleSheet,
     LayoutChangeEvent,
@@ -34,16 +35,20 @@ interface PaletteEntry {
 }
 
 const PALETTE: PaletteEntry[] = [
-    { asset: 'decals.cobweb', label: 'Cobweb', band: 'wall', span: { w: 2, h: 2 } },
-    { asset: 'decals.porthole', label: 'Window', band: 'wall', span: { w: 1, h: 2 } },
-    { asset: 'decals.bloodsplatter', label: 'Splat', band: 'wall', span: { w: 2, h: 2 } },
-    { asset: 'floor.placemat', label: 'Mat', band: 'floor', span: { w: 4, h: 4 } },
+    { asset: 'decals.poster1', label: 'Poster A', band: 'wall', span: { w: 2, h: 2 } },
+    { asset: 'decals.poster2', label: 'Poster B', band: 'wall', span: { w: 2, h: 2 } },
+    { asset: 'decals.window', label: 'Window', band: 'wall', span: { w: 1, h: 2 } },
+    { asset: 'floor.carpet', label: 'Carpet', band: 'floor', span: { w: 4, h: 4 } },
+    { asset: 'floor.bed', label: 'Bed', band: 'floor', span: { w: 3, h: 4 } },
+    { asset: 'floor.desk', label: 'Desk', band: 'floor', span: { w: 3, h: 3 } },
+    { asset: 'floor.plant', label: 'Plant', band: 'floor', span: { w: 1, h: 2 } },
     { asset: 'minis.aro', label: 'Aro', band: 'floor', span: { w: 2, h: 3 } },
 ];
 
 interface RoomEditorProps {
     layout: RoomLayout;
     onChange: (next: RoomLayout) => void;
+    onDragItemChange?: (id: string | null) => void;
     /** Reserved space at the bottom (e.g. parent back button). The Edit chip
         and palette stack sit above this. */
     bottomInset?: number;
@@ -61,11 +66,39 @@ interface DragMeta {
     height: number;
 }
 
+interface DropPreview {
+    band: RoomBand;
+    gx: number;
+    gy: number;
+    span: { w: number; h: number };
+    valid: boolean;
+}
+
 let nextItemSerial = 1;
 const newItemId = (asset: RoomItemAssetKey) =>
     `${asset}-${Date.now().toString(36)}-${nextItemSerial++}`;
 
-const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset = 0 }) => {
+const MIN_PLACED_TOUCH_SIZE = 48;
+const PALETTE_DRAG_THRESHOLD = 6;
+
+function sameDropPreview(a: DropPreview | null, b: DropPreview | null) {
+    if (!a || !b) return a === b;
+    return (
+        a.band === b.band &&
+        a.gx === b.gx &&
+        a.gy === b.gy &&
+        a.span.w === b.span.w &&
+        a.span.h === b.span.h &&
+        a.valid === b.valid
+    );
+}
+
+const RoomEditor: React.FC<RoomEditorProps> = ({
+    layout,
+    onChange,
+    onDragItemChange,
+    bottomInset = 0,
+}) => {
     const [size, setSize] = useState({ w: 0, h: 0 });
     const [editing, setEditing] = useState(false);
     // The active drag's display metadata. Non-null while a gesture is in
@@ -79,13 +112,21 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
     // True while the finger is over the trash zone — drives the trash's
     // hover highlight so the user gets a confirm-on-release cue.
     const [trashHover, setTrashHover] = useState(false);
+    const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
 
     const containerRef = useRef<View>(null);
     const containerOriginRef = useRef({ x: 0, y: 0 });
+    const layoutRef = useRef(layout);
+    const onChangeRef = useRef(onChange);
+    const onDragItemChangeRef = useRef(onDragItemChange);
     // Source-of-truth for the active drag, accessed inside gesture
     // callbacks where setState is async/stale.
     const dragRef = useRef<{ source: DragSource; meta: DragMeta } | null>(null);
     const ghostPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+
+    layoutRef.current = layout;
+    onChangeRef.current = onChange;
+    onDragItemChangeRef.current = onDragItemChange;
 
     const handleLayout = (e: LayoutChangeEvent) => {
         const { width, height } = e.nativeEvent.layout;
@@ -101,6 +142,7 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
 
     const wallHeight = size.h * WALL_BAND_FRACTION;
     const floorHeight = size.h - wallHeight;
+    const editButtonBottom = bottomInset + size.h * 0.01;
 
     // Trash zone — top-center pill in container-local coords. Only shown
     // while dragging a placed item; release-over-trash deletes.
@@ -158,6 +200,34 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
         return { band, gx, gy };
     };
 
+    const previewFor = (
+        source: DragSource,
+        pageX: number,
+        pageY: number,
+    ): DropPreview | null => {
+        const span = source.kind === 'palette' ? source.span : source.item.span ?? { w: 1, h: 1 };
+        const drop = dropTargetFor(pageX, pageY, span);
+        if (!drop) return null;
+        const allowedBand = source.kind === 'palette' ? source.band : source.item.band;
+        return {
+            ...drop,
+            span,
+            valid: drop.band === allowedBand,
+        };
+    };
+
+    const updateDropPreview = (next: DropPreview | null) => {
+        setDropPreview((prev) => (sameDropPreview(prev, next) ? prev : next));
+    };
+
+    const clearDragState = () => {
+        setDraggedId(null);
+        setDragMeta(null);
+        setTrashHover(false);
+        updateDropPreview(null);
+        onDragItemChangeRef.current?.(null);
+    };
+
     const beginDrag = (source: DragSource, e: GestureResponderEvent) => {
         const { pageX, pageY } = e.nativeEvent;
         const band = source.kind === 'palette' ? source.band : source.item.band;
@@ -170,31 +240,46 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
             y: pageY - containerOriginRef.current.y - height / 2,
         });
         dragRef.current = { source, meta };
-        if (source.kind === 'placed') setDraggedId(source.item.id);
+        if (source.kind === 'placed') {
+            setDraggedId(source.item.id);
+            onDragItemChangeRef.current?.(source.item.id);
+        } else {
+            onDragItemChangeRef.current?.(null);
+        }
         setDragMeta(meta);
+        updateDropPreview(previewFor(source, pageX, pageY));
     };
 
     const updateDrag = (_e: GestureResponderEvent, g: PanResponderGestureState) => {
         const cur = dragRef.current;
         if (!cur) return;
+        const pageX = g.moveX || g.x0;
+        const pageY = g.moveY || g.y0;
         ghostPos.setValue({
-            x: g.moveX - containerOriginRef.current.x - cur.meta.width / 2,
-            y: g.moveY - containerOriginRef.current.y - cur.meta.height / 2,
+            x: pageX - containerOriginRef.current.x - cur.meta.width / 2,
+            y: pageY - containerOriginRef.current.y - cur.meta.height / 2,
         });
         if (cur.source.kind === 'placed') {
-            setTrashHover(isOverTrash(g.moveX, g.moveY));
+            const overTrash = isOverTrash(pageX, pageY);
+            setTrashHover(overTrash);
+            if (overTrash) {
+                updateDropPreview(null);
+                return;
+            }
         }
+        updateDropPreview(previewFor(cur.source, pageX, pageY));
     };
 
     const endDrag = (_e: GestureResponderEvent, g: PanResponderGestureState) => {
         const cur = dragRef.current;
         dragRef.current = null;
-        setDraggedId(null);
-        setDragMeta(null);
-        setTrashHover(false);
-        if (!cur) return;
+        if (!cur) {
+            clearDragState();
+            return;
+        }
         const { source } = cur;
         const span = source.kind === 'palette' ? source.span : source.item.span ?? { w: 1, h: 1 };
+        const currentLayout = layoutRef.current;
         // gestureState.moveX is 0 if no move occurred — fall back to the
         // grant point so a tap-and-release on a palette item lands at the
         // touch location instead of (0,0).
@@ -204,8 +289,8 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
         if (source.kind === 'palette') {
             const drop = dropTargetFor(dropX, dropY, span);
             if (drop && drop.band === source.band) {
-                onChange([
-                    ...layout,
+                onChangeRef.current([
+                    ...currentLayout,
                     {
                         id: newItemId(source.asset),
                         asset: source.asset,
@@ -216,23 +301,29 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
                     },
                 ]);
             }
+            clearDragState();
             return;
         }
 
         // Placed item — trash beats grid, so check trash first.
         if (isOverTrash(dropX, dropY)) {
-            onChange(layout.filter((it) => it.id !== source.item.id));
+            onChangeRef.current(currentLayout.filter((it) => it.id !== source.item.id));
+            clearDragState();
             return;
         }
         const drop = dropTargetFor(dropX, dropY, span);
         // Outside grid or wrong band → leave in place (no layout change).
-        if (!drop || drop.band !== source.item.band) return;
+        if (!drop || drop.band !== source.item.band) {
+            clearDragState();
+            return;
+        }
         // Same band, valid cell → reposition in place (preserve id/order).
-        onChange(
-            layout.map((it) =>
+        onChangeRef.current(
+            currentLayout.map((it) =>
                 it.id === source.item.id ? { ...it, gx: drop.gx, gy: drop.gy } : it,
             ),
         );
+        clearDragState();
     };
 
     // One responder factory per role. `useMemo` keys off `editing`/size so the
@@ -242,8 +333,12 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
         () =>
             PALETTE.map((entry) =>
                 PanResponder.create({
-                    onStartShouldSetPanResponder: () => editing && size.w > 0,
-                    onMoveShouldSetPanResponder: () => editing && size.w > 0,
+                    onStartShouldSetPanResponder: () => false,
+                    onMoveShouldSetPanResponder: (_e, g) =>
+                        editing &&
+                        size.w > 0 &&
+                        Math.abs(g.dy) > PALETTE_DRAG_THRESHOLD &&
+                        Math.abs(g.dy) >= Math.abs(g.dx),
                     onPanResponderTerminationRequest: () => false,
                     onPanResponderGrant: (e) =>
                         beginDrag(
@@ -294,11 +389,24 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
                 </>
             )}
 
+            {editing &&
+                size.w > 0 &&
+                dropPreview &&
+                renderDropPreview(dropPreview, size.w, wallHeight, floorHeight)}
+
             {editing && size.w > 0 &&
                 sortedItems.map((item) => {
                     const bandTop = item.band === 'wall' ? 0 : wallHeight;
                     const bandH = item.band === 'wall' ? wallHeight : floorHeight;
                     const rect = itemPixelRect(item, size.w, bandH);
+                    const itemLeft = rect.left;
+                    const itemTop = rect.top + bandTop;
+                    const extraW = Math.max(0, MIN_PLACED_TOUCH_SIZE - rect.width) / 2;
+                    const extraH = Math.max(0, MIN_PLACED_TOUCH_SIZE - rect.height) / 2;
+                    const hitLeft = Math.max(0, itemLeft - extraW);
+                    const hitTop = Math.max(0, itemTop - extraH);
+                    const hitRight = Math.min(size.w, itemLeft + rect.width + extraW);
+                    const hitBottom = Math.min(size.h, itemTop + rect.height + extraH);
                     const responder = makePlacedResponder(item);
                     const isDragged = draggedId === item.id;
                     return (
@@ -308,15 +416,25 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
                             style={[
                                 styles.placedOverlay,
                                 {
-                                    left: rect.left,
-                                    top: rect.top + bandTop,
-                                    width: rect.width,
-                                    height: rect.height,
+                                    left: hitLeft,
+                                    top: hitTop,
+                                    width: hitRight - hitLeft,
+                                    height: hitBottom - hitTop,
                                     opacity: isDragged ? 0 : 1,
                                 },
                             ]}
                         >
-                            <View style={styles.placedHighlight} />
+                            <View
+                                style={[
+                                    styles.placedHighlight,
+                                    {
+                                        left: itemLeft - hitLeft,
+                                        top: itemTop - hitTop,
+                                        width: rect.width,
+                                        height: rect.height,
+                                    },
+                                ]}
+                            />
                         </View>
                     );
                 })}
@@ -376,9 +494,15 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
             {editing && (
                 <View
                     pointerEvents="box-none"
-                    style={[styles.paletteWrap, { bottom: bottomInset + 56 }]}
+                    style={[styles.paletteWrap, { bottom: bottomInset + 76 }]}
                 >
-                    <View style={styles.paletteContent}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        scrollEnabled={!dragMeta}
+                        style={styles.paletteFrame}
+                        contentContainerStyle={styles.paletteContent}
+                    >
                         {PALETTE.map((item, i) => (
                             <View
                                 key={item.asset}
@@ -393,13 +517,13 @@ const RoomEditor: React.FC<RoomEditorProps> = ({ layout, onChange, bottomInset =
                                 <Text style={styles.paletteLabel}>{item.label}</Text>
                             </View>
                         ))}
-                    </View>
+                    </ScrollView>
                 </View>
             )}
 
             <TouchableOpacity
                 onPress={() => setEditing((prev) => !prev)}
-                style={[styles.editButton, { bottom: bottomInset + 8 }]}
+                style={[styles.editButton, { bottom: editButtonBottom }]}
                 hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
             >
                 <Image
@@ -445,6 +569,41 @@ function renderGrid(band: RoomBand, top: number, height: number, width: number) 
     return <React.Fragment key={`grid-${band}`}>{lines}</React.Fragment>;
 }
 
+function renderDropPreview(
+    preview: DropPreview,
+    width: number,
+    wallHeight: number,
+    floorHeight: number,
+) {
+    const bandTop = preview.band === 'wall' ? 0 : wallHeight;
+    const bandHeight = preview.band === 'wall' ? wallHeight : floorHeight;
+    const rect = itemPixelRect(
+        {
+            band: preview.band,
+            gx: preview.gx,
+            gy: preview.gy,
+            span: preview.span,
+        },
+        width,
+        bandHeight,
+    );
+    return (
+        <View
+            pointerEvents="none"
+            style={[
+                styles.dropPreview,
+                {
+                    left: rect.left,
+                    top: rect.top + bandTop,
+                    width: rect.width,
+                    height: rect.height,
+                },
+                preview.valid ? styles.dropPreviewValid : styles.dropPreviewInvalid,
+            ]}
+        />
+    );
+}
+
 const styles = StyleSheet.create({
     gridLine: {
         position: 'absolute',
@@ -457,20 +616,38 @@ const styles = StyleSheet.create({
     },
     placedOverlay: {
         position: 'absolute',
-        alignItems: 'stretch',
+        zIndex: 6,
+        elevation: 6,
     },
     placedHighlight: {
-        flex: 1,
+        position: 'absolute',
         borderWidth: 2,
         borderColor: 'rgba(255, 215, 0, 0.7)',
         borderRadius: 4,
         backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    },
+    dropPreview: {
+        position: 'absolute',
+        borderWidth: 2,
+        borderRadius: 5,
+        zIndex: 5,
+        elevation: 5,
+    },
+    dropPreviewValid: {
+        borderColor: 'rgba(120, 255, 170, 0.95)',
+        backgroundColor: 'rgba(120, 255, 170, 0.16)',
+    },
+    dropPreviewInvalid: {
+        borderColor: 'rgba(255, 100, 100, 0.95)',
+        backgroundColor: 'rgba(255, 100, 100, 0.14)',
     },
     ghost: {
         position: 'absolute',
         left: 0,
         top: 0,
         opacity: 0.85,
+        zIndex: 14,
+        elevation: 14,
     },
     trashZone: {
         position: 'absolute',
@@ -480,8 +657,8 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 8,
-        elevation: 8,
+        zIndex: 15,
+        elevation: 15,
     },
     trashZoneHover: {
         backgroundColor: 'rgba(190, 40, 40, 0.95)',
@@ -524,24 +701,25 @@ const styles = StyleSheet.create({
         position: 'absolute',
         left: 8,
         right: 8,
-        zIndex: 9,
-        elevation: 9,
+        zIndex: 11,
+        elevation: 11,
     },
-    paletteContent: {
-        flexDirection: 'row',
-        flexWrap: 'nowrap',
-        paddingHorizontal: 6,
-        paddingVertical: 6,
+    paletteFrame: {
         backgroundColor: 'rgba(0, 0, 0, 0.55)',
         borderWidth: 2,
         borderColor: '#2E5A3E',
         borderRadius: 8,
-        justifyContent: 'space-around',
+    },
+    paletteContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        paddingVertical: 6,
+        gap: 5,
     },
     paletteItem: {
-        width: 56,
-        height: 64,
-        marginHorizontal: 2,
+        width: 54,
+        height: 58,
         backgroundColor: 'rgba(255, 255, 255, 0.08)',
         borderWidth: 2,
         borderColor: 'transparent',
@@ -551,14 +729,16 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
     },
     paletteImage: {
-        width: 36,
-        height: 36,
+        width: 34,
+        height: 34,
     },
     paletteLabel: {
         color: '#E8F5E8',
         fontFamily: 'Monaco',
-        fontSize: 15,
+        fontSize: 9,
+        lineHeight: 10,
         marginTop: 2,
+        textAlign: 'center',
     },
 });
 

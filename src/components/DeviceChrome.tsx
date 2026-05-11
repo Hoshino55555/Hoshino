@@ -5,13 +5,10 @@ import {
     Image,
     TouchableOpacity,
     Text,
-    Dimensions,
+    useWindowDimensions,
 } from 'react-native';
 import { useChrome } from '../contexts/ChromeContext';
 import { Chrome } from '../assets';
-
-const { width: screenWidth } = Dimensions.get('window');
-const isTablet = screenWidth > 768;
 
 export const DeviceCasing: React.FC = () => {
     const { active, pressFrame } = useChrome();
@@ -46,6 +43,11 @@ export const DeviceCasing: React.FC = () => {
 
 export const DeviceButtons: React.FC = () => {
     const { active, pressIn, pressOut } = useChrome();
+    const { width, height } = useWindowDimensions();
+    const buttonSize = Math.min(width * 0.19, height * 0.09);
+    const bottomOffset = height * 0.095;
+    const buttonInset = width * 0.14;
+    const centerDrop = buttonSize * 0.4;
     const {
         leftButtonText = '',
         centerButtonText = '',
@@ -61,11 +63,27 @@ export const DeviceButtons: React.FC = () => {
 
     return (
         <View
-            style={[styles.bottomButtonContainer, overlayMode && styles.darkenedButtons]}
+            style={[
+                styles.bottomButtonContainer,
+                {
+                    paddingHorizontal: buttonInset,
+                    bottom: bottomOffset,
+                },
+                overlayMode && styles.darkenedButtons,
+            ]}
             pointerEvents="box-none"
         >
             <TouchableOpacity
-                style={[styles.bottomButton, styles.left, leftButtonDisabled && styles.disabled]}
+                style={[
+                    styles.bottomButton,
+                    styles.left,
+                    {
+                        width: buttonSize,
+                        height: buttonSize,
+                        borderRadius: buttonSize / 2,
+                    },
+                    leftButtonDisabled && styles.disabled,
+                ]}
                 onPressIn={() => !leftButtonDisabled && pressIn('left')}
                 onPressOut={() => pressOut('left')}
                 onPress={!leftButtonDisabled ? onLeftButtonPress : undefined}
@@ -77,7 +95,17 @@ export const DeviceButtons: React.FC = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-                style={[styles.bottomButton, styles.center, centerButtonDisabled && styles.disabled]}
+                style={[
+                    styles.bottomButton,
+                    styles.center,
+                    {
+                        width: buttonSize,
+                        height: buttonSize,
+                        borderRadius: buttonSize / 2,
+                        marginTop: centerDrop,
+                    },
+                    centerButtonDisabled && styles.disabled,
+                ]}
                 onPressIn={() => !centerButtonDisabled && pressIn('center')}
                 onPressOut={() => pressOut('center')}
                 onPress={!centerButtonDisabled ? onCenterButtonPress : undefined}
@@ -87,7 +115,16 @@ export const DeviceButtons: React.FC = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-                style={[styles.bottomButton, styles.right, rightButtonDisabled && styles.disabled]}
+                style={[
+                    styles.bottomButton,
+                    styles.right,
+                    {
+                        width: buttonSize,
+                        height: buttonSize,
+                        borderRadius: buttonSize / 2,
+                    },
+                    rightButtonDisabled && styles.disabled,
+                ]}
                 onPressIn={() => !rightButtonDisabled && pressIn('right')}
                 onPressOut={() => pressOut('right')}
                 onPress={!rightButtonDisabled ? onRightButtonPress : undefined}
@@ -123,18 +160,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         width: '100%',
-        paddingHorizontal: isTablet ? 40 : 55,
         position: 'absolute',
-        bottom: isTablet ? 8 : 80,
         zIndex: 3,
         elevation: 20,
     },
     bottomButton: {
-        width: isTablet ? 80 : 75,
-        height: isTablet ? 80 : 75,
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: isTablet ? 40 : 30,
         overflow: 'hidden',
         position: 'relative',
     },
@@ -142,7 +174,6 @@ const styles = StyleSheet.create({
         marginRight: 'auto',
     },
     center: {
-        marginTop: isTablet ? 10 : 30,
     },
     right: {
         marginLeft: 'auto',

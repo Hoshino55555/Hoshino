@@ -31,8 +31,8 @@ interface GameStateContextType {
     cookRecipe: (recipeId: string, ingredients?: string[]) => Promise<CookResponse>;
     applyBooster: (
         skuId: BoosterSkuId,
-        qty?: number,
-        requestId?: string
+        qty: number | undefined,
+        requestId: string
     ) => Promise<{
         newBalance: number;
         boosters: BoosterCounts;
@@ -44,7 +44,7 @@ interface GameStateContextType {
     }>;
     consumeBooster: (
         skuId: BoosterSkuId,
-        requestId?: string
+        requestId: string
     ) => Promise<{
         boosters: BoosterCounts;
         state: GameState;

@@ -47,9 +47,8 @@ export type IAPSkuId =
     | 'star-fragments-small'
     | 'star-fragments-medium'
     | 'star-fragments-large'
-    | 'season-pass'
+    | 'lunar-pass'
     | 'bundle-starter'
-    | 'bundle-themed'
     | 'bundle-bargain';
 
 export interface CreatePurchaseIntentResult {

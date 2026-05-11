@@ -34,8 +34,8 @@ interface UseGameStateResult {
     cookRecipe: (recipeId: string, ingredients?: string[]) => Promise<CookResponse>;
     applyBooster: (
         skuId: BoosterSkuId,
-        qty?: number,
-        requestId?: string
+        qty: number | undefined,
+        requestId: string
     ) => Promise<{
         newBalance: number;
         boosters: BoosterCounts;
@@ -47,7 +47,7 @@ interface UseGameStateResult {
     }>;
     consumeBooster: (
         skuId: BoosterSkuId,
-        requestId?: string
+        requestId: string
     ) => Promise<{
         boosters: BoosterCounts;
         state: GameState;
@@ -292,7 +292,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     );
 
     const applyBooster = useCallback(
-        async (skuId: BoosterSkuId, qty: number = 1, requestId?: string) => {
+        async (skuId: BoosterSkuId, qty: number = 1, requestId: string) => {
             // Booster purchase no longer mutates moonoko state — it just adds
             // charges to the wallet. characterId is irrelevant; kept here only
             // so callers don't have to thread a character ref through the
@@ -303,7 +303,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
     );
 
     const consumeBooster = useCallback(
-        async (skuId: BoosterSkuId, requestId?: string) => {
+        async (skuId: BoosterSkuId, requestId: string) => {
             if (!characterId) throw new Error('No character selected');
             const requestedFor = characterId;
             const res = await GameStateService.consumeBooster(

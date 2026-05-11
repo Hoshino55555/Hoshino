@@ -6,27 +6,13 @@ import {
     StyleSheet,
     ImageBackground,
     Image,
-    Dimensions,
+    useWindowDimensions,
 } from 'react-native';
 import type { ImageStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Backgrounds, Sleep, getCharacterSleep } from '../assets';
 
 const SLEEP_REQUIRED_MS = 8 * 60 * 60 * 1000;
-
-// Deterministic pixel widths for the alarm box and wake button. Earlier
-// attempts to size these with `width: '%'` + `aspectRatio` produced
-// off-center rendering on Android (the wake button's <Image> was falling
-// back to source-intrinsic dimensions despite the parent constraint, so
-// it visibly extended past the alarm box on the right while their lefts
-// aligned). Computing the box geometry from screen width up-front and
-// driving width + height as plain numbers removes the percentage-vs-
-// intrinsic ambiguity.
-const SCREEN_W = Dimensions.get('window').width;
-const ALARM_BOX_WIDTH = Math.round(SCREEN_W * 0.85);
-const ALARM_BOX_HEIGHT = Math.round((ALARM_BOX_WIDTH * 240) / 896);
-const WAKE_BUTTON_WIDTH = Math.round(SCREEN_W * 0.8);
-const WAKE_BUTTON_HEIGHT = Math.round((WAKE_BUTTON_WIDTH * 223) / 855);
 
 interface Props {
     onWake: () => void;
@@ -62,6 +48,11 @@ const SleepScreen: React.FC<Props> = ({
     wakeAtMs,
 }) => {
     const insets = useSafeAreaInsets();
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+    const alarmBoxWidth = screenWidth * 0.85;
+    const alarmBoxHeight = alarmBoxWidth * (240 / 896);
+    const wakeButtonWidth = screenWidth * 0.8;
+    const wakeButtonHeight = wakeButtonWidth * (223 / 855);
     const [now, setNow] = useState(Date.now());
 
     // Parent (SleepController) sets wakeRequested when something other than
@@ -122,30 +113,50 @@ const SleepScreen: React.FC<Props> = ({
                     </View>
                 </View>
 
-                <View style={styles.alarmWrap}>
+                <View style={[styles.alarmWrap, { marginBottom: screenHeight * 0.057 }]}>
                     <ImageBackground
                         source={Sleep.alarmBox}
-                        style={styles.alarmBg}
+                        style={[
+                            styles.alarmBg,
+                            { width: alarmBoxWidth, height: alarmBoxHeight },
+                        ]}
                         resizeMode="stretch"
                     >
-                        <View style={styles.alarmContent}>
+                        <View
+                            style={[
+                                styles.alarmContent,
+                                {
+                                    paddingHorizontal: alarmBoxWidth * 0.036,
+                                    transform: [
+                                        { translateX: alarmBoxWidth * 0.009 },
+                                        { translateY: alarmBoxHeight * 0.012 },
+                                    ],
+                                },
+                            ]}
+                        >
                             <Text style={styles.alarmLabel}>Alarm</Text>
                             <Text style={styles.alarmTime}>{alarmText}</Text>
                         </View>
                     </ImageBackground>
                 </View>
 
-                <View style={[styles.footer, { paddingBottom: insets.bottom + 56 }]}>
+                <View style={[styles.footer, { paddingBottom: insets.bottom + screenHeight * 0.066 }]}>
                     <TouchableOpacity
                         onPress={handleWake}
                         hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                         activeOpacity={0.85}
-                        style={styles.wakeTouchable}
+                        style={[
+                            styles.wakeTouchable,
+                            { width: wakeButtonWidth, height: wakeButtonHeight },
+                        ]}
                         testID="sleep-wake-button"
                     >
                         <Image
                             source={Sleep.wakeupButton}
-                            style={styles.wakeImage as ImageStyle}
+                            style={[
+                                styles.wakeImage,
+                                { width: wakeButtonWidth, height: wakeButtonHeight },
+                            ] as ImageStyle}
                             resizeMode="contain"
                         />
                     </TouchableOpacity>
@@ -207,19 +218,14 @@ const styles = StyleSheet.create({
     alarmWrap: {
         width: '100%',
         alignItems: 'center',
-        marginBottom: 48,
     },
     alarmBg: {
-        width: ALARM_BOX_WIDTH,
-        height: ALARM_BOX_HEIGHT,
     },
     alarmContent: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 32,
-        transform: [{ translateX: 8 }, { translateY: 3 }],
     },
     alarmLabel: {
         fontFamily: '04b03',
@@ -240,13 +246,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     wakeTouchable: {
-        width: WAKE_BUTTON_WIDTH,
-        height: WAKE_BUTTON_HEIGHT,
         alignSelf: 'center',
     },
     wakeImage: {
-        width: WAKE_BUTTON_WIDTH,
-        height: WAKE_BUTTON_HEIGHT,
     },
 });
 

@@ -5,20 +5,22 @@ import {
     TouchableOpacity,
     StyleSheet,
     ScrollView,
-    ImageBackground,
-    Image,
-    Dimensions,
+    useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Backgrounds, Frames } from '../assets';
+import FooterBackBar from './FooterBackBar';
+import PageArtShell from './PageArtShell';
+import { Backgrounds } from '../assets';
+
+export type ArcadeGameId = 'starburst' | 'water-ring-toss';
 
 interface GamesListProps {
     onClose: () => void;
-    onSelectGame: (gameId: string) => void;
+    onSelectGame: (gameId: ArcadeGameId) => void;
 }
 
 interface GameTile {
-    id: string;
+    id: ArcadeGameId;
     name: string;
     description: string;
     available: boolean;
@@ -41,12 +43,15 @@ const GAMES: GameTile[] = [
 
 const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
     const insets = useSafeAreaInsets();
-    const screenWidth = Dimensions.get('window').width;
+    const { width: screenWidth } = useWindowDimensions();
     // Top banner is 1200×805, bottom strip is 1200×284 — reserves derived from
     // screen width so the layered overlays render at native aspect. Matches
     // Shop / FeedingPage so all menu screens share the same banner-anchored grid.
     const bannerReserve = screenWidth * (805 / 1200);
     const bottomBarReserve = screenWidth * (284 / 1200);
+    const contentTopPadding = bannerReserve * 1.03 + insets.top;
+    const contentBottomPadding =
+        bottomBarReserve * 1.17 + insets.bottom;
 
     const handleTilePress = (game: GameTile) => {
         if (!game.available) return;
@@ -54,13 +59,25 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
     };
 
     return (
-        <View style={StyleSheet.absoluteFill}>
-            <ImageBackground
-                source={Backgrounds.arcade}
-                style={styles.bg}
-                resizeMode="cover"
-                testID="games-screen"
-            >
+        <PageArtShell
+            background={Backgrounds.arcade}
+            testID="games-screen"
+            style={StyleSheet.absoluteFill}
+            overlays={[
+                {
+                    key: 'bottom',
+                    source: Backgrounds.arcadeBottom,
+                    edge: 'bottom',
+                    height: bottomBarReserve,
+                },
+                {
+                    key: 'banner',
+                    source: Backgrounds.arcadeBanner,
+                    edge: 'top',
+                    height: bannerReserve,
+                },
+            ]}
+        >
                 <View
                     style={[
                         styles.scrollClipper,
@@ -71,8 +88,8 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
                         contentContainerStyle={[
                             styles.scrollBody,
                             {
-                                paddingTop: bannerReserve + insets.top + 8,
-                                paddingBottom: bottomBarReserve + insets.bottom + 16,
+                                paddingTop: contentTopPadding,
+                                paddingBottom: contentBottomPadding,
                             },
                         ]}
                     >
@@ -95,104 +112,21 @@ const GamesList: React.FC<GamesListProps> = ({ onClose, onSelectGame }) => {
                     </ScrollView>
                 </View>
 
-                <View
-                    pointerEvents="none"
-                    style={[styles.bottomOverlay, { height: bottomBarReserve }]}
-                >
-                    <Image
-                        source={Backgrounds.arcadeBottom}
-                        style={styles.overlayImage}
-                        resizeMode="contain"
-                    />
-                </View>
-                <View
-                    pointerEvents="none"
-                    style={[styles.bannerOverlay, { top: 0, height: bannerReserve }]}
-                >
-                    <Image
-                        source={Backgrounds.arcadeBanner}
-                        style={styles.overlayImage}
-                        resizeMode="contain"
-                    />
-                </View>
-
-                <View
-                    style={[
-                        styles.bottomBar,
-                        { height: bottomBarReserve, paddingBottom: insets.bottom },
-                    ]}
-                    pointerEvents="box-none"
-                >
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={onClose}
-                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                    >
-                        <Image
-                            source={Frames.backButton}
-                            style={styles.backButtonImage}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.backButtonLabel}>Back</Text>
-                    </TouchableOpacity>
-                </View>
-            </ImageBackground>
-        </View>
+                <FooterBackBar
+                    onBack={onClose}
+                    height={bottomBarReserve}
+                    bottomInset={insets.bottom}
+                />
+        </PageArtShell>
     );
 };
 
 const styles = StyleSheet.create({
-    bg: { flex: 1, width: '100%', height: '100%' },
-    // Sits in the painted plank baked into the bottom of the new ARCADE bg.
-    // Absolute so the scroll content above isn't shifted — paddingBottom on
-    // the scroll view already reserves the matching space.
-    bottomBar: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingHorizontal: 16,
-        zIndex: 2,
-    },
-    backButton: {
-        padding: 4,
-        alignItems: 'center',
-    },
-    backButtonImage: {
-        width: 56,
-        height: 46,
-    },
-    backButtonLabel: {
-        color: '#e84a4a',
-        fontFamily: 'Monaco',
-        fontSize: 14,
-        marginTop: 1,
-    },
     scrollClipper: {
         position: 'absolute',
         left: 0,
         right: 0,
         overflow: 'hidden',
-    },
-    bannerOverlay: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 1,
-    },
-    bottomOverlay: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1,
-    },
-    overlayImage: {
-        width: '100%',
-        height: '100%',
     },
     scrollBody: {
         paddingHorizontal: 16,

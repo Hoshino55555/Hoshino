@@ -18,20 +18,18 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 import MoonokoSelection from './src/components/MoonokoSelection';
 import MoonokoInteraction from './src/components/MoonokoInteraction';
-import GamesList from './src/components/GamesList';
+import GamesList, { type ArcadeGameId } from './src/components/GamesList';
 import Starburst from './src/components/Starburst';
 import WaterRingToss from './src/components/WaterRingToss';
 import SleepScreen from './src/components/SleepScreen';
 import SleepConfirmationModal from './src/components/SleepConfirmationModal';
 import MorningRecapModal, { MorningRecapDeltas } from './src/components/MorningRecapModal';
-import MoonokoCollection from './src/components/MoonokoCollection';
 import Shop from './src/components/Shop';
 import FeedingPage from './src/components/FeedingPage';
 import InventoryPage from './src/components/InventoryPage';
 import Gallery from './src/components/Gallery';
 import WelcomeScreen from './src/components/WelcomeScreen';
 import CharacterChat from './src/components/CharacterChat';
-import GlobalLeaderboard from './src/components/GlobalLeaderboard';
 import Notification, { DeploymentStatusBanner } from './src/components/Notification';
 import WalletButton from './src/components/WalletButton';
 import Settings from './src/components/Settings';
@@ -48,9 +46,7 @@ import ZoomOutOverlay from './src/components/ZoomOutOverlay';
 import { Logos } from './src/assets';
 import { Connection, PublicKey } from '@solana/web3.js';
 
-// NEW: Programmable NFT Integration
-// New services and configs
-import { getGameCharacters, MOONOKOS_BY_ID, toGameCharacter } from './src/data/moonokos';
+import { MOONOKOS_BY_ID, toGameCharacter } from './src/data/moonokos';
 import { ENABLE_VRF_DEV_SCREEN } from './src/config/vrf';
 import { FirebaseAuthProvider, useFirebaseAuth } from './src/contexts/FirebaseAuthContext';
 import { GameStateProvider, useGameStateContext } from './src/contexts/GameStateContext';
@@ -59,6 +55,7 @@ import type { ForagedItem } from './src/services/GameStateService';
 import { scheduleSleepAlarm, cancelSleepAlarm } from './src/services/AlarmService';
 import MusicService from './src/services/MusicService';
 import { pushEmptySnapshot } from './src/widgets/widgetService';
+import { useAppNavigationTransition } from './src/hooks/useAppNavigationTransition';
 
 // Pending one-shot action requested by a widget tap. Includes characterId so
 // MoonokoInteraction can refuse to drain if the active character doesn't
@@ -72,6 +69,22 @@ export interface PendingWidgetAction {
 }
 
 const WIDGET_ACTION_TTL_MS = 60_000;
+
+type AppView =
+    | 'welcome'
+    | 'selection'
+    | 'interaction'
+    | 'feeding'
+    | 'shop'
+    | 'gallery'
+    | 'arcade'
+    | ArcadeGameId
+    | 'inventory'
+    | 'settings'
+    | 'profile'
+    | 'chat'
+    | 'sleep'
+    | 'vrf-dev';
 
 interface Character {
     id: string;
@@ -182,32 +195,19 @@ const saveStoredPlayerProfile = async (
     }
 };
 
-const validateCharacterInput = (character: Character): boolean => {
-    if (
-        !character?.name ||
-        character.name.length === 0 ||
-        character.name.length > 50
-    ) {
-        return false;
-    }
-    if (!character?.description || character.description.length > 1000) {
-        return false;
-    }
-    if (
-        !character?.image ||
-        character.image.length === 0 ||
-        character.image.length > 500
-    ) {
-        return false;
-    }
-    return true;
-};
-
 function App() {
     const { connected, publicKey, connect, disconnect, email, walletSource } = useWallet();
     const { firebaseUid } = useFirebaseAuth();
-    const [currentView, setCurrentView] = useState('welcome');
-    const [previousView, setPreviousView] = useState('welcome');
+    const {
+        currentView,
+        previousView,
+        transitionPhase,
+        replaceView,
+        transitionTo,
+        navigateToView,
+        handleIrisClosed,
+        handleIrisOpened,
+    } = useAppNavigationTransition<AppView>('welcome');
     const [welcomePhase, setWelcomePhase] = useState<string>('intro');
     const [shouldGoToCongratulations, setShouldGoToCongratulations] = useState(false);
     const [shouldFadeInInteraction, setShouldFadeInInteraction] = useState(false);
@@ -221,98 +221,11 @@ function App() {
     const [pendingWidgetAction, setPendingWidgetAction] =
         useState<PendingWidgetAction | null>(null);
 
-    // Single App-owned iris state machine. The whole tree (persistent MI
-    // layer, route overlay layer, chrome, wallet pill, notifications) lives
-    // INSIDE one <ZoomOutOverlay> rendered below. Screens never animate
-    // their own iris — they just call transitionTo(view) and the machine
-    // runs:
-    //   idle    -> closing  (iris animates closed, screen still on screen A)
-    //           -> covered  (currentView swaps to B; iris fully black; new
-    //                        screen mounts and gets at least one paint
-    //                        committed before the open animates so the
-    //                        first frame of B is visible behind a still-
-    //                        closed iris instead of mid-animation)
-    //           -> opening  (iris animates open over the now-painted B)
-    //           -> idle
-    // setCurrentView is no longer called directly anywhere that wants the
-    // iris — call transitionTo. Direct setCurrentView still works for
-    // bypass cases (initial hydration, deep links into a fresh state).
-    type TransitionPhase = 'idle' | 'closing' | 'covered' | 'opening';
-    const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>('idle');
     // Sleep modal opens from the room's sleep menu button. The modal itself
     // doesn't need the iris (it's a transient confirmation), but the
     // start-sleep + wake actions it triggers DO route through transitionTo.
     // SleepController consumes this flag.
     const [sleepModalVisible, setSleepModalVisible] = useState(false);
-    const pendingViewRef = useRef<string | null>(null);
-    const coverRafRef = useRef<number | null>(null);
-    const coverHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Refs mirror state for the iris callbacks below. Without them, the
-    // useCallback identities would change every time currentView or
-    // transitionPhase ticks, which would re-fire ZoomOutOverlay's animation
-    // useEffect mid-transition and restart the timing.
-    const currentViewRef = useRef(currentView);
-    const transitionPhaseRef = useRef<TransitionPhase>('idle');
-    useEffect(() => {
-        currentViewRef.current = currentView;
-    }, [currentView]);
-    useEffect(() => {
-        transitionPhaseRef.current = transitionPhase;
-    }, [transitionPhase]);
-    const transitionTo = useCallback((view: string) => {
-        if (transitionPhaseRef.current !== 'idle') return;
-        if (view === currentViewRef.current) return;
-        pendingViewRef.current = view;
-        setTransitionPhase('closing');
-    }, []);
-    const handleIrisClosed = useCallback(() => {
-        const next = pendingViewRef.current;
-        pendingViewRef.current = null;
-        if (next != null) {
-            setPreviousView(currentViewRef.current);
-            setCurrentView(next);
-        }
-        setTransitionPhase('covered');
-    }, []);
-    const handleIrisOpened = useCallback(() => {
-        setTransitionPhase((p) => (p === 'opening' ? 'idle' : p));
-    }, []);
-    // Hold the 'covered' phase long enough to (a) let React commit + Android
-    // paint the new currentView behind the still-closed iris, and (b) give
-    // the user a clearly visible held-black beat that masks the screen swap
-    // through the iris's sub-pixel pinhole. The 2-RAF wait covers (a); the
-    // setTimeout covers (b). Without the held duration the seam is a single-
-    // frame flash and any iris-pinhole leakage is perceived as jitter rather
-    // than a deliberate transition.
-    const COVERED_HOLD_MS = 200;
-    useEffect(() => {
-        if (transitionPhase !== 'covered') return;
-        const id1 = requestAnimationFrame(() => {
-            coverRafRef.current = requestAnimationFrame(() => {
-                coverRafRef.current = null;
-                coverHoldRef.current = setTimeout(() => {
-                    coverHoldRef.current = null;
-                    setTransitionPhase('opening');
-                }, COVERED_HOLD_MS);
-            });
-        });
-        return () => {
-            cancelAnimationFrame(id1);
-            if (coverRafRef.current != null) {
-                cancelAnimationFrame(coverRafRef.current);
-                coverRafRef.current = null;
-            }
-            if (coverHoldRef.current != null) {
-                clearTimeout(coverHoldRef.current);
-                coverHoldRef.current = null;
-            }
-        };
-    }, [transitionPhase]);
-
-    const navigateToView = (view: string) => {
-        setPreviousView(currentView);
-        setCurrentView(view);
-    };
 
     const navigateToSelection = (fromPhase?: string, name?: string) => {
         if (fromPhase) {
@@ -325,8 +238,7 @@ function App() {
                 persistPlayerProfile(publicKey.toString(), { playerName: trimmed });
             }
         }
-        setPreviousView(currentView);
-        setCurrentView('selection');
+        navigateToView('selection');
     };
     const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(
         null
@@ -488,41 +400,6 @@ function App() {
         }
     };
 
-    const handleCharacterSelect = async (character: Character) => {
-        console.log('🎮 Character selected in App:', character.name, {
-            connected,
-            character
-        });
-
-        if (!validateCharacterInput(character)) {
-            console.log('❌ Character validation failed');
-            addNotification('Invalid character data', 'error');
-            return;
-        }
-
-        console.log(
-            '✅ Setting selected character and switching to interaction view'
-        );
-        addNotification(`${character.name} selected! Preparing your companion...`, 'success');
-
-        const nextOwnedCharacters = normalizeOwnedCharacterIds([
-            ...ownedCharacters,
-            character.id,
-        ]);
-        const restoredCharacter =
-            restoreCharacterFromId(character.id, nextOwnedCharacters) ?? character;
-
-        setOwnedCharacters(nextOwnedCharacters);
-        setSelectedCharacter(restoredCharacter);
-        if (publicKey) {
-            persistPlayerProfile(publicKey.toString(), {
-                ownedCharacterIds: nextOwnedCharacters,
-                selectedCharacterId: restoredCharacter.id,
-            });
-        }
-        setCurrentView('interaction');
-    };
-
     useEffect(() => {
         let isCancelled = false;
 
@@ -575,19 +452,19 @@ function App() {
             const shouldWelcome = !alreadyWelcomed && profile.playerName.trim().length > 0;
 
             if (hasStoredCompanion) {
-                setCurrentView(restoredCharacter ? 'interaction' : 'selection');
+                replaceView(restoredCharacter ? 'interaction' : 'selection');
                 if (shouldWelcome) {
                     addNotification(`🌟 Welcome back, ${profile.playerName}!`, 'success');
                     welcomedWalletsRef.current.add(walletAddress);
                 }
             } else if (profile.playerName.trim()) {
-                setCurrentView('selection');
+                replaceView('selection');
                 if (shouldWelcome) {
                     addNotification(`🌟 Welcome back, ${profile.playerName}!`, 'success');
                     welcomedWalletsRef.current.add(walletAddress);
                 }
             } else {
-                setCurrentView('welcome');
+                replaceView('welcome');
             }
 
             setProfileHydratedWallet(walletAddress);
@@ -652,7 +529,7 @@ function App() {
             setPlayerName('');
             setOwnedCharacters([]);
             setSelectedCharacter(null);
-            setCurrentView('welcome');
+            replaceView('welcome');
             setProfileHydratedWallet(walletAddress);
         };
 
@@ -716,7 +593,7 @@ function App() {
                 });
             }
         }
-        setCurrentView('selection');
+        replaceView('selection');
     };
 
     const handleGoToInteraction = (name?: string) => {
@@ -729,7 +606,7 @@ function App() {
             }
         }
         setShouldFadeInInteraction(true);
-        setCurrentView('interaction');
+        replaceView('interaction');
     };
 
     const handleGoToCongratulations = (character?: Character) => {
@@ -752,7 +629,7 @@ function App() {
             console.log('🎉 Setting selected character:', restoredCharacter.name);
         }
         setShouldGoToCongratulations(true);
-        setCurrentView('welcome');
+        replaceView('welcome');
         // Reset the flag after a longer delay to ensure WelcomeScreen has time to render
         setTimeout(() => {
             setShouldGoToCongratulations(false);
@@ -772,7 +649,7 @@ function App() {
                 if (parsed.hostname === 'forage' && parsed.pathname === '/drain') {
                     const characterId = parsed.searchParams.get('characterId');
                     if (!characterId) return;
-                    setCurrentView('interaction');
+                    replaceView('interaction');
                     setPendingWidgetAction({
                         type: 'forage-drain',
                         characterId,
@@ -867,7 +744,7 @@ function App() {
         />
     );
 
-    const renderContent = () => {
+    const renderRootRoute = () => {
         switch (currentView) {
             case 'welcome':
                 return (
@@ -888,7 +765,7 @@ function App() {
                     <MoonokoSelection
                         onBack={() => {
                             if (previousView === 'welcome') {
-                                setCurrentView('welcome');
+                                replaceView('welcome');
                             } else {
                                 navigateToView(previousView);
                             }
@@ -897,59 +774,24 @@ function App() {
                         onGoToCongratulations={handleGoToCongratulations}
                     />
                 );
-            case 'collection':
-                return (
-                    <MoonokoCollection
-                        characters={getGameCharacters(ownedCharacters, 'png')}
-                        selectedCharacter={selectedCharacter}
-                        onSelectCharacter={handleCharacterSelect}
-                        onExit={() => setCurrentView('selection')}
-                        walletAddress={publicKey?.toString()}
-                        connected={connected}
-                        onNotification={addNotification}
-                    />
-                );
-            case 'interaction':
-            case 'feeding':
-                return null;
-            case 'arcade':
-            case 'starburst':
-            case 'water-ring-toss':
-            case 'sleep':
-                return null;
             case 'chat':
                 return selectedCharacter ? null : (
                     <View style={styles.noCharacterContainer}>
                         <Text style={styles.noCharacterText}>Please select a character first!</Text>
                         <TouchableOpacity
-                            onPress={() => setCurrentView('selection')}
+                            onPress={() => replaceView('selection')}
                             style={styles.selectButton}
                         >
                             <Text style={styles.selectButtonText}>Select Character</Text>
                         </TouchableOpacity>
                     </View>
                 );
-            case 'shop':
-            case 'gallery':
-                return null;
-            case 'inventory':
-                return null;
-            case 'leaderboard':
-                return (
-                    <GlobalLeaderboard
-                        walletAddress={publicKey?.toString()}
-                        onClose={() => setCurrentView('interaction')}
-                    />
-                );
-            case 'settings':
-            case 'profile':
-                return null;
             case 'vrf-dev': {
                 const VRFTest = require('./src/components/_dev/VRFTest').default;
                 return (
                     <VRFTest
                         onClose={() =>
-                            setCurrentView(previousView === 'vrf-dev' ? 'welcome' : previousView)
+                            replaceView(previousView === 'vrf-dev' ? 'welcome' : previousView)
                         }
                     />
                 );
@@ -959,8 +801,72 @@ function App() {
         }
     };
 
-    const miRoutes = ['interaction', 'feeding', 'shop', 'gallery', 'inventory', 'settings', 'chat', 'profile'];
-    const miMounted = miRoutes.includes(currentView);
+    const renderFullScreenRoute = () => {
+        switch (currentView) {
+            case 'feeding':
+                return (
+                    <FeedingPage
+                        onBack={() => transitionTo('interaction')}
+                        onNotification={addNotification}
+                    />
+                );
+            case 'shop':
+                return (
+                    <Shop
+                        connection={connection}
+                        onNotification={addNotification}
+                        onClose={() => transitionTo('interaction')}
+                    />
+                );
+            case 'gallery':
+                return <Gallery onBack={() => transitionTo('interaction')} />;
+            case 'arcade':
+                return (
+                    <GamesList
+                        onClose={() => transitionTo('interaction')}
+                        onSelectGame={(gameId) => transitionTo(gameId)}
+                    />
+                );
+            case 'starburst':
+                return <StarburstView onBack={() => transitionTo('arcade')} />;
+            case 'water-ring-toss':
+                return <WaterRingTossView onBack={() => transitionTo('arcade')} />;
+            case 'inventory':
+                return <InventoryPage onBack={() => transitionTo('interaction')} />;
+            case 'settings':
+                return (
+                    <Settings
+                        onBack={() => transitionTo('interaction')}
+                        onNotification={addNotification}
+                    />
+                );
+            case 'profile':
+                return (
+                    <Profile
+                        onBack={() => navigateToView(previousView || 'interaction')}
+                        onNotification={addNotification}
+                        playerName={playerName}
+                        publicKey={publicKey?.toString() ?? null}
+                        email={email}
+                        walletSource={walletSource}
+                        onUpdatePlayerName={updatePlayerName}
+                        onLogout={disconnectWallet}
+                    />
+                );
+            case 'chat':
+                return selectedCharacter ? (
+                    <CharacterChat
+                        character={selectedCharacter}
+                        onExit={() => transitionTo('interaction')}
+                        playerName={playerName}
+                        onNotification={addNotification}
+                    />
+                ) : null;
+            default:
+                return null;
+        }
+    };
+    const fullScreenRoute = renderFullScreenRoute();
 
     // Hold a splash-colored shim until the wallet has resolved AND its
     // profile has hydrated. Without this, returning users paint a frame
@@ -981,8 +887,8 @@ function App() {
         <SafeAreaView style={styles.container}>
             <StatusBar style="light" hidden={true} />
             {/* Single global iris. Everything that should be hidden during a
-                page transition lives inside this overlay — the persistent MI
-                layer, the route-overlay layer, the chrome buttons, the
+                page transition lives inside this overlay — the interaction
+                layer, full-screen route surface, the chrome buttons, the
                 wallet pill, and notifications. Per-screen iris instances
                 were removed so there's exactly one Reanimated timer running
                 a transition at any time. The iris is "open" (FINAL_SCALE)
@@ -997,93 +903,21 @@ function App() {
                 onExitComplete={handleIrisClosed}
                 onOpenComplete={handleIrisOpened}
             >
-                {miMounted && (
+                {currentView === 'interaction' && (
                     <View
-                        key="mi-layer"
+                        key="interaction-layer"
                         style={StyleSheet.absoluteFill}
                         pointerEvents="box-none"
                     >
                         {moonokoInteractionElement}
                     </View>
                 )}
-                {currentView === 'feeding' && (
-                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                        <FeedingPage
-                            onBack={() => transitionTo('interaction')}
-                            onNotification={addNotification}
-                        />
-                    </View>
+                {fullScreenRoute && (
+                    <FullScreenRouteSurface>
+                        {fullScreenRoute}
+                    </FullScreenRouteSurface>
                 )}
-                {currentView === 'shop' && (
-                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                        <Shop
-                            connection={connection}
-                            onNotification={addNotification}
-                            onClose={() => transitionTo('interaction')}
-                        />
-                    </View>
-                )}
-                {currentView === 'gallery' && (
-                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                        <Gallery onBack={() => transitionTo('interaction')} />
-                    </View>
-                )}
-                {currentView === 'arcade' && (
-                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                        <GamesList
-                            onClose={() => transitionTo('interaction')}
-                            onSelectGame={(gameId) => transitionTo(gameId)}
-                        />
-                    </View>
-                )}
-                {currentView === 'starburst' && (
-                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                        <StarburstView onBack={() => transitionTo('arcade')} />
-                    </View>
-                )}
-                {currentView === 'water-ring-toss' && (
-                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                        <WaterRingTossView onBack={() => transitionTo('arcade')} />
-                    </View>
-                )}
-                {currentView === 'inventory' && (
-                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                        <InventoryPage onBack={() => transitionTo('interaction')} />
-                    </View>
-                )}
-                {currentView === 'settings' && (
-                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                        <Settings
-                            onBack={() => transitionTo('interaction')}
-                            onNotification={addNotification}
-                        />
-                    </View>
-                )}
-                {currentView === 'profile' && (
-                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                        <Profile
-                            onBack={() => navigateToView(previousView || 'interaction')}
-                            onNotification={addNotification}
-                            playerName={playerName}
-                            publicKey={publicKey?.toString() ?? null}
-                            email={email}
-                            walletSource={walletSource}
-                            onUpdatePlayerName={updatePlayerName}
-                            onLogout={disconnectWallet}
-                        />
-                    </View>
-                )}
-                {currentView === 'chat' && selectedCharacter && (
-                    <View key="overlay-layer" style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]} pointerEvents="box-none">
-                        <CharacterChat
-                            character={selectedCharacter}
-                            onExit={() => transitionTo('interaction')}
-                            playerName={playerName}
-                            onNotification={addNotification}
-                        />
-                    </View>
-                )}
-                {!miMounted && renderContent()}
+                {!fullScreenRoute && currentView !== 'interaction' && renderRootRoute()}
 
                 {/* Sleep is App-level — SleepController owns the modal,
                     SleepScreen overlay, and morning recap. Lives inside the
@@ -1102,14 +936,14 @@ function App() {
 
                 {/* Chrome (DeviceButtons + WalletButton + notifications) sits
                     inside the iris with no zIndex of its own — natural render
-                    order puts it on top of the mi-layer (zIndex 0) on the
-                    home screen, but BEHIND the zIndex:50 overlay layer when
-                    Shop/Inventory/Settings/etc. is up. The iris covers it
-                    during page transitions because the iris is the last
+                    order puts it on top of the interaction layer on the home
+                    screen, but BEHIND the zIndex:50 full-screen route surface
+                    when Shop/Inventory/Settings/etc. is up. The iris covers
+                    it during page transitions because the iris is the last
                     sibling rendered inside ZoomOutOverlay's wrapper. */}
-                {/* DeviceCasing — sits ABOVE the mi-layer (z 0) so the
+                {/* DeviceCasing — sits ABOVE the interaction layer (z 0) so the
                     painted frame overlaps the InnerScreen edges and hides
-                    the seam, but BELOW route overlays (z 50) so screens
+                    the seam, but BELOW full-screen routes (z 50) so screens
                     like Shop/Inventory/Settings paint over it on their
                     own routes. DeviceButtons, WalletButton (1000),
                     notifications, and the iris layers all sit above. */}
@@ -1182,6 +1016,10 @@ const styles = StyleSheet.create({
     splashLogo: {
         width: 192,
         height: 192,
+    },
+    fullScreenRouteSurface: {
+        zIndex: 50,
+        elevation: 50,
     },
 
     noCharacterContainer: {
@@ -1275,6 +1113,18 @@ function GameStateGate({
     return <>{children}</>;
 }
 
+function FullScreenRouteSurface({ children }: { children: ReactNode }) {
+    return (
+        <View
+            key="full-screen-route"
+            style={[StyleSheet.absoluteFill, styles.fullScreenRouteSurface]}
+            pointerEvents="box-none"
+        >
+            {children}
+        </View>
+    );
+}
+
 // Tiny wrapper so the App-level Starburst route can call play() — App itself
 // renders OUTSIDE GameStateProvider, but this component renders inside it.
 function StarburstView({ onBack }: { onBack: () => void }) {
@@ -1312,8 +1162,8 @@ function WaterRingTossView({ onBack }: { onBack: () => void }) {
 // MoonokoInteraction's `case 'sleep'` for the trigger that opens the
 // modal (it just calls onSleepRequest now).
 interface SleepControllerProps {
-    currentView: string;
-    transitionTo: (view: string) => void;
+    currentView: AppView;
+    transitionTo: (view: AppView) => void;
     selectedCharacter: Character | null;
     sleepModalVisible: boolean;
     setSleepModalVisible: (v: boolean) => void;

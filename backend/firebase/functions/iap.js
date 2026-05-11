@@ -123,7 +123,7 @@ const IAP_SKUS = {
         priceUsd: 9.99,
         grant: { kind: 'starFragments', amount: 7000 },
     },
-    'season-pass': {
+    'lunar-pass': {
         priceUsd: 9.99,
         grant: { kind: 'seasonPass' },
     },
@@ -131,10 +131,6 @@ const IAP_SKUS = {
     'bundle-starter': {
         priceUsd: 4.99,
         grant: { kind: 'bundle', bundleId: 'starter' },
-    },
-    'bundle-themed': {
-        priceUsd: 7.99,
-        grant: { kind: 'bundle', bundleId: 'themed' },
     },
     'bundle-bargain': {
         priceUsd: 2.99,

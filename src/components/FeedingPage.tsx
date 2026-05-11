@@ -8,12 +8,14 @@ import {
     ScrollView,
     Modal,
     Image,
-    Dimensions,
     Pressable,
     Animated,
     Easing,
+    useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FooterBackBar from './FooterBackBar';
+import PageArtShell from './PageArtShell';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import {
     RECIPES,
@@ -128,13 +130,16 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
         devResetMealClaims,
     } = useGameStateContext();
     const insets = useSafeAreaInsets();
-    const screenWidth = Dimensions.get('window').width;
+    const { width: screenWidth } = useWindowDimensions();
     // Top banner is 1200×807, bottom strip is 1200×284 — height scales with
     // screen width since the overlays render full-bleed (width:'100%') and
     // resizeMode:contain. Matches Shop's reserve calc so all menu screens
     // share the same banner-anchored layout grid.
     const bannerReserve = screenWidth * (807 / 1200);
     const bottomBarReserve = screenWidth * (284 / 1200);
+    const contentTopPadding = bannerReserve * 1.03 + insets.top;
+    const contentBottomPadding =
+        bottomBarReserve * 1.17 + insets.bottom;
 
     const [manualOpen, setManualOpen] = useState(false);
     const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
@@ -265,13 +270,25 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
-            <ImageBackground
-                source={Backgrounds.cooking}
-                style={styles.bg}
-                resizeMode="cover"
-                testID="feeding-screen"
-            >
+        <PageArtShell
+            background={Backgrounds.cooking}
+            backgroundColor="#1a1033"
+            testID="feeding-screen"
+            overlays={[
+                {
+                    key: 'bottom',
+                    source: Backgrounds.cookingBottom,
+                    edge: 'bottom',
+                    height: bottomBarReserve,
+                },
+                {
+                    key: 'banner',
+                    source: Backgrounds.cookingBanner,
+                    edge: 'top',
+                    height: bannerReserve,
+                },
+            ]}
+        >
                 <View
                     style={[
                         styles.scrollClipper,
@@ -282,8 +299,8 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                     contentContainerStyle={[
                         styles.scrollBody,
                         {
-                            paddingTop: bannerReserve + insets.top + 8,
-                            paddingBottom: bottomBarReserve + insets.bottom + 16,
+                            paddingTop: contentTopPadding,
+                            paddingBottom: contentBottomPadding,
                         },
                     ]}
                 >
@@ -480,26 +497,6 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                 </ScrollView>
                 </View>
 
-                <View
-                    pointerEvents="none"
-                    style={[styles.bottomOverlay, { height: bottomBarReserve }]}
-                >
-                    <Image
-                        source={Backgrounds.cookingBottom}
-                        style={styles.overlayImage}
-                        resizeMode="contain"
-                    />
-                </View>
-                <View
-                    pointerEvents="none"
-                    style={[styles.bannerOverlay, { top: 0, height: bannerReserve }]}
-                >
-                    <Image
-                        source={Backgrounds.cookingBanner}
-                        style={styles.overlayImage}
-                        resizeMode="contain"
-                    />
-                </View>
                 {/* Dev-only: tap the star painted into the banner art to
                     clear all meal-window claim flags so the feed flow can
                     be retested without waiting for the next game-day
@@ -547,26 +544,11 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                     );
                 })()}
 
-                <View
-                    style={[
-                        styles.bottomBar,
-                        { height: bottomBarReserve, paddingBottom: insets.bottom },
-                    ]}
-                    pointerEvents="box-none"
-                >
-                    <TouchableOpacity
-                        style={styles.backButton}
-                        onPress={onBack}
-                        hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-                    >
-                        <Image
-                            source={Frames.backButton}
-                            style={styles.backButtonImage}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.backButtonLabel}>Back</Text>
-                    </TouchableOpacity>
-                </View>
+                <FooterBackBar
+                    onBack={onBack}
+                    height={bottomBarReserve}
+                    bottomInset={insets.bottom}
+                />
 
                 <ManualCookModal
                     visible={manualOpen}
@@ -576,8 +558,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                     onCook={handleManualCook}
                     recipe={selectedRecipe}
                 />
-            </ImageBackground>
-        </View>
+        </PageArtShell>
     );
 };
 
@@ -1081,57 +1062,11 @@ const ManualCookModal: React.FC<ManualCookModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-    bg: { flex: 1, width: '100%', height: '100%' },
-    // Bottom bar lives in the painted strip at the very bottom of the new
-    // background. Absolute so the scroll content above isn't pushed by it —
-    // scrollClipper already reserves the same height via marginBottom.
-    bottomBar: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingHorizontal: 16,
-        zIndex: 2,
-    },
-    backButton: {
-        padding: 4,
-        alignItems: 'center',
-    },
-    backButtonImage: {
-        width: 56,
-        height: 46,
-    },
-    backButtonLabel: {
-        color: '#e84a4a',
-        fontFamily: 'Monaco',
-        fontSize: 14,
-        marginTop: 1,
-    },
     scrollClipper: {
         position: 'absolute',
         left: 0,
         right: 0,
         overflow: 'hidden',
-    },
-    bannerOverlay: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 1,
-    },
-    bottomOverlay: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1,
-    },
-    overlayImage: {
-        width: '100%',
-        height: '100%',
     },
     scrollBody: {
         paddingHorizontal: 16,

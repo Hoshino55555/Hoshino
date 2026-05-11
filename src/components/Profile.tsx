@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Frames } from '../assets';
+import FooterBackButton, { FOOTER_BACK_BUTTON_OFFSET_Y } from './FooterBackButton';
 
 interface Props {
     onBack: () => void;
@@ -67,14 +67,10 @@ const Profile: React.FC<Props> = ({
     return (
         <View style={[styles.safeArea, { backgroundColor: '#E8F5E8' }]} testID="profile-screen">
                 <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-                    <TouchableOpacity style={styles.backButton} onPress={onBack} hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}>
-                        <Image
-                            source={Frames.backButton}
-                            style={styles.backButtonImage}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.backButtonLabel}>Back</Text>
-                    </TouchableOpacity>
+                    <FooterBackButton
+                        onPress={onBack}
+                        offsetY={FOOTER_BACK_BUTTON_OFFSET_Y}
+                    />
                 </View>
 
                 <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
@@ -140,20 +136,6 @@ const styles = StyleSheet.create({
         paddingBottom: 4,
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    backButton: {
-        padding: 4,
-        alignItems: 'center',
-    },
-    backButtonImage: {
-        width: 56,
-        height: 46,
-    },
-    backButtonLabel: {
-        color: '#e84a4a',
-        fontFamily: 'Monaco',
-        fontSize: 14,
-        marginTop: 1,
     },
     content: {
         flex: 1,

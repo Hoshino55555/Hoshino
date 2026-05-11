@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
     cancelAnimation,
     Easing,
@@ -31,10 +31,6 @@ console.log('[iris build]', IRIS_BUILD_TAG);
 // is just a clean matrix(s 0 0 s cx cy) — no negative scales, no inner
 // flip, no transform-stack ambiguity.
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const irisCenterX = screenWidth / 2;
-const irisCenterY = screenHeight / 2;
-
 // Path is in centered coords spanning roughly ±1000 (after baking, viewBox
 // 2048). Two competing constraints on INITIAL_SCALE:
 //   1. Outer rect must remain bigger than the screen at all scales (so the
@@ -56,7 +52,6 @@ const HUGE_RECT_PATH = 'M-50000000,-50000000 H50000000 V50000000 H-50000000 Z ';
 const COMPOUND_PATH = HUGE_RECT_PATH + HOSHINO_STAR_PATH;
 
 const STAR_RADIUS = 1024;
-export const IRIS_FINAL_SCALE = (Math.max(screenWidth, screenHeight) * 2) / STAR_RADIUS;
 // 0.0001 × 1024-unit star radius → 0.1px pinhole at "closed" — sub-pixel,
 // no visible hole. 0.0001 × 50_000_000 rect half-extent → 5_000px rect
 // coverage, still far bigger than any phone screen.
@@ -96,7 +91,11 @@ const ZoomOutOverlay: React.FC<Props> = ({
     onOpenComplete,
     initialOpen = false,
 }) => {
-    const scale = useSharedValue(initialOpen ? IRIS_FINAL_SCALE : IRIS_INITIAL_SCALE);
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+    const irisCenterX = screenWidth / 2;
+    const irisCenterY = screenHeight / 2;
+    const irisFinalScale = (Math.max(screenWidth, screenHeight) * 2) / STAR_RADIUS;
+    const scale = useSharedValue(initialOpen ? irisFinalScale : IRIS_INITIAL_SCALE);
     const hardMaskOpacity = useSharedValue(initialOpen ? 0 : 1);
     const exitCompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -144,7 +143,7 @@ const ZoomOutOverlay: React.FC<Props> = ({
         // in-out curve so the star aperture visibly collapses instead of
         // snapping shut in the final stretch.
         scale.value = withTiming(
-            exiting ? IRIS_INITIAL_SCALE : IRIS_FINAL_SCALE,
+            exiting ? IRIS_INITIAL_SCALE : irisFinalScale,
             {
                 duration: exiting ? IRIS_CLOSE_DURATION_MS : IRIS_OPEN_DURATION_MS,
                 easing: exiting ? IRIS_CLOSE_EASING : IRIS_OPEN_EASING,
@@ -164,6 +163,7 @@ const ZoomOutOverlay: React.FC<Props> = ({
     }, [
         exiting,
         hardMaskOpacity,
+        irisFinalScale,
         notifyExitCompleteAfterMaskSettles,
         onExitComplete,
         onOpenComplete,

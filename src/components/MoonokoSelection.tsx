@@ -5,7 +5,7 @@ import {
     TouchableOpacity,
     StyleSheet,
     Image,
-    Dimensions,
+    useWindowDimensions,
     ScrollView,
     Modal
 } from 'react-native';
@@ -39,13 +39,18 @@ const CHARACTERS: Character[] = MOONOKOS.map((m) => ({
     image: `${m.imageBase}.gif`,
 }));
 
-const CARD_WIDTH = 220; // 200 card width + 20 total margin (10 on each side)
-
 const MoonokoSelection: React.FC<Props> = ({
     onBack,
     onNotification,
     onGoToCongratulations
 }) => {
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+    const cardStride = screenWidth * 0.56;
+    const cardMargin = cardStride * 0.045;
+    const cardSize = cardStride - cardMargin * 2;
+    const cardPadding = cardSize * 0.05;
+    const characterImageSize = cardSize * 0.75;
+    const slotMachineTopMargin = screenHeight * 0.18;
 
     const [currentCharacterIndex, setCurrentCharacterIndex] = useState<number>(0); // Start with first character
     const [isMinting, setIsMinting] = useState(false);
@@ -64,14 +69,14 @@ const MoonokoSelection: React.FC<Props> = ({
     useEffect(() => {
         setTimeout(() => {
             if (scrollerRef.current) {
-                const initialScrollX = currentCharacterIndex * CARD_WIDTH;
+                const initialScrollX = currentCharacterIndex * cardStride;
                 scrollerRef.current.scrollTo({
                     x: initialScrollX,
                     animated: false
                 });
             }
         }, 100);
-    }, []);
+    }, [cardStride]);
 
 
 
@@ -99,18 +104,18 @@ const MoonokoSelection: React.FC<Props> = ({
         
         // Calculate scroll position within the CHARACTERS array bounds
         const totalCards = CHARACTERS.length; // 5 cards total
-        const totalScrollDistance = CARD_WIDTH * totalCards * ANIMATION_CONFIG.totalLoops;
+        const totalScrollDistance = cardStride * totalCards * ANIMATION_CONFIG.totalLoops;
         const scrollDistance = totalScrollDistance * easeInOut;
         
         // Ensure we stay within the CHARACTERS array bounds
-        return scrollDistance % (totalCards * CARD_WIDTH);
+        return scrollDistance % (totalCards * cardStride);
     };
 
 
 
     const landOnRandomCharacter = () => {
         const finalIndex = Math.floor(Math.random() * CHARACTERS.length);
-        const finalScrollX = finalIndex * CARD_WIDTH;
+        const finalScrollX = finalIndex * cardStride;
         
         setCurrentCharacterIndex(finalIndex);
         
@@ -137,7 +142,7 @@ const MoonokoSelection: React.FC<Props> = ({
         }
         
         // Update current character index based on scroll position
-        const scrollIndex = Math.floor(scrollPosition / CARD_WIDTH);
+        const scrollIndex = Math.floor(scrollPosition / cardStride);
         const actualIndex = scrollIndex % CHARACTERS.length;
         setCurrentCharacterIndex(actualIndex);
     };
@@ -237,20 +242,20 @@ const MoonokoSelection: React.FC<Props> = ({
             <View style={styles.mainDisplayArea}>
                 <Image source={Backgrounds.screen} style={styles.backgroundImage as any} resizeMode="cover" />
                 {/* Character Selection Scroller */}
-                <View style={styles.slotMachineContainer}>
+                <View style={[styles.slotMachineContainer, { marginTop: slotMachineTopMargin }]}>
                     <ScrollView
                         ref={scrollerRef}
                         horizontal
                         style={{ flex: 1 }}
                         contentContainerStyle={{ 
                             flexDirection: 'row',
-                            paddingHorizontal: (Dimensions.get('window').width - CARD_WIDTH) / 2
+                            paddingHorizontal: (screenWidth - cardStride) / 2
                         }}
                         decelerationRate="fast"
                         showsHorizontalScrollIndicator={false}
                         onScroll={(e) => {
                             const offsetX = e.nativeEvent.contentOffset.x;
-                            const scrollIndex = Math.round(offsetX / CARD_WIDTH);
+                            const scrollIndex = Math.round(offsetX / cardStride);
                             const actualIndex = Math.max(0, Math.min(scrollIndex, CHARACTERS.length - 1));
                             setCurrentCharacterIndex(actualIndex);
                         }}
@@ -261,9 +266,12 @@ const MoonokoSelection: React.FC<Props> = ({
                                 key={`${character.id}-${index}`}
                                 style={[
                                     styles.slotMachineCard,
-                                    { 
-                                        marginHorizontal: 10
-                                    }
+                                    {
+                                        width: cardSize,
+                                        height: cardSize,
+                                        marginHorizontal: cardMargin,
+                                        padding: cardPadding,
+                                    },
                                 ]}
                                 onPress={() => {
                                     handleCharacterPress(character);
@@ -281,6 +289,11 @@ const MoonokoSelection: React.FC<Props> = ({
                                     source={getImageSource(character.image)}
                                     style={[
                                         styles.characterImage,
+                                        {
+                                            width: characterImageSize,
+                                            height: characterImageSize,
+                                            marginTop: cardSize * 0.1,
+                                        },
                                         isSpinning && styles.spinningImage
                                     ] as any}
                                     onError={(error) => console.log('Image load error for', character.name, ':', error)}
@@ -400,7 +413,6 @@ const styles = StyleSheet.create({
         width: '100%',
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 150, // Push cards down more for better centering
     },
     slotMachineScroller: {
         flex: 1,
@@ -412,12 +424,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 50,
     },
     slotMachineCard: {
-        width: 200,
-        height: 200,
         backgroundColor: '#E8F5E8',
         borderRadius: 10,
-        marginHorizontal: 10,
-        padding: 10,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 3,
@@ -438,9 +446,6 @@ const styles = StyleSheet.create({
     } as const,
 
     characterImage: {
-        width: 150,
-        height: 150,
-        marginTop: 20,
     } as any,
     characterInfo: {
         marginBottom: -20,

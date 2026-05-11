@@ -163,7 +163,7 @@ Practical implications:
 
 ### Known inconsistencies to resolve
 
-- Border styles and shadows vary across [Shop.tsx](../src/components/Shop.tsx), [Gallery.tsx](../src/components/Gallery.tsx), [FeedingPage.tsx](../src/components/FeedingPage.tsx), [IngredientSelection.tsx](../src/components/IngredientSelection.tsx)
+- Border styles and shadows vary across [Shop.tsx](../src/components/Shop.tsx), [Gallery.tsx](../src/components/Gallery.tsx), [FeedingPage.tsx](../src/components/FeedingPage.tsx), and [InventoryPage.tsx](../src/components/InventoryPage.tsx)
 - Some screens bleed into safe areas; some respect them
 - ~~Font usage drifts~~ — three-font model documented above; remaining drift gets fixed as it's spotted
 
@@ -336,7 +336,7 @@ Tracked here so they don't get lost. Owner in brackets.
 - **[Creative]** Gacha rare-character drop rate (daily pull)?
 - **[Design]** Energy decay curve shape — linear, stepped, or something custom?
 - **[Design]** Hunger increase curve per missed meal window — flat penalty or compounding?
-- **[Design]** Sleep UX — current captive-overlay implementation is parked (tapping sleep toasts "being reworked"). Server stat-engine sleep state is still in place; only the client surface is disabled. Need product direction on whether sleep is an ambient passive state (any interaction wakes, no modal) vs. a full screen takeover. See `src/components/MoonokoInteraction.tsx` (sleep case) and `src/components/SleepOverlay.tsx`.
+- **[Design]** Sleep UX polish — current flow uses `SleepConfirmationModal`, `SleepScreen`, and `MorningRecapModal`; remaining product direction is whether sleep should stay a full screen takeover or become a quieter ambient passive state.
 - **[Design]** Account linking + cross-wallet merge — parked pending MagicBlock on-chain/off-chain state split. See [../ACCOUNT_LINKING.md](../ACCOUNT_LINKING.md).
 
 ---
@@ -368,7 +368,7 @@ The token-or-no-token question defaults to **no token** without being affirmativ
 **Phase A — Hygiene (days 1-3)**
 - Global rename: `Moonoko` → `Moonoko` across code, assets, strings
 - Dedupe the hardcoded moonoko arrays (`App.tsx` has them duplicated) → `src/data/moonokos.ts`
-- Strip dead code: character-NFT mint call sites (`handleMintCharacter`, ProgrammableNFTService for character minting)
+- Strip dead code: legacy character-NFT mint call sites and unused service scaffolding
 - Fix device-frame UX hygiene (borders/shadows/fonts normalized in `InnerScreen.tsx`)
 
 **Phase B — Foundations (days 4-10)**
@@ -400,7 +400,7 @@ The token-or-no-token question defaults to **no token** without being affirmativ
 - Morning recap animation polish beyond basic notification
 - Free-position room placement
 - Ascension ritual UX + lunar-cycle season boundaries beyond stub
-- Full device-frame refactor across every screen (normalize the top 4 surfaces — Shop, Gallery, Feeding, IngredientSelection — let the rest slip)
+- Full device-frame refactor across every screen (normalize the top surfaces — Shop, Gallery, Feeding, Inventory — let the rest slip)
 - MagicBlock Ephemeral Rollups (VRF-only in MVP; ER stays deferred)
 
 ### Risk register
