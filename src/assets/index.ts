@@ -180,6 +180,7 @@ export const ShopItems = {
     snoozeSeed: require('../../assets/images/ui/shop-items/snooze-seed.png'),
     starberry: require('../../assets/images/ui/shop-items/starberry.png'),
     moonokoBall: require('../../assets/images/ui/shop-items/moonoko-ball.png'),
+    slot: require('../../assets/images/ui/shop-items/slot.png'),
 } as const;
 
 export const Backgrounds = {
@@ -237,6 +238,8 @@ export const Menu = {
 
 export const Cooking = {
     pot: require('../../assets/images/ui/cook-pot.png'),
+    manualCookButton: require('../../assets/images/ui/feeding/manual-cook.png'),
+    levelPopup: require('../../assets/images/ui/feeding/level-popup.png'),
 } as const;
 
 // 54-frame button-strip animation. Frames 1–18 are the left-button press
@@ -353,6 +356,7 @@ export const Rooms = {
         poster1: require('../../assets/images/rooms/poster1.png'),
         poster2: require('../../assets/images/rooms/poster2.png'),
         window: require('../../assets/images/rooms/window.png'),
+        lights: require('../../assets/images/rooms/lights.png'),
     },
     floor: {
         carpet: require('../../assets/images/rooms/carpet.png'),
@@ -362,6 +366,9 @@ export const Rooms = {
     },
     minis: {
         aro: require('../../assets/images/rooms/aro-mini.png'),
+    },
+    ui: {
+        invbutton1: require('../../assets/images/rooms/invbutton1.png'),
     },
 } as const;
 

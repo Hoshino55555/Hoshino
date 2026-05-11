@@ -15,6 +15,22 @@ import {
 // need to first-paint is ready.
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+// TEMP: replace Hermes's promise-rejection tracker with one that prints the
+// full error + stack, so we can trace the 60s-interval `.type of null`
+// rejection. Remove once fixed.
+if (__DEV__ && (global as any).HermesInternal?.enablePromiseRejectionTracker) {
+    (global as any).HermesInternal.enablePromiseRejectionTracker({
+        allRejections: true,
+        onUnhandled: (id: number, error: any) => {
+            const stack = error?.stack || new Error().stack;
+            console.warn(
+                `[RejectionTrace id=${id}] err=${String(error)}\nstack=\n${stack}`,
+            );
+        },
+        onHandled: () => {},
+    });
+}
+
 import Notification from './src/components/chrome/Notification';
 import WalletButton from './src/components/chrome/WalletButton';
 
@@ -327,13 +343,15 @@ function App() {
                     </TouchableOpacity>
                 )}
 
-                <WalletButton
-                    connected={connected}
-                    publicKey={walletAddress}
-                    playerName={playerName}
-                    onConnect={connectWallet}
-                    onOpenProfile={() => navigateToView('profile')}
-                />
+                {currentView === 'interaction' && (
+                    <WalletButton
+                        connected={connected}
+                        publicKey={walletAddress}
+                        playerName={playerName}
+                        onConnect={connectWallet}
+                        onOpenProfile={() => navigateToView('profile')}
+                    />
+                )}
 
                 {notifications.map((notification, i) => (
                     <Notification

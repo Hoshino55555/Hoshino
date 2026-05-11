@@ -368,17 +368,17 @@ const styles = StyleSheet.create({
     },
     outerPixel: {
         position: 'absolute',
-        backgroundColor: colors.forestDark, // Dark green
+        backgroundColor: '#89c0ab',
         zIndex: 10,
     },
     glowPixel: {
         position: 'absolute',
-        backgroundColor: '#8FBF7A', // Yellowish green glow with more blue
+        backgroundColor: '#b4e0cf',
         zIndex: 11,
     },
     innerPixel: {
         position: 'absolute',
-        backgroundColor: colors.forestDark, // Same dark green
+        backgroundColor: '#89c0ab',
         zIndex: 12,
     },
 });

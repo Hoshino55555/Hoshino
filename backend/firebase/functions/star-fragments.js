@@ -218,23 +218,27 @@ async function creditIngredients(uid, counts, tx) {
 }
 
 // Daily spin reward pool. Weights are integers; total can be anything (we
-// pick uniformly in [0, sum) and walk). Each entry returns a reward object.
+// pick uniformly in [0, sum) and walk). Mostly ingredients, with one slot
+// each for shards and a random booster.
 const SPIN_POOL = [
-    // 25% — common ingredient (×1)
-    { weight: 25, kind: 'ingredient', tier: 'common' },
-    // 20% — uncommon ingredient
-    { weight: 20, kind: 'ingredient', tier: 'uncommon' },
-    // 12% — rare ingredient
-    { weight: 12, kind: 'ingredient', tier: 'rare' },
-    // 3% — ultra-rare (star_dust)
-    { weight: 3,  kind: 'ingredient', tier: 'ultra_rare' },
-    // 25% — small SF reward
-    { weight: 25, kind: 'starFragments', amount: 10 },
-    // 12% — medium SF
-    { weight: 12, kind: 'starFragments', amount: 50 },
-    // 3% — jackpot SF
-    { weight: 3,  kind: 'starFragments', amount: 250 },
+    { weight: 30, kind: 'ingredient',    tier: 'common' },
+    { weight: 25, kind: 'ingredient',    tier: 'uncommon' },
+    { weight: 15, kind: 'ingredient',    tier: 'rare' },
+    { weight: 5,  kind: 'ingredient',    tier: 'ultra_rare' },
+    { weight: 15, kind: 'starFragments', amount: 250 },
+    { weight: 10, kind: 'booster' },
 ];
+
+// Per-tier ingredient qty (1-5), reverse-weighted by rarity: commons skew
+// toward 5, ultra-rare nearly always 1. Weights need not sum to 100.
+const TIER_QTY_WEIGHTS = {
+    common:     [ { qty: 1, w: 5  }, { qty: 2, w: 10 }, { qty: 3, w: 20 }, { qty: 4, w: 30 }, { qty: 5, w: 35 } ],
+    uncommon:   [ { qty: 1, w: 10 }, { qty: 2, w: 20 }, { qty: 3, w: 30 }, { qty: 4, w: 25 }, { qty: 5, w: 15 } ],
+    rare:       [ { qty: 1, w: 30 }, { qty: 2, w: 30 }, { qty: 3, w: 25 }, { qty: 4, w: 10 }, { qty: 5, w: 5  } ],
+    ultra_rare: [ { qty: 1, w: 60 }, { qty: 2, w: 25 }, { qty: 3, w: 10 }, { qty: 4, w: 4  }, { qty: 5, w: 1  } ],
+};
+
+const BOOSTER_SPIN_SKUS = ['booster-mood', 'booster-sleep', 'booster-hunger'];
 
 const TIER_INGREDIENTS = (() => {
     const buckets = { common: [], uncommon: [], rare: [], ultra_rare: [] };
@@ -244,6 +248,16 @@ const TIER_INGREDIENTS = (() => {
     return buckets;
 })();
 
+function pickFromWeighted(entries) {
+    const total = entries.reduce((s, e) => s + e.w, 0);
+    let roll = Math.floor(Math.random() * total);
+    for (const e of entries) {
+        if (roll < e.w) return e;
+        roll -= e.w;
+    }
+    return entries[entries.length - 1];
+}
+
 function pickReward() {
     const total = SPIN_POOL.reduce((s, e) => s + e.weight, 0);
     let roll = Math.floor(Math.random() * total);
@@ -252,13 +266,18 @@ function pickReward() {
             if (entry.kind === 'ingredient') {
                 const ids = TIER_INGREDIENTS[entry.tier];
                 const id = ids[Math.floor(Math.random() * ids.length)];
-                return { kind: 'ingredient', id, qty: 1, tier: entry.tier };
+                const qty = pickFromWeighted(TIER_QTY_WEIGHTS[entry.tier]).qty;
+                return { kind: 'ingredient', id, qty, tier: entry.tier };
+            }
+            if (entry.kind === 'booster') {
+                const skuId = BOOSTER_SPIN_SKUS[Math.floor(Math.random() * BOOSTER_SPIN_SKUS.length)];
+                return { kind: 'booster', skuId, qty: 1 };
             }
             return { kind: 'starFragments', amount: entry.amount };
         }
         roll -= entry.weight;
     }
-    return { kind: 'starFragments', amount: 10 };
+    return { kind: 'starFragments', amount: 250 };
 }
 
 exports.claimDailySpin = onCall(COMMON_OPTS, async (request) => {
@@ -284,36 +303,44 @@ exports.claimDailySpin = onCall(COMMON_OPTS, async (request) => {
             Number.isSafeInteger(rawClaimBalance) && rawClaimBalance >= 0
                 ? rawClaimBalance
                 : 0;
+        let walletPatch = {
+            balance: newBalance,
+            dailySpin: { lastClaimedAtMs: nowMs },
+            updatedAt: nowMs,
+        };
+
         if (reward.kind === 'starFragments') {
             newBalance += reward.amount;
+            walletPatch.balance = newBalance;
         } else if (reward.kind === 'ingredient') {
-            // Inventory cap enforcement: silently swap ingredient → SF if at
-            // the pantry cap so the user still gets *something* from the spin.
-            // Read inventory first to honor Firestore tx (reads-before-writes).
+            // Inventory cap enforcement: credit as many of the rolled qty as
+            // fit in the pantry; convert the overflow into SF (10 each) so a
+            // near-full pantry doesn't waste the spin. If nothing fits, swap
+            // the whole reward to a flat 10 SF consolation.
             const iRef = inventoryRef(uid);
             const iSnap = await tx.get(iRef);
             const cur = (iSnap.exists && iSnap.data().counts) || {};
             const { inventoryCap } = readCaps(data);
-            if (totalIngredients(cur) + reward.qty > inventoryCap) {
-                // Convert to a small SF reward instead — same value tier as
-                // the smallest SF prize so the spin never feels worthless.
+            const room = Math.max(0, inventoryCap - totalIngredients(cur));
+            const credited = Math.min(reward.qty, room);
+            if (credited <= 0) {
                 reward.kind = 'starFragments';
                 reward.amount = 10;
                 newBalance += 10;
             } else {
-                await creditIngredients(uid, { [reward.id]: reward.qty }, tx);
+                await creditIngredients(uid, { [reward.id]: credited }, tx);
+                reward.qty = credited;
             }
+            walletPatch.balance = newBalance;
+        } else if (reward.kind === 'booster') {
+            const curBoosters =
+                (data && typeof data.boosters === 'object' && data.boosters) || {};
+            const nextBoosters = { ...curBoosters };
+            nextBoosters[reward.skuId] = (nextBoosters[reward.skuId] || 0) + reward.qty;
+            walletPatch.boosters = nextBoosters;
         }
 
-        tx.set(
-            ref,
-            {
-                balance: newBalance,
-                dailySpin: { lastClaimedAtMs: nowMs },
-                updatedAt: nowMs,
-            },
-            { merge: true }
-        );
+        tx.set(ref, walletPatch, { merge: true });
 
         return {
             reward,
@@ -477,7 +504,7 @@ exports.purchaseIngredients = onCall(COMMON_OPTS, async (request) => {
 const INGREDIENT_BOX_DEFS = {
     'box-ingredients-common':   { tier: 'common',   rolls: 5, priceSF: 30 },
     'box-ingredients-uncommon': { tier: 'uncommon', rolls: 5, priceSF: 60 },
-    'box-ingredients-rare':     { tier: 'rare',     rolls: 3, priceSF: 65 },
+    'box-ingredients-rare':     { tier: 'rare',     rolls: 5, priceSF: 65 },
 };
 
 exports.purchaseIngredientBox = onCall(COMMON_OPTS, async (request) => {

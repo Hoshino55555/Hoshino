@@ -158,13 +158,16 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     }, []);
 
     const disconnect = useCallback(async () => {
+        // Phantom/Backpack deeplink connectors require a wallet-app round-trip
+        // to revoke the session on the wallet side — that's the protocol, not
+        // something we can suppress. Skip that here: clear local app state +
+        // drop the Privy session only. The wallet still thinks it's
+        // connected, but the next login forces a fresh approval anyway, so
+        // the practical effect is the same without yanking the user out of
+        // the app.
         try {
             if (walletSource === 'mwa') {
                 await mobileWalletService.disconnect();
-            } else if (walletSource === 'phantom') {
-                await phantomConnector.disconnect();
-            } else if (walletSource === 'backpack') {
-                await backpackConnector.disconnect();
             }
         } catch (error) {
             console.error('📱 Failed to disconnect wallet:', error);
@@ -182,7 +185,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
                 }
             }
         }
-    }, [backpackConnector, logout, phantomConnector, user, walletSource]);
+    }, [logout, user, walletSource]);
 
     const signer = useMemo<VRFSigner | null>(() => {
         if (walletSource === 'mwa' && mwaPublicKey) {

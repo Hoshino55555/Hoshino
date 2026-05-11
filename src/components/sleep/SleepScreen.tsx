@@ -108,7 +108,10 @@ const SleepScreen: React.FC<Props> = ({
                         />
                         <Image
                             source={getCharacterSleep(characterId)}
-                            style={styles.character as ImageStyle}
+                            style={[
+                                styles.character as ImageStyle,
+                                characterId === 'sirius' && styles.characterSirius,
+                            ]}
                             resizeMode="contain"
                         />
                     </View>
@@ -216,6 +219,9 @@ const styles = StyleSheet.create({
         width: '75%',
         height: '65%',
     },
+    characterSirius: {
+        bottom: '24%',
+    },
     alarmWrap: {
         width: '100%',
         alignItems: 'center',
@@ -241,7 +247,7 @@ const styles = StyleSheet.create({
         // Visually centered in the painted pill on the right side of the
         // box; the box art reserves roughly the right third for the pill.
         // Extra paddingRight pulls the text further left into the pill.
-        paddingRight: 24,
+        paddingRight: 36,
     },
     footer: {
         alignItems: 'center',

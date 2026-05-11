@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ImageBackground, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { Frames } from '../../assets';
 import { colors, fonts } from '../../styles/tokens';
 import { Z } from '../../styles/zLayers';
@@ -39,6 +39,8 @@ const WalletButton: React.FC<WalletButtonProps> = ({
         : publicKey
             ? truncateAddress(publicKey)
             : 'Wallet';
+    // 4 chars → 28pt, 9 chars → 18pt, linear in between, clamped at the ends.
+    const labelFontSize = Math.max(18, Math.min(28, 28 - 2 * (label.length - 4)));
 
     return (
         <View style={styles.container}>
@@ -48,14 +50,10 @@ const WalletButton: React.FC<WalletButtonProps> = ({
                 testID="wallet-pill"
                 activeOpacity={0.85}
             >
-                <ImageBackground
-                    source={Frames.username}
-                    style={styles.connectedPill}
-                    imageStyle={styles.connectedPillImage}
-                    resizeMode="stretch"
-                >
-                    <Text style={styles.connectedText} numberOfLines={1}>{label}</Text>
-                </ImageBackground>
+                <View style={styles.connectedPillWrap}>
+                    <Image source={Frames.username} style={styles.connectedPillImage} resizeMode="contain" />
+                    <Text style={[styles.connectedText, { fontSize: labelFontSize }]} numberOfLines={1}>{label}</Text>
+                </View>
             </TouchableOpacity>
         </View>
     );
@@ -64,8 +62,8 @@ const WalletButton: React.FC<WalletButtonProps> = ({
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        top: 40,
-        right: 20,
+        bottom: 20,
+        right: -25,
         zIndex: Z.wallet,
         elevation: Z.wallet,
     },
@@ -88,21 +86,21 @@ const styles = StyleSheet.create({
         fontFamily: fonts.body,
         transform: [{ translateY: 3 }],
     },
-    connectedPill: {
-        paddingTop: 7,
-        paddingBottom: 9,
-        paddingHorizontal: 14,
-        maxWidth: 200,
+    connectedPillWrap: {
+        width: 140,
+        height: 75 * 198 / 324,
         alignItems: 'center',
         justifyContent: 'center',
     },
     connectedPillImage: {
-        borderRadius: 0,
+        position: 'absolute',
+        width: 75,
+        height: 75 * 198 / 324,
     },
     connectedText: {
-        color: colors.forestDark,
-        fontSize: 24,
-        lineHeight: 17,
+        color: colors.slotInk,
+        fontSize: 28,
+        lineHeight: 22,
         fontFamily: fonts.body,
         textAlign: 'center',
         textAlignVertical: 'center',

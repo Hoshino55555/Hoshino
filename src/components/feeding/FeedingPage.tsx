@@ -181,6 +181,7 @@ const RecipeCard = React.memo<RecipeCardProps>(({
             onPress={handlePress}
             disabled={hardDisabled}
         >
+            <View style={styles.cardShadow} />
             <ImageBackground
                 source={recipeCardArt(recipe)}
                 style={styles.cardArt}
@@ -257,7 +258,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     // share the same banner-anchored layout grid.
     const bannerReserve = screenWidth * (807 / 1200);
     const bottomBarReserve = screenWidth * (284 / 1200);
-    const contentTopPadding = bannerReserve * 1.03 + insets.top;
+    const contentTopPadding = bannerReserve * 0.97 + insets.top;
     const contentBottomPadding =
         bottomBarReserve * 1.17 + insets.bottom;
 
@@ -265,6 +266,12 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
     const [pendingManual, setPendingManual] = useState(false);
     const [lastResult, setLastResult] = useState<CookResponse['result'] | null>(null);
+
+    useEffect(() => {
+        if (!lastResult) return;
+        const timer = setTimeout(() => setLastResult(null), 5000);
+        return () => clearTimeout(timer);
+    }, [lastResult]);
 
     // Hidden visual-QA toggle: 8 taps on MANUAL COOK within 800ms intervals
     // unlocks every recipe card on screen. Purely client-side — does not call
@@ -373,13 +380,6 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                 ? await cookRecipe(selectedRecipe.id, ingredients)
                 : await cookManual(ingredients);
             setLastResult(res.result);
-            if (res.result.kind === 'slop') {
-                onNotification?.('Cooked... slop. Still edible.', 'warning');
-            } else if (res.result.firstDiscovery) {
-                onNotification?.(`Discovered ${res.result.recipeName}!`, 'success');
-            } else {
-                onNotification?.(`Cooked ${res.result.recipeName}`, 'success');
-            }
             setManualOpen(false);
             setSelectedRecipe(null);
         } catch (e: any) {
@@ -414,28 +414,32 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                 <ScrollView
                     contentContainerStyle={scrollContentStyle}
                 >
-                    <TouchableOpacity
-                        style={[styles.manualCard, alreadyClaimed && styles.cardDisabled]}
-                        activeOpacity={alreadyClaimed ? 1 : 0.8}
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.manualButton,
+                            alreadyClaimed && styles.cardDisabled,
+                            pressed && !alreadyClaimed && { transform: [{ scale: 0.96 }] },
+                        ]}
                         onPress={handleManualPress}
+                        disabled={alreadyClaimed}
                     >
-                        <Text style={styles.manualTitle}>MANUAL COOK</Text>
-                        <Text style={styles.manualSubtitle}>
-                            {alreadyClaimed
-                                ? `${windowLabel} already cooked — come back next window`
-                                : 'Toss ingredients into the pot and see what happens'}
-                        </Text>
-                    </TouchableOpacity>
+                        <ImageBackground
+                            source={Cooking.manualCookButton}
+                            style={styles.manualButtonImage}
+                            resizeMode="contain"
+                        >
+                            <Text style={styles.manualTitle}>
+                                MANUAL<Text style={styles.manualTitleSpace}> </Text>COOK
+                            </Text>
+                            <Text style={styles.manualSubtitle} numberOfLines={1}>
+                                {alreadyClaimed
+                                    ? `${windowLabel} already cooked - come back next window`
+                                    : 'Toss ingredients into the pot and see what happens'}
+                            </Text>
+                        </ImageBackground>
+                    </Pressable>
 
-                    <Text style={styles.sectionHeading}>
-                        RECIPE BOOK · {discoveredRecipeDetails.length}/{RECIPES.length}
-                    </Text>
-
-                    {discoveredRecipeDetails.length === 0 ? (
-                        <Text style={styles.emptyText}>
-                            No recipes yet. Cook manually to discover your first dish.
-                        </Text>
-                    ) : (
+                    {discoveredRecipeDetails.length > 0 && (
                         <View style={styles.recipeGrid}>
                             {discoveredRecipeDetails.map((recipe) => {
                                 const affordable = canAfford(recipe, inventory);
@@ -476,31 +480,36 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                         </View>
                     )}
 
-                    {lastResult && (
-                        <View style={styles.lastResultCard}>
-                            <Text style={styles.lastResultTitle}>
+                </ScrollView>
+                </View>
+
+                {lastResult && (
+                    <View
+                        style={styles.lastResultOverlay}
+                        pointerEvents="none"
+                    >
+                        <ImageBackground
+                            source={Cooking.levelPopup}
+                            style={styles.lastResultCard}
+                            resizeMode="stretch"
+                        >
+                            <Text style={styles.lastResultTitle} numberOfLines={1}>
                                 {lastResult.kind === 'recipe'
                                     ? `${lastResult.recipeName} · Lv.${lastResult.level}`
                                     : 'Slop'}
                             </Text>
-                            <Text style={styles.lastResultLine}>
+                            <Text style={styles.lastResultLine} numberOfLines={1}>
                                 +{lastResult.hungerBoost} hunger · +{lastResult.moodBoost}{' '}
                                 mood · +{lastResult.xp} pts
                             </Text>
-                            <Text style={styles.lastResultBreakdown}>
-                                base {lastResult.basePoints} × mood{' '}
-                                {lastResult.moodMult.toFixed(2)} × hunger{' '}
-                                {lastResult.hungerMult.toFixed(2)}
-                            </Text>
                             {lastResult.firstDiscovery && (
-                                <Text style={styles.lastResultDiscovery}>
+                                <Text style={styles.lastResultDiscovery} numberOfLines={1}>
                                     NEW RECIPE DISCOVERED
                                 </Text>
                             )}
-                        </View>
-                    )}
-                </ScrollView>
-                </View>
+                        </ImageBackground>
+                    </View>
+                )}
 
                 {/* Dev-only: tap the star painted into the banner art to
                     clear all meal-window claim flags so the feed flow can
@@ -1082,24 +1091,36 @@ const styles = StyleSheet.create({
     scrollBody: {
         paddingHorizontal: 16,
     },
-    manualCard: {
-        backgroundColor: 'rgba(46, 90, 62, 0.85)',
-        borderWidth: 2,
-        borderColor: colors.gold,
-        borderRadius: 8,
-        padding: 14,
+    manualButton: {
+        width: '100%',
+        aspectRatio: 980 / 175,
         marginBottom: 18,
-        alignItems: 'center',
+    },
+    manualButtonImage: {
+        width: '100%',
+        height: '100%',
     },
     manualTitle: {
-        color: colors.goldBright,
+        position: 'absolute',
+        top: '19%',
+        left: 0,
+        right: 0,
+        color: '#ffffff',
         fontFamily: fonts.pixel,
         fontSize: 12,
-        marginBottom: 4,
+        textAlign: 'center',
+    },
+    manualTitleSpace: {
+        fontSize: 6,
     },
     manualSubtitle: {
-        color: colors.mintPale,
-        fontSize: 10,
+        position: 'absolute',
+        top: '55%',
+        left: 0,
+        right: 0,
+        color: colors.slotInk,
+        fontFamily: fonts.body,
+        fontSize: 18,
         textAlign: 'center',
     },
     sectionHeading: {
@@ -1128,6 +1149,16 @@ const styles = StyleSheet.create({
     recipeCard: {
         marginBottom: 10,
         width: '48%',
+    },
+    cardShadow: {
+        position: 'absolute',
+        top: 10,
+        left: '3%',
+        right: '3%',
+        bottom: '6%',
+        backgroundColor: '#000',
+        opacity: 0.25,
+        borderRadius: 14,
     },
     cardArt: {
         aspectRatio: 1304 / 840,
@@ -1236,32 +1267,51 @@ const styles = StyleSheet.create({
     },
     cardDisabled: { filter: [{ grayscale: 1 }] },
     cardPending: { borderColor: colors.gold },
+    lastResultOverlay: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 16,
+        right: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 50,
+        elevation: 50,
+    },
     lastResultCard: {
-        backgroundColor: 'rgba(24, 46, 32, 0.85)',
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#8dd68d',
-        padding: 10,
-        marginTop: 14,
+        width: '100%',
+        aspectRatio: 1120 / 210,
+        justifyContent: 'center',
     },
     lastResultTitle: {
-        color: colors.goldBright,
+        position: 'absolute',
+        top: '15%',
+        left: 0,
+        right: 0,
+        color: colors.white,
         fontFamily: fonts.pixel,
-        fontSize: 10,
-        marginBottom: 4,
+        fontSize: 11,
+        textAlign: 'center',
     },
-    lastResultLine: { color: colors.mintPale, fontSize: 10 },
-    lastResultBreakdown: {
-        color: colors.mintPale,
-        fontSize: 9,
-        opacity: 0.75,
-        marginTop: 2,
+    lastResultLine: {
+        position: 'absolute',
+        top: '46%',
+        left: 0,
+        right: 0,
+        color: colors.slotInk,
+        fontFamily: fonts.body,
+        fontSize: 18,
+        textAlign: 'center',
     },
     lastResultDiscovery: {
-        color: '#8dd68d',
+        position: 'absolute',
+        top: '70%',
+        left: 0,
+        right: 0,
+        color: colors.purpleText,
         fontFamily: fonts.pixel,
         fontSize: 9,
-        marginTop: 6,
+        textAlign: 'center',
     },
 });
 

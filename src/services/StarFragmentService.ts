@@ -40,7 +40,8 @@ const callSpendStarFragments = httpsCallable<
 
 export type DailySpinReward =
     | { kind: 'starFragments'; amount: number }
-    | { kind: 'ingredient'; id: string; qty: number; tier: string };
+    | { kind: 'ingredient'; id: string; qty: number; tier: string }
+    | { kind: 'booster'; skuId: string; qty: number };
 
 const callClaimDailySpin = httpsCallable<
     Record<string, never>,

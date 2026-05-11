@@ -57,8 +57,8 @@ const STAR_RADIUS = 1024;
 // no visible hole. 0.0001 × 50_000_000 rect half-extent → 5_000px rect
 // coverage, still far bigger than any phone screen.
 const IRIS_INITIAL_SCALE = 0.0001;
-const IRIS_OPEN_DURATION_MS = 1400;
-const IRIS_CLOSE_DURATION_MS = 1850;
+const IRIS_OPEN_DURATION_MS = 1250;
+const IRIS_CLOSE_DURATION_MS = 1250;
 
 const IRIS_OPEN_EASING = Easing.in(Easing.cubic);
 const IRIS_CLOSE_EASING = Easing.inOut(Easing.quad);
@@ -93,7 +93,7 @@ const ZoomOutOverlay: React.FC<Props> = ({
     const { width: screenWidth, height: screenHeight } = useWindowDimensions();
     const irisCenterX = screenWidth / 2;
     const irisCenterY = screenHeight / 2;
-    const irisFinalScale = (Math.max(screenWidth, screenHeight) * 2) / STAR_RADIUS;
+    const irisFinalScale = (Math.max(screenWidth, screenHeight)) / STAR_RADIUS;
     const scale = useSharedValue(initialOpen ? irisFinalScale : IRIS_INITIAL_SCALE);
     const hardMaskOpacity = useSharedValue(initialOpen ? 0 : 1);
     const exitCompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

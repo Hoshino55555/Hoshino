@@ -584,7 +584,10 @@ const MoonokoInteraction: React.FC<Props> = ({
         return (
             <View
                 key={button.id}
-                style={styles.menuIcon}
+                style={[
+                    styles.menuIcon,
+                    { width: menuIconHitSize, height: menuIconHitSize },
+                ]}
                 testID={`menu-${button.action}`}
             >
                 <Image
@@ -601,7 +604,8 @@ const MoonokoInteraction: React.FC<Props> = ({
                     style={[
                         styles.menuImage as ImageStyle,
                         { width: menuIconSize, height: menuIconSize },
-                        button.icon === 'chat' && ({ transform: [{ translateY: -2 }] } as ImageStyle),
+                        button.icon === 'chat' && ({ transform: [{ translateY: -menuIconSize * 0.06 }] } as ImageStyle),
+                        button.icon === 'feed' && ({ transform: [{ translateX: -menuIconSize * 0.01 }, { translateY: menuIconSize * 0.03 }] } as ImageStyle),
                     ]}
                 />
             </View>
@@ -883,14 +887,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: '5%',
     },
     menuIcon: {
-        padding: 6,
         alignItems: 'center',
         justifyContent: 'center',
     },
     menuIconSelectImage: {
         position: 'absolute',
-        top: -2,
-        left: -2,
+        top: 0,
+        left: 0,
     },
     menuImage: {
         width: 48,

@@ -8,7 +8,7 @@ import {
     Image,
     Animated,
 } from 'react-native';
-import { Stars, getIngredientArt } from '../../assets';
+import { Stars, ShopItems, getIngredientArt } from '../../assets';
 import type { DailySpinReward } from '../../services/StarFragmentService';
 import { ingredientLabel } from '../../services/RecipeCatalog';
 import { colors, fonts } from '../../styles/tokens';
@@ -19,14 +19,31 @@ export type ReelTile =
     | { kind: 'starFragments'; amount: number; color: string }
     | {
           kind: 'ingredient';
-          id: string;
           tier: 'common' | 'uncommon' | 'rare' | 'ultra_rare';
+          previewId: string;
           color: string;
-      };
+      }
+    | { kind: 'booster'; color: string };
 
-// Daily-spin reel preview pool. Mirrors backend SPIN_POOL — every distinct
-// reward type is shown so the player knows what's possible. Tier color
-// follows ingredient tier accents (matches Inventory + Feeding pages).
+// Booster skuId → preview art for reveal display. Pool/reel tiles use a
+// single representative icon (snoozeSeed) since the spin slot is "any
+// booster" and the actual SKU is chosen server-side.
+const BOOSTER_ART: Record<string, any> = {
+    'booster-mood': ShopItems.moonokoBall,
+    'booster-sleep': ShopItems.snoozeSeed,
+    'booster-hunger': ShopItems.starberry,
+};
+const BOOSTER_LABEL: Record<string, string> = {
+    'booster-mood': 'Mood Booster',
+    'booster-sleep': 'Sleep Booster',
+    'booster-hunger': 'Hunger Booster',
+};
+const BOOSTER_TILE_COLOR = '#E0B33A';
+
+// Daily-spin reel preview pool. Mirrors backend SPIN_POOL — each entry is
+// one outcome the server can roll (4 ingredient tiers + 3 SF amounts).
+// Ingredient tiles show a representative icon; the actual ingredient is
+// chosen server-side from the tier bucket and revealed on landing.
 export const TIER_TILE_COLOR = {
     common: '#8B8B8B',
     uncommon: '#4CAF50',
@@ -35,16 +52,16 @@ export const TIER_TILE_COLOR = {
 } as const;
 
 export const REEL_TILES: ReelTile[] = [
-    { kind: 'ingredient', id: 'egg',        tier: 'common',     color: TIER_TILE_COLOR.common },
-    { kind: 'starFragments', amount: 10,    color: colors.forestDark },
-    { kind: 'ingredient', id: 'lettuce',    tier: 'common',     color: TIER_TILE_COLOR.common },
-    { kind: 'ingredient', id: 'strawberry', tier: 'uncommon',   color: TIER_TILE_COLOR.uncommon },
-    { kind: 'starFragments', amount: 50,    color: colors.forestDark },
-    { kind: 'ingredient', id: 'tomato',     tier: 'uncommon',   color: TIER_TILE_COLOR.uncommon },
-    { kind: 'ingredient', id: 'bacon',      tier: 'rare',       color: TIER_TILE_COLOR.rare },
-    { kind: 'ingredient', id: 'milk',       tier: 'rare',       color: TIER_TILE_COLOR.rare },
-    { kind: 'starFragments', amount: 250,   color: '#FF9800' },
-    { kind: 'ingredient', id: 'star_dust',  tier: 'ultra_rare', color: TIER_TILE_COLOR.ultra_rare },
+    { kind: 'ingredient',    tier: 'common',     previewId: 'egg',        color: TIER_TILE_COLOR.common },
+    { kind: 'ingredient',    tier: 'uncommon',   previewId: 'strawberry', color: TIER_TILE_COLOR.uncommon },
+    { kind: 'starFragments', amount: 250,                                 color: '#FF9800' },
+    { kind: 'ingredient',    tier: 'common',     previewId: 'lettuce',    color: TIER_TILE_COLOR.common },
+    { kind: 'ingredient',    tier: 'rare',       previewId: 'bacon',      color: TIER_TILE_COLOR.rare },
+    { kind: 'booster',                                                    color: BOOSTER_TILE_COLOR },
+    { kind: 'ingredient',    tier: 'uncommon',   previewId: 'tomato',     color: TIER_TILE_COLOR.uncommon },
+    { kind: 'ingredient',    tier: 'rare',       previewId: 'tuna',       color: TIER_TILE_COLOR.rare },
+    { kind: 'ingredient',    tier: 'ultra_rare', previewId: 'star_dust',  color: TIER_TILE_COLOR.ultra_rare },
+    { kind: 'ingredient',    tier: 'common',     previewId: 'carrot',     color: TIER_TILE_COLOR.common },
 ];
 
 export const REEL_TILE_SIZE = 84;
@@ -63,20 +80,32 @@ const REEL_TILE_CENTER_OFFSET = REEL_TILE_GAP + REEL_TILE_SIZE / 2;
 const REEL_TRACK_TILES: ReelTile[] = [...REEL_TILES, ...REEL_TILES, ...REEL_TILES];
 
 // Match a server-granted reward to its index in REEL_TILES so the reel
-// can decelerate to the correct visual landing tile. Falls back to 0 if
-// nothing matches (shouldn't happen — server pool mirrors REEL_TILES).
+// can decelerate to the correct visual landing tile. Prefers the exact
+// ingredient (when a tile happens to mirror its previewId), otherwise
+// falls back to the first tile of the matching tier. Falls back to 0 if
+// nothing matches.
 export function findReelIndex(reward: {
-    kind: 'starFragments' | 'ingredient';
+    kind: 'starFragments' | 'ingredient' | 'booster';
     amount?: number;
+    tier?: string;
     id?: string;
 }): number {
+    if (reward.kind === 'ingredient' && reward.id) {
+        const exact = REEL_TILES.findIndex(
+            (t) => t.kind === 'ingredient' && t.previewId === reward.id
+        );
+        if (exact >= 0) return exact;
+    }
     const idx = REEL_TILES.findIndex((t) => {
         if (t.kind !== reward.kind) return false;
         if (t.kind === 'starFragments' && reward.kind === 'starFragments') {
             return t.amount === reward.amount;
         }
         if (t.kind === 'ingredient' && reward.kind === 'ingredient') {
-            return t.id === reward.id;
+            return t.tier === reward.tier;
+        }
+        if (t.kind === 'booster' && reward.kind === 'booster') {
+            return true;
         }
         return false;
     });
@@ -131,21 +160,19 @@ const SpinModal: React.FC<Props> = ({
                             key={`pool-${i}`}
                             style={[styles.poolTile, { borderColor: t.color }]}
                         >
-                            {t.kind === 'starFragments' ? (
-                                <>
-                                    <Image
-                                        source={Stars.fragment}
-                                        style={styles.poolIcon}
-                                        resizeMode="contain"
-                                    />
-                                    <Text style={styles.poolText}>×{t.amount}</Text>
-                                </>
-                            ) : (
-                                <Image
-                                    source={getIngredientArt(t.id)}
-                                    style={styles.poolIcon}
-                                    resizeMode="contain"
-                                />
+                            <Image
+                                source={
+                                    t.kind === 'starFragments'
+                                        ? Stars.fragment
+                                        : t.kind === 'booster'
+                                            ? ShopItems.snoozeSeed
+                                            : getIngredientArt(t.previewId)
+                                }
+                                style={styles.poolIcon}
+                                resizeMode="contain"
+                            />
+                            {t.kind === 'starFragments' && (
+                                <Text style={styles.poolStarText}>{t.amount}</Text>
                             )}
                         </View>
                     ))}
@@ -166,21 +193,19 @@ const SpinModal: React.FC<Props> = ({
                                         key={`reel-${i}`}
                                         style={[styles.reelTile, { borderColor: t.color }]}
                                     >
-                                        {t.kind === 'starFragments' ? (
-                                            <>
-                                                <Image
-                                                    source={Stars.fragment}
-                                                    style={styles.reelTileIcon}
-                                                    resizeMode="contain"
-                                                />
-                                                <Text style={styles.reelTileText}>×{t.amount}</Text>
-                                            </>
-                                        ) : (
-                                            <Image
-                                                source={getIngredientArt(t.id)}
-                                                style={styles.reelTileIcon}
-                                                resizeMode="contain"
-                                            />
+                                        <Image
+                                            source={
+                                                t.kind === 'starFragments'
+                                                    ? Stars.fragment
+                                                    : t.kind === 'booster'
+                                                        ? ShopItems.snoozeSeed
+                                                        : getIngredientArt(t.previewId)
+                                            }
+                                            style={styles.reelTileIcon}
+                                            resizeMode="contain"
+                                        />
+                                        {t.kind === 'starFragments' && (
+                                            <Text style={styles.reelStarText}>{t.amount}</Text>
                                         )}
                                     </View>
                                 ))}
@@ -200,8 +225,10 @@ const SpinModal: React.FC<Props> = ({
                                     shadowOpacity: revealGlow,
                                     borderColor:
                                         reward.kind === 'ingredient'
-                                            ? TIER_TILE_COLOR[reward.tier]
-                                            : '#FF9800',
+                                            ? TIER_TILE_COLOR[reward.tier as keyof typeof TIER_TILE_COLOR]
+                                            : reward.kind === 'booster'
+                                                ? BOOSTER_TILE_COLOR
+                                                : '#FF9800',
                                 },
                             ]}
                         >
@@ -214,6 +241,17 @@ const SpinModal: React.FC<Props> = ({
                                     />
                                     <Text style={styles.revealText}>
                                         +{reward.amount} Shards
+                                    </Text>
+                                </>
+                            ) : reward.kind === 'booster' ? (
+                                <>
+                                    <Image
+                                        source={BOOSTER_ART[reward.skuId] ?? ShopItems.snoozeSeed}
+                                        style={styles.revealIcon}
+                                        resizeMode="contain"
+                                    />
+                                    <Text style={styles.revealText}>
+                                        {BOOSTER_LABEL[reward.skuId] ?? 'Booster'} ×{reward.qty}
                                     </Text>
                                 </>
                             ) : (
@@ -256,8 +294,8 @@ const styles = StyleSheet.create({
         borderColor: colors.slotInk,
         padding: 20,
         alignItems: 'center',
-        minWidth: 320,
-        maxWidth: 380,
+        minWidth: 376,
+        maxWidth: 400,
     },
     title: {
         fontFamily: fonts.body,
@@ -276,26 +314,29 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
         justifyContent: 'center',
         marginBottom: 14,
-        maxWidth: 340,
+        maxWidth: 330,
     },
     poolTile: {
-        width: 44,
-        height: 44,
+        width: 60,
+        height: 60,
         borderWidth: 2,
         backgroundColor: '#fdfaee',
         margin: 3,
-        alignItems: 'center',
-        justifyContent: 'center',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+        padding: 2,
     },
     poolIcon: {
-        width: 28,
-        height: 28,
+        width: 40,
+        height: 40,
     },
-    poolText: {
-        fontFamily: fonts.body,
-        fontSize: 18,
+    poolStarText: {
+        position: 'absolute',
+        bottom: 2,
+        right: 3,
+        fontFamily: fonts.pixel,
+        fontSize: 10,
         color: colors.slotInk,
-        marginTop: -2,
     },
     reelViewport: {
         height: REEL_TILE_SIZE + 16,
@@ -328,18 +369,21 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         backgroundColor: '#f5eed6',
         marginHorizontal: REEL_TILE_GAP / 2,
-        alignItems: 'center',
-        justifyContent: 'center',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+        padding: 6,
     },
     reelTileIcon: {
-        width: 48,
-        height: 48,
+        width: 56,
+        height: 56,
     },
-    reelTileText: {
-        fontFamily: fonts.body,
-        fontSize: 21,
+    reelStarText: {
+        position: 'absolute',
+        bottom: 4,
+        right: 6,
+        fontFamily: fonts.pixel,
+        fontSize: 16,
         color: colors.slotInk,
-        marginTop: 2,
     },
     status: {
         fontFamily: fonts.body,

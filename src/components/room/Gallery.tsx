@@ -11,7 +11,7 @@ import { colors } from '../../styles/tokens';
 
 // Single shared room for the local-only MVP. Switch to per-character keying
 // (`room:layout:${characterId}`) when the editor moves to a per-moonoko home.
-const ROOM_LAYOUT_STORAGE_KEY = 'room:layout:default';
+const ROOM_LAYOUT_STORAGE_KEY = 'room:layout:v7';
 
 interface Props {
     onBack: () => void;
@@ -28,7 +28,10 @@ interface Props {
 const Gallery: React.FC<Props> = ({ onBack }) => {
     const insets = useSafeAreaInsets();
     const { height } = useWindowDimensions();
-    const footerInset = insets.bottom + height * 0.01;
+    // Lift the back+edit buttons off the very bottom edge so they don't
+    // sit on top of the painted room frame.
+    const roomChromeLift = height * 0.02;
+    const footerInset = insets.bottom + height * 0.01 + roomChromeLift;
     const footerTopPadding = height * 0.005;
     // Editable room layout. Hydrate from AsyncStorage; fall back to the
     // hand-tuned starter mockup so first-time users see a furnished room.
@@ -36,6 +39,9 @@ const Gallery: React.FC<Props> = ({ onBack }) => {
     // before the load resolves would clobber a real saved room.
     const [layout, setLayout] = useState<RoomLayout>(STARTER_ROOM_LAYOUT);
     const [draggedRoomItemId, setDraggedRoomItemId] = useState<string | null>(null);
+    // Edit-mode state lives here (not in RoomEditor) so <Room> can paint its
+    // grid behind the items when the editor is open.
+    const [editing, setEditing] = useState(false);
     const hydratedRef = useRef(false);
 
     useEffect(() => {
@@ -89,7 +95,7 @@ const Gallery: React.FC<Props> = ({ onBack }) => {
             testID="gallery-screen"
         >
             <View style={StyleSheet.absoluteFill}>
-                <Room layout={layout} hiddenItemId={draggedRoomItemId} />
+                <Room layout={layout} hiddenItemId={draggedRoomItemId} editing={editing} />
             </View>
             {/* Editor overlay — its grid + palette only paint in edit mode,
                 but the Edit/Done chip lives inside it always. Sit it above
@@ -99,7 +105,9 @@ const Gallery: React.FC<Props> = ({ onBack }) => {
                 layout={layout}
                 onChange={(next) => setLayout(next)}
                 onDragItemChange={setDraggedRoomItemId}
-                bottomInset={insets.bottom}
+                bottomInset={insets.bottom + roomChromeLift}
+                editing={editing}
+                onEditingChange={setEditing}
             />
             <FooterBackBar
                 onBack={handleClose}

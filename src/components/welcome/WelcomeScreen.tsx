@@ -778,7 +778,7 @@ const styles = StyleSheet.create({
     },
     storyTextLarge: {
         fontSize: 24,
-        color: colors.forestDark, // Dark green text
+        color: '#486f60',
         lineHeight: 18,
         fontFamily: fonts.body,
     },
@@ -968,7 +968,9 @@ const styles = StyleSheet.create({
         paddingLeft: 10,
         paddingTop: 5,
         paddingRight: 10,
-        backgroundColor: colors.mintPale,
+        backgroundColor: '#fefaf1',
+        borderRadius: 6,
+        overflow: 'hidden',
     },
     dialogTextContainer: {
         flex: 1, // Take up available space for text

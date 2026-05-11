@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import FooterBackButton, { FOOTER_BACK_BUTTON_OFFSET_Y } from '../chrome/FooterBackButton';
+import FooterBackBar from '../chrome/FooterBackBar';
 import { colors, fonts } from '../../styles/tokens';
 
 interface Props {
@@ -67,14 +67,10 @@ const Profile: React.FC<Props> = ({
 
     return (
         <View style={[styles.safeArea, { backgroundColor: colors.mintPale }]} testID="profile-screen">
-                <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-                    <FooterBackButton
-                        onPress={onBack}
-                        offsetY={FOOTER_BACK_BUTTON_OFFSET_Y}
-                    />
-                </View>
-
-                <ScrollView style={styles.content} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+                <ScrollView
+                    style={[styles.content, { paddingTop: insets.top + 8 }]}
+                    contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 96 }]}
+                >
                     <Text style={styles.title}>Profile</Text>
 
                     <View style={styles.section}>
@@ -123,6 +119,8 @@ const Profile: React.FC<Props> = ({
                         </TouchableOpacity>
                     )}
                 </ScrollView>
+
+                <FooterBackBar onBack={onBack} bottomInset={insets.bottom} />
         </View>
     );
 };
@@ -130,13 +128,6 @@ const Profile: React.FC<Props> = ({
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-    },
-    topBar: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 4,
-        flexDirection: 'row',
-        alignItems: 'center',
     },
     content: {
         flex: 1,

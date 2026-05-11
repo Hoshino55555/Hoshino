@@ -767,7 +767,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             onPress: () => requestPurchase(item),
             priceNode: (
                 <Text style={[styles.itemPrice, { color: ready ? colors.forestDark : colors.inkText }]}>
-                    {ready ? 'FREE' : 'COOLDOWN'}
+                    {ready ? 'FREE' : 'SOLD OUT'}
                 </Text>
             ),
         });
@@ -801,9 +801,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     </Text>
                 </View>
             ),
-            overlay: insufficient ? (
-                <Text style={styles.insufficientOverlay}>INSUFFICIENT</Text>
-            ) : null,
         });
     };
 
@@ -819,14 +816,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         const atMax = current != null && max != null && current >= max;
         const insufficient = balance < item.priceStarFragments;
         const disabled = atMax || insufficient;
-        const summary =
-            current != null && max != null
-                ? `Now ${current}${atMax ? ' (max)' : ` · max ${max}`}`
-                : item.summary || '';
         return renderCardShell({
             item,
             title: item.name,
-            description: summary,
+            description: item.summary || '',
             disabled,
             onPress: () => requestPurchase(item),
             priceNode: (
@@ -837,9 +830,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     </Text>
                 </View>
             ),
-            overlay: insufficient && !atMax ? (
-                <Text style={styles.insufficientOverlay}>INSUFFICIENT</Text>
-            ) : null,
         });
     };
 
@@ -869,9 +859,6 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                     </Text>
                 </View>
             ),
-            overlay: insufficient && !isActive ? (
-                <Text style={styles.insufficientOverlay}>INSUFFICIENT</Text>
-            ) : null,
         });
     };
 
@@ -905,18 +892,11 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 </Text>
             </View>
         );
-        const overlay = (
-            <>
-                {locked ? (
-                    <View style={styles.comingSoonBadge}>
-                        <Text style={styles.comingSoonText}>COMING SOON</Text>
-                    </View>
-                ) : null}
-                {insufficient ? (
-                    <Text style={styles.insufficientOverlay}>INSUFFICIENT</Text>
-                ) : null}
-            </>
-        );
+        const overlay = locked ? (
+            <View style={styles.comingSoonBadge}>
+                <Text style={styles.comingSoonText}>COMING SOON</Text>
+            </View>
+        ) : null;
         return renderCardShell({
             item,
             title: item.name,
@@ -1058,12 +1038,8 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
         borderWidth: 2,
-        borderColor: terminalGreen.bgMid,
+        borderColor: colors.black,
         padding: 10,
-        borderTopColor: terminalGreen.accent,
-        borderLeftColor: terminalGreen.accent,
-        borderRightColor: terminalGreen.bgDeep,
-        borderBottomColor: terminalGreen.bgDeep,
     },
     balanceIcon: {
         width: 32,
@@ -1094,21 +1070,13 @@ const styles = StyleSheet.create({
         flex: 1,
         marginHorizontal: 2,
         backgroundColor: colors.mintPale,
-        borderColor: terminalGreen.bgMid,
+        borderColor: colors.black,
         borderWidth: 2,
         paddingVertical: 8,
         alignItems: 'center',
-        borderTopColor: terminalGreen.accent,
-        borderLeftColor: terminalGreen.accent,
-        borderRightColor: terminalGreen.bgDeep,
-        borderBottomColor: terminalGreen.bgDeep,
     },
     activeTab: {
         backgroundColor: '#b8e6b8',
-        borderTopColor: terminalGreen.bgDeep,
-        borderLeftColor: terminalGreen.bgDeep,
-        borderRightColor: terminalGreen.accent,
-        borderBottomColor: terminalGreen.accent,
     },
     tabButtonText: {
         fontFamily: fonts.body,
@@ -1117,13 +1085,9 @@ const styles = StyleSheet.create({
     },
     itemsContainer: {
         borderWidth: 3,
-        borderColor: terminalGreen.bgMid,
+        borderColor: colors.black,
         backgroundColor: colors.mintPale,
         padding: 8,
-        borderTopColor: terminalGreen.bgDeep,
-        borderLeftColor: terminalGreen.bgDeep,
-        borderRightColor: terminalGreen.accent,
-        borderBottomColor: terminalGreen.accent,
     },
     section: {
         marginBottom: 12,
@@ -1170,10 +1134,11 @@ const styles = StyleSheet.create({
     },
     cardHeaderCompact: {
         height: 22,
+        paddingTop: 7,
     },
     cardHeaderIngredient: {
         height: 32,
-        paddingTop: 8,
+        paddingTop: 6,
     },
     ingredientBoxTitle: {
         fontFamily: fonts.body,
@@ -1227,16 +1192,6 @@ const styles = StyleSheet.create({
     },
     disabledText: {
         color: colors.inkText,
-    },
-    insufficientOverlay: {
-        position: 'absolute',
-        bottom: 4,
-        left: 0,
-        right: 0,
-        textAlign: 'center',
-        fontFamily: fonts.body,
-        fontSize: 14,
-        color: terminalGreen.err,
     },
     priceContainer: {
         flexDirection: 'row',
