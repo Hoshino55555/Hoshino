@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     View,
     Text,
@@ -138,7 +138,7 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
         [boosters]
     );
 
-    const handleConsumeBooster = async (skuId: BoosterSkuId) => {
+    const handleConsumeBooster = useCallback(async (skuId: BoosterSkuId) => {
         if (consumingId) return;
         setConsumingId(skuId);
         try {
@@ -149,7 +149,7 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
         } finally {
             setConsumingId(null);
         }
-    };
+    }, [consumingId, consumeBooster]);
 
     // Sort owned ingredients by tier (rarest first) then alphabetically.
     const owned = useMemo(() => {
@@ -169,42 +169,36 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
             });
     }, [inventory]);
 
-    const totalCount = owned.reduce((s, e) => s + e.count, 0);
+    const totalCount = useMemo(
+        () => owned.reduce((s, e) => s + e.count, 0),
+        [owned],
+    );
+
+    // PageArtShell + ScrollView are both memoized — passing fresh array
+    // references each render busts both memos. Keyed on the dims they
+    // depend on (which only change with screenWidth/insets).
+    const shellOverlays = useMemo(
+        () => [
+            { key: 'bottom', source: Backgrounds.inventoryBottom, edge: 'bottom' as const, height: bottomBarReserve },
+            { key: 'banner', source: Backgrounds.inventoryBanner, edge: 'top' as const, height: bannerReserve },
+        ],
+        [bottomBarReserve, bannerReserve],
+    );
+    const scrollContentStyle = useMemo(
+        () => [styles.scrollBody, { paddingTop: contentTopPadding, paddingBottom: contentBottomPadding }],
+        [contentTopPadding, contentBottomPadding],
+    );
 
     return (
         <PageArtShell
             background={Backgrounds.inventory}
             backgroundColor="#1a1033"
             testID="inventory-screen"
-            overlays={[
-                {
-                    key: 'bottom',
-                    source: Backgrounds.inventoryBottom,
-                    edge: 'bottom',
-                    height: bottomBarReserve,
-                },
-                {
-                    key: 'banner',
-                    source: Backgrounds.inventoryBanner,
-                    edge: 'top',
-                    height: bannerReserve,
-                },
-            ]}
+            overlays={shellOverlays}
         >
-                <View
-                    style={[
-                        styles.scrollClipper,
-                        { top: 0, bottom: 0 },
-                    ]}
-                >
+                <View style={styles.scrollClipper}>
                     <ScrollView
-                        contentContainerStyle={[
-                            styles.scrollBody,
-                            {
-                                paddingTop: contentTopPadding,
-                                paddingBottom: contentBottomPadding,
-                            },
-                        ]}
+                        contentContainerStyle={scrollContentStyle}
                         showsVerticalScrollIndicator={false}
                     >
                         <View style={styles.tabNavigation}>
@@ -318,14 +312,11 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                                 ) : (
                                     <View style={styles.grid}>
                                         {(() => {
-                                            const meta =
-                                                CAMP_META[activeCamp.id] ?? {
-                                                    name: activeCamp.id,
-                                                    image: null,
-                                                    description: '',
-                                                };
-                                            const remaining =
-                                                activeCamp.expiresAtMs - Date.now();
+                                            const meta = CAMP_META[activeCamp.id] ?? {
+                                                name: activeCamp.id,
+                                                image: null,
+                                                description: '',
+                                            };
                                             return (
                                                 <ImageBackground
                                                     key={activeCamp.id}
@@ -335,19 +326,13 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
                                                     resizeMode="cover"
                                                 >
                                                     {meta.image ? (
-                                                        <Image
-                                                            source={meta.image}
-                                                            style={styles.itemImage}
-                                                            resizeMode="cover"
-                                                        />
+                                                        <Image source={meta.image} style={styles.itemImage} resizeMode="cover" />
                                                     ) : (
                                                         <View style={styles.itemImage} />
                                                     )}
-                                                    <Text style={styles.itemName} numberOfLines={2}>
-                                                        {meta.name}
-                                                    </Text>
+                                                    <Text style={styles.itemName} numberOfLines={2}>{meta.name}</Text>
                                                     <Text style={styles.countText} numberOfLines={1}>
-                                                        {formatRemaining(remaining)}
+                                                        {formatRemaining(activeCamp.expiresAtMs - Date.now())}
                                                     </Text>
                                                 </ImageBackground>
                                             );
@@ -371,6 +356,8 @@ const InventoryPage: React.FC<Props> = ({ onBack }) => {
 const styles = StyleSheet.create({
     scrollClipper: {
         position: 'absolute',
+        top: 0,
+        bottom: 0,
         left: 0,
         right: 0,
         overflow: 'hidden',

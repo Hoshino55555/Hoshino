@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -119,6 +119,124 @@ function currentMealWindow(now = new Date()): MealWindow {
     return 'dinner';
 }
 
+interface RecipeCardProps {
+    recipe: Recipe;
+    affordable: boolean;
+    isPending: boolean;
+    alreadyClaimed: boolean;
+    secretAllUnlocked: boolean;
+    level: number;
+    projectedXp: number;
+    onPress: (recipe: Recipe) => void;
+}
+
+const RecipeCard = React.memo<RecipeCardProps>(({
+    recipe,
+    affordable,
+    isPending,
+    alreadyClaimed,
+    secretAllUnlocked,
+    level,
+    projectedXp,
+    onPress,
+}) => {
+    // Dev-reveal mode shows every card at full opacity for art QA — the
+    // affordability / claimed dim signals are noise when you're eyeballing
+    // card visuals. Tap behavior is unaffected (still uses hardDisabled below).
+    const visuallyDisabled =
+        !secretAllUnlocked && (!affordable || isPending || alreadyClaimed);
+    // Keep the card tappable when the only reason it's disabled is the claimed
+    // window, so we can pop the explanatory toast instead of silently eating the tap.
+    const hardDisabled = isPending || (!affordable && !alreadyClaimed);
+
+    // Collapse the ingredient list into a multiset so duplicates render as
+    // `[icon] ×N` instead of repeating icons (matches recipe-example.png).
+    const ingredientEntries = useMemo(() => {
+        const counts: Record<string, number> = {};
+        for (const ing of recipe.ingredients) {
+            counts[ing] = (counts[ing] || 0) + 1;
+        }
+        return Object.entries(counts);
+    }, [recipe.ingredients]);
+
+    const handlePress = useCallback(() => onPress(recipe), [onPress, recipe]);
+
+    const twoCol = ingredientEntries.length > 3;
+    const leftEntries = twoCol ? ingredientEntries.slice(0, 3) : ingredientEntries;
+    const rightEntries = twoCol ? ingredientEntries.slice(3) : [];
+
+    return (
+        <Pressable
+            style={({ pressed }) => [
+                styles.recipeCard,
+                visuallyDisabled && styles.cardDisabled,
+                isPending && styles.cardPending,
+                // Press feedback: shrink slightly instead of fading. Skip when
+                // the card is locked/pending so a hard-disabled tap doesn't
+                // fake an interactive bounce.
+                pressed && !visuallyDisabled && { transform: [{ scale: 0.96 }] },
+            ]}
+            onPress={handlePress}
+            disabled={hardDisabled}
+        >
+            <ImageBackground
+                source={recipeCardArt(recipe)}
+                style={styles.cardArt}
+                imageStyle={styles.cardArtImage}
+                resizeMode="stretch"
+            >
+                {/* Title sits in the colored slot baked into the card art (upper-left). */}
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                    {renderMonacoTitle(recipe.name, 20)}
+                </Text>
+                <Image
+                    source={getRecipeArt(recipe.id)}
+                    style={styles.dishImage}
+                    resizeMode="contain"
+                />
+                <View
+                    style={[
+                        styles.ingredientList,
+                        twoCol && styles.ingredientListTwoCol,
+                    ]}
+                >
+                    <View style={styles.ingredientCol}>
+                        {leftEntries.map(([ing, n]) => (
+                            <View key={ing} style={styles.ingredientRow}>
+                                <Image
+                                    source={getIngredientArt(ing)}
+                                    style={styles.ingredientIcon}
+                                    resizeMode="contain"
+                                />
+                                <Text style={styles.ingredientCount}>×{n}</Text>
+                            </View>
+                        ))}
+                    </View>
+                    {twoCol && (
+                        <View style={styles.ingredientCol}>
+                            {rightEntries.map(([ing, n]) => (
+                                <View key={ing} style={styles.ingredientRow}>
+                                    <Image
+                                        source={getIngredientArt(ing)}
+                                        style={styles.ingredientIcon}
+                                        resizeMode="contain"
+                                    />
+                                    <Text style={styles.ingredientCount}>×{n}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+                </View>
+                <Text style={styles.cardLevel}>Lv.{level}</Text>
+                {/* Points number renders over the fire badge that's already
+                    painted into the card art. */}
+                <Text style={styles.pointsOverFire}>{projectedXp}</Text>
+            </ImageBackground>
+        </Pressable>
+    );
+});
+RecipeCard.displayName = 'RecipeCard';
+
 const FeedingPage = ({ onBack, onNotification }: Props) => {
     const {
         state,
@@ -181,18 +299,18 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
     const moodMult = 1 + 0.1 * Math.max(0, Math.min(5, mood));
     const hungerMult = 0.5 + 0.1 * Math.max(0, Math.min(5, hunger));
 
-    const notifyAlreadyClaimed = () => {
+    const notifyAlreadyClaimed = useCallback(() => {
         onNotification?.(
             `${windowLabel} already cooked — wait for the next meal window`,
             'warning'
         );
-    };
+    }, [windowLabel, onNotification]);
 
     // Tracks rapid taps on the MANUAL COOK card. Counter resets if the user
     // pauses longer than 800ms between taps, so accidental discovery is
     // unlikely. At 8 the visual-QA override flips on for the rest of the
     // session and we cancel any pending modal open so the salvo stays clean.
-    const handleManualPress = () => {
+    const handleManualPress = useCallback(() => {
         if (manualOpenTimer.current) {
             clearTimeout(manualOpenTimer.current);
             manualOpenTimer.current = null;
@@ -225,9 +343,9 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
             manualOpenTimer.current = null;
             setManualOpen(true);
         }, 220);
-    };
+    }, [secretAllUnlocked, alreadyClaimed, notifyAlreadyClaimed, onNotification]);
 
-    const handleCookRecipe = (recipe: Recipe) => {
+    const handleCookRecipe = useCallback((recipe: Recipe) => {
         if (pendingManual) return;
         if (alreadyClaimed) {
             notifyAlreadyClaimed();
@@ -239,14 +357,14 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
         }
         setSelectedRecipe(recipe);
         setManualOpen(true);
-    };
+    }, [pendingManual, alreadyClaimed, notifyAlreadyClaimed, inventory, onNotification]);
 
-    const dismissCookModal = () => {
+    const dismissCookModal = useCallback(() => {
         setManualOpen(false);
         setSelectedRecipe(null);
-    };
+    }, []);
 
-    const handleManualCook = async (ingredients: IngredientId[]) => {
+    const handleManualCook = useCallback(async (ingredients: IngredientId[]) => {
         setPendingManual(true);
         try {
             const res = selectedRecipe
@@ -267,42 +385,32 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
         } finally {
             setPendingManual(false);
         }
-    };
+    }, [selectedRecipe, cookRecipe, cookManual, onNotification]);
+
+    // PageArtShell + ScrollView are both memoized — passing fresh array
+    // references each render busts both memos.
+    const shellOverlays = useMemo(
+        () => [
+            { key: 'bottom', source: Backgrounds.cookingBottom, edge: 'bottom' as const, height: bottomBarReserve },
+            { key: 'banner', source: Backgrounds.cookingBanner, edge: 'top' as const, height: bannerReserve },
+        ],
+        [bottomBarReserve, bannerReserve],
+    );
+    const scrollContentStyle = useMemo(
+        () => [styles.scrollBody, { paddingTop: contentTopPadding, paddingBottom: contentBottomPadding }],
+        [contentTopPadding, contentBottomPadding],
+    );
 
     return (
         <PageArtShell
             background={Backgrounds.cooking}
             backgroundColor="#1a1033"
             testID="feeding-screen"
-            overlays={[
-                {
-                    key: 'bottom',
-                    source: Backgrounds.cookingBottom,
-                    edge: 'bottom',
-                    height: bottomBarReserve,
-                },
-                {
-                    key: 'banner',
-                    source: Backgrounds.cookingBanner,
-                    edge: 'top',
-                    height: bannerReserve,
-                },
-            ]}
+            overlays={shellOverlays}
         >
-                <View
-                    style={[
-                        styles.scrollClipper,
-                        { top: 0, bottom: 0 },
-                    ]}
-                >
+                <View style={styles.scrollClipper}>
                 <ScrollView
-                    contentContainerStyle={[
-                        styles.scrollBody,
-                        {
-                            paddingTop: contentTopPadding,
-                            paddingBottom: contentBottomPadding,
-                        },
-                    ]}
+                    contentContainerStyle={scrollContentStyle}
                 >
                     <TouchableOpacity
                         style={[styles.manualCard, alreadyClaimed && styles.cardDisabled]}
@@ -330,19 +438,6 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                             {discoveredRecipeDetails.map((recipe) => {
                                 const affordable = canAfford(recipe, inventory);
                                 const isPending = pendingManual && selectedRecipe?.id === recipe.id;
-                                // Dev-reveal mode shows every card at full
-                                // opacity for art QA — the affordability /
-                                // claimed dim signals are noise when you're
-                                // eyeballing card visuals. Tap behavior is
-                                // unaffected (still uses hardDisabled below).
-                                const visuallyDisabled =
-                                    !secretAllUnlocked &&
-                                    (!affordable || isPending || alreadyClaimed);
-                                // Keep the card tappable when the only reason it's
-                                // disabled is the claimed window, so we can pop the
-                                // explanatory toast instead of silently eating the tap.
-                                const hardDisabled =
-                                    isPending || (!affordable && !alreadyClaimed);
                                 const level = levelFromProgress(
                                     recipeProgress[recipe.id] || 0
                                 );
@@ -362,110 +457,18 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                                             hungerMult
                                     )
                                 );
-                                // Collapse the ingredient list into a multiset so
-                                // duplicates render as `[icon] ×N` instead of
-                                // repeating icons (matches recipe-example.png).
-                                const counts: Record<string, number> = {};
-                                for (const ing of recipe.ingredients) {
-                                    counts[ing] = (counts[ing] || 0) + 1;
-                                }
-                                const ingredientEntries = Object.entries(counts);
                                 return (
-                                    <Pressable
+                                    <RecipeCard
                                         key={recipe.id}
-                                        style={({ pressed }) => [
-                                            styles.recipeCard,
-                                            visuallyDisabled && styles.cardDisabled,
-                                            isPending && styles.cardPending,
-                                            // Press feedback: shrink slightly
-                                            // instead of fading. Skip when the
-                                            // card is locked/pending so a
-                                            // hard-disabled tap doesn't fake
-                                            // an interactive bounce.
-                                            pressed && !visuallyDisabled && {
-                                                transform: [{ scale: 0.96 }],
-                                            },
-                                        ]}
-                                        onPress={() => {
-                                            if (hardDisabled) return;
-                                            if (alreadyClaimed) {
-                                                notifyAlreadyClaimed();
-                                                return;
-                                            }
-                                            handleCookRecipe(recipe);
-                                        }}
-                                        disabled={hardDisabled}
-                                    >
-                                        <ImageBackground
-                                            source={recipeCardArt(recipe)}
-                                            style={styles.cardArt}
-                                            imageStyle={styles.cardArtImage}
-                                            resizeMode="stretch"
-                                        >
-                                            {/* Title sits in the colored slot baked into
-                                                the card art (upper-left). */}
-                                            <Text
-                                                style={styles.cardTitle}
-                                                numberOfLines={1}
-                                            >
-                                                {renderMonacoTitle(recipe.name, 20)}
-                                            </Text>
-                                            <Image
-                                                source={getRecipeArt(recipe.id)}
-                                                style={styles.dishImage}
-                                                resizeMode="contain"
-                                            />
-                                            {(() => {
-                                                // 2-col mode for >3 unique ingredients: fill the
-                                                // left column with the first 3 entries, rest spill
-                                                // into a right column. So 4→3|1, 5→3|2, 6→3|3.
-                                                const twoCol = ingredientEntries.length > 3;
-                                                const leftEntries = twoCol
-                                                    ? ingredientEntries.slice(0, 3)
-                                                    : ingredientEntries;
-                                                const rightEntries = twoCol
-                                                    ? ingredientEntries.slice(3)
-                                                    : [];
-                                                const renderRow = ([ing, n]: [string, number]) => (
-                                                    <View key={ing} style={styles.ingredientRow}>
-                                                        <Image
-                                                            source={getIngredientArt(ing)}
-                                                            style={styles.ingredientIcon}
-                                                            resizeMode="contain"
-                                                        />
-                                                        <Text style={styles.ingredientCount}>
-                                                            ×{n}
-                                                        </Text>
-                                                    </View>
-                                                );
-                                                return (
-                                                    <View
-                                                        style={[
-                                                            styles.ingredientList,
-                                                            twoCol && styles.ingredientListTwoCol,
-                                                        ]}
-                                                    >
-                                                        <View style={styles.ingredientCol}>
-                                                            {leftEntries.map(renderRow)}
-                                                        </View>
-                                                        {twoCol && (
-                                                            <View style={styles.ingredientCol}>
-                                                                {rightEntries.map(renderRow)}
-                                                            </View>
-                                                        )}
-                                                    </View>
-                                                );
-                                            })()}
-                                            <Text style={styles.cardLevel}>
-                                                Lv.{level}
-                                            </Text>
-                                            {/* Points number renders over the fire badge
-                                                that's already painted into the card art. */}
-                                            <Text style={styles.pointsOverFire}>
-                                                {projectedXp}
-                                            </Text>
-                                        </ImageBackground>
-                                    </Pressable>
+                                        recipe={recipe}
+                                        affordable={affordable}
+                                        isPending={isPending}
+                                        alreadyClaimed={alreadyClaimed}
+                                        secretAllUnlocked={secretAllUnlocked}
+                                        level={level}
+                                        projectedXp={projectedXp}
+                                        onPress={handleCookRecipe}
+                                    />
                                 );
                             })}
                         </View>
@@ -1064,6 +1067,8 @@ const ManualCookModal: React.FC<ManualCookModalProps> = ({
 const styles = StyleSheet.create({
     scrollClipper: {
         position: 'absolute',
+        top: 0,
+        bottom: 0,
         left: 0,
         right: 0,
         overflow: 'hidden',
@@ -1222,14 +1227,6 @@ const styles = StyleSheet.create({
         textShadowColor: '#2d1b69',
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
-    },
-    recipeNote: {
-        color: '#c14a4a',
-        fontFamily: '04b03',
-        fontSize: 11,
-        paddingHorizontal: 6,
-        paddingBottom: 4,
-        textAlign: 'center',
     },
     cardDisabled: { filter: [{ grayscale: 1 }] },
     cardPending: { borderColor: '#E8B84A' },

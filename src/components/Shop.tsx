@@ -120,20 +120,67 @@ const REEL_TILES: ReelTile[] = [
 const REEL_TILE_SIZE = 84;
 const REEL_TILE_GAP = 8;
 const REEL_STEP = REEL_TILE_SIZE + REEL_TILE_GAP;
+// Spin reel renders three REEL_TILES copies stitched together so the
+// translate animation never visibly wraps. Hoist the spread once so the
+// 30-element array isn't rebuilt every render while the modal is open.
+const REEL_TRACK_TILES: ReelTile[] = [...REEL_TILES, ...REEL_TILES, ...REEL_TILES];
+
+// IAP payment token selector — three fixed options. Module scope so the
+// `.map` source isn't a new array literal on every render.
+const IAP_TOKENS: IAPPaymentToken[] = ['SOL', 'USDC', 'SKR'];
+
+const formatCooldown = (ms: number) => {
+    if (ms <= 0) return 'Ready';
+    const h = Math.floor(ms / 3_600_000);
+    const m = Math.floor((ms % 3_600_000) / 60_000);
+    const s = Math.floor((ms % 60_000) / 1000);
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+};
+
+const getRarityCasing = (rarity: ItemRarity) => {
+    switch (rarity) {
+        case ItemRarity.COMMON: return Frames.casingCommon;
+        case ItemRarity.UNCOMMON: return Frames.casingUncommon;
+        case ItemRarity.RARE: return Frames.casingRare;
+        case ItemRarity.EPIC: return Frames.casingEpic;
+        case ItemRarity.LEGENDARY: return Frames.casingLegendary;
+        default: return Frames.casingCommon;
+    }
+};
+
+const rarityLabel = (rarity: ItemRarity): string => {
+    switch (rarity) {
+        case ItemRarity.COMMON: return 'Common';
+        case ItemRarity.UNCOMMON: return 'Uncommon';
+        case ItemRarity.RARE: return 'Rare';
+        case ItemRarity.EPIC: return 'Epic';
+        case ItemRarity.LEGENDARY: return 'Legendary';
+        default: return '';
+    }
+};
 
 const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItemsPurchased }) => {
     const insets = useSafeAreaInsets();
     const { publicKey, walletSource, signer } = useWallet();
     const { width: screenWidth } = useWindowDimensions();
-    // Banner is 1200×773 (transparent shadow stripped); size to native aspect.
-    const bannerReserve = screenWidth * (773 / 1200);
-    // Shadow PNG is 1200×790; sits BEHIND the banner so its bottom 17px peaks
-    // out below as a soft transparent fade over scroll content.
-    const bannerShadowReserve = screenWidth * (790 / 1200);
-    // Bottom strip is 1200×284 with the shadow built into its top edge.
-    const bottomBarReserve = screenWidth * (284 / 1200);
-    const contentTopPadding = bannerShadowReserve * 1.01;
-    const contentBottomPadding = bottomBarReserve * 0.96;
+    // Banner is 1200×773, shadow is 1200×790 (sits BEHIND the banner so its
+    // bottom 17px peeks out as a soft fade over scroll content), bottom strip
+    // is 1200×284 with the shadow baked into its top edge. Memoized as one
+    // object so all five derived dims live on a single screenWidth dep.
+    const { bannerReserve, bannerShadowReserve, bottomBarReserve, contentTopPadding, contentBottomPadding } = useMemo(() => {
+        const banner = screenWidth * (773 / 1200);
+        const bannerShadow = screenWidth * (790 / 1200);
+        const bottomBar = screenWidth * (284 / 1200);
+        return {
+            bannerReserve: banner,
+            bannerShadowReserve: bannerShadow,
+            bottomBarReserve: bottomBar,
+            contentTopPadding: bannerShadow * 1.01,
+            contentBottomPadding: bottomBar * 0.96,
+        };
+    }, [screenWidth]);
 
     const walletKey = publicKey ?? FALLBACK_WALLET;
     const starFragmentService = useMemo(() => new StarFragmentService(connection), [connection]);
@@ -429,52 +476,14 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         setIapQueue([]);
     }, [iapPurchasing]);
 
-    const formatCooldown = (ms: number) => {
-        if (ms <= 0) return 'Ready';
-        const h = Math.floor(ms / 3_600_000);
-        const m = Math.floor((ms % 3_600_000) / 60_000);
-        const s = Math.floor((ms % 60_000) / 1000);
-        if (h > 0) return `${h}h ${m}m`;
-        if (m > 0) return `${m}m ${s}s`;
-        return `${s}s`;
-    };
-
     useEffect(() => {
         refreshBalance();
     }, [refreshBalance]);
-
-    const handleClose = () => {
-        onClose();
-    };
-
-    const remainingBalance = balance;
 
     const sections = useMemo(
         () => groupBySubcategory(itemsForTab(selectedTab)),
         [selectedTab]
     );
-
-    const getRarityCasing = (rarity: ItemRarity) => {
-        switch (rarity) {
-            case ItemRarity.COMMON: return Frames.casingCommon;
-            case ItemRarity.UNCOMMON: return Frames.casingUncommon;
-            case ItemRarity.RARE: return Frames.casingRare;
-            case ItemRarity.EPIC: return Frames.casingEpic;
-            case ItemRarity.LEGENDARY: return Frames.casingLegendary;
-            default: return Frames.casingCommon;
-        }
-    };
-
-    const rarityLabel = (rarity: ItemRarity): string => {
-        switch (rarity) {
-            case ItemRarity.COMMON: return 'Common';
-            case ItemRarity.UNCOMMON: return 'Uncommon';
-            case ItemRarity.RARE: return 'Rare';
-            case ItemRarity.EPIC: return 'Epic';
-            case ItemRarity.LEGENDARY: return 'Legendary';
-            default: return '';
-        }
-    };
 
     const renderCardShell = (params: {
         item: ShopItem;
@@ -937,31 +946,24 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         });
     };
 
+    // PageArtShell is memoized — passing a new overlays array reference each
+    // render would bust its memo. Keyed on the three reserve dims (which
+    // themselves only change with screenWidth).
+    const shellOverlays = useMemo(
+        () => [
+            { key: 'bottom', source: Backgrounds.shopBottom, edge: 'bottom' as const, height: bottomBarReserve },
+            { key: 'banner-shadow', source: Backgrounds.shopBannerShadow, edge: 'top' as const, height: bannerShadowReserve },
+            { key: 'banner', source: Backgrounds.shopBanner, edge: 'top' as const, height: bannerReserve },
+        ],
+        [bottomBarReserve, bannerShadowReserve, bannerReserve],
+    );
+
     return (
-        <View style={{ flex: 1, backgroundColor: '#1a1033' }}>
+        <View style={styles.root}>
             <PageArtShell
                 background={Backgrounds.shop}
                 testID="shop-screen"
-                overlays={[
-                    {
-                        key: 'bottom',
-                        source: Backgrounds.shopBottom,
-                        edge: 'bottom',
-                        height: bottomBarReserve,
-                    },
-                    {
-                        key: 'banner-shadow',
-                        source: Backgrounds.shopBannerShadow,
-                        edge: 'top',
-                        height: bannerShadowReserve,
-                    },
-                    {
-                        key: 'banner',
-                        source: Backgrounds.shopBanner,
-                        edge: 'top',
-                        height: bannerReserve,
-                    },
-                ]}
+                overlays={shellOverlays}
             >
                 <View
                     style={[
@@ -983,7 +985,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                         <Image source={Stars.fragment} style={styles.balanceIcon} resizeMode="contain" />
                         <View style={styles.dustTextContainer}>
                             <Text style={styles.walletLabel}>WALLET</Text>
-                            <Text style={styles.dustAmount}>{remainingBalance} Shards</Text>
+                            <Text style={styles.dustAmount}>{balance} Shards</Text>
                         </View>
                     </View>
 
@@ -1014,7 +1016,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                 </View>
 
                 <FooterBackBar
-                    onBack={handleClose}
+                    onBack={onClose}
                     height={bottomBarReserve}
                     bottomInset={insets.bottom}
                 />
@@ -1071,7 +1073,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                                             { transform: [{ translateX: reelTranslateX }] },
                                         ]}
                                     >
-                                        {[...REEL_TILES, ...REEL_TILES, ...REEL_TILES].map((t, i) => (
+                                        {REEL_TRACK_TILES.map((t, i) => (
                                             <View
                                                 key={`reel-${i}`}
                                                 style={[styles.reelTile, { borderColor: t.color }]}
@@ -1168,7 +1170,7 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 
                         <Text style={styles.iapSectionLabel}>Pay with</Text>
                         <View style={styles.iapRailRow}>
-                            {(['SOL', 'USDC', 'SKR'] as IAPPaymentToken[]).map((tk) => (
+                            {IAP_TOKENS.map((tk) => (
                                 <TouchableOpacity
                                     key={tk}
                                     style={[
@@ -1298,6 +1300,10 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
 };
 
 const styles = StyleSheet.create({
+    root: {
+        flex: 1,
+        backgroundColor: '#1a1033',
+    },
     spinBackdrop: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.6)',
