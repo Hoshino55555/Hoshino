@@ -26,6 +26,7 @@ import {
 } from '../../services/RecipeCatalog';
 import type { CookResponse, IngredientCounts } from '../../services/GameStateService';
 import { Backgrounds, Cooking, getIngredientArt, getRecipeArt, RecipeCards, Frames } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 // Tier rule for the recipe-card background art: any rare/ultra_rare ingredient
 // promotes to RARE (rainbow), any uncommon promotes to INTERMEDIATE (yellow),
@@ -1079,7 +1080,7 @@ const styles = StyleSheet.create({
     manualCard: {
         backgroundColor: 'rgba(46, 90, 62, 0.85)',
         borderWidth: 2,
-        borderColor: '#E8B84A',
+        borderColor: colors.gold,
         borderRadius: 8,
         padding: 14,
         marginBottom: 18,
@@ -1092,18 +1093,18 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     manualSubtitle: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontSize: 10,
         textAlign: 'center',
     },
     sectionHeading: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'PressStart2P',
         fontSize: 10,
         marginBottom: 8,
     },
     emptyText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontSize: 11,
         fontStyle: 'italic',
         textAlign: 'center',
@@ -1139,7 +1140,7 @@ const styles = StyleSheet.create({
         top: '3%',
         left: '7%',
         maxWidth: '88%',
-        color: '#ffffff',
+        color: colors.white,
         fontFamily: 'Monaco',
         fontSize: 20,
         letterSpacing: 0.5,
@@ -1153,7 +1154,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: '23%',
         left: '5%',
-        color: '#ffffff',
+        color: colors.white,
         fontFamily: 'Monaco',
         fontSize: 20,
         textShadowColor: '#2d1b69',
@@ -1221,7 +1222,7 @@ const styles = StyleSheet.create({
         right: '12%',
         minWidth: '14%',
         textAlign: 'center',
-        color: '#ffffff',
+        color: colors.white,
         fontFamily: 'Monaco',
         fontSize: 23,
         textShadowColor: '#2d1b69',
@@ -1229,7 +1230,7 @@ const styles = StyleSheet.create({
         textShadowRadius: 0,
     },
     cardDisabled: { filter: [{ grayscale: 1 }] },
-    cardPending: { borderColor: '#E8B84A' },
+    cardPending: { borderColor: colors.gold },
     lastResultCard: {
         backgroundColor: 'rgba(24, 46, 32, 0.85)',
         borderRadius: 6,
@@ -1244,9 +1245,9 @@ const styles = StyleSheet.create({
         fontSize: 10,
         marginBottom: 4,
     },
-    lastResultLine: { color: '#E8F5E8', fontSize: 10 },
+    lastResultLine: { color: colors.mintPale, fontSize: 10 },
     lastResultBreakdown: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontSize: 9,
         opacity: 0.75,
         marginTop: 2,
@@ -1270,7 +1271,7 @@ const modalStyles = StyleSheet.create({
         backgroundColor: '#1a1f36',
         borderRadius: 10,
         borderWidth: 2,
-        borderColor: '#E8B84A',
+        borderColor: colors.gold,
         padding: 16,
         maxHeight: '92%',
         overflow: 'visible',
@@ -1283,7 +1284,7 @@ const modalStyles = StyleSheet.create({
         marginBottom: 12,
     },
     section: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 24,
         marginTop: 6,
@@ -1311,7 +1312,7 @@ const modalStyles = StyleSheet.create({
         minWidth: 50,
         paddingHorizontal: 8,
         paddingVertical: 3,
-        backgroundColor: '#E8B84A',
+        backgroundColor: colors.gold,
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
@@ -1327,14 +1328,14 @@ const modalStyles = StyleSheet.create({
         fontSize: 20,
     },
     potHint: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 16,
         opacity: 0.75,
         marginTop: 4,
     },
     potEmpty: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 13,
         opacity: 0.7,
@@ -1398,7 +1399,7 @@ const modalStyles = StyleSheet.create({
         left: 2,
         paddingHorizontal: 3,
         paddingVertical: 1,
-        backgroundColor: '#E8B84A',
+        backgroundColor: colors.gold,
         borderRadius: 3,
         zIndex: 1,
     },
@@ -1461,14 +1462,14 @@ const modalStyles = StyleSheet.create({
         borderColor: 'rgba(232, 245, 232, 0.6)',
     },
     clearText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 18,
     },
     cook: {
         paddingVertical: 10,
         paddingHorizontal: 18,
-        backgroundColor: '#E8B84A',
+        backgroundColor: colors.gold,
         borderRadius: 6,
     },
     cookDisabled: { opacity: 0.4 },

@@ -10,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import { getIngredientArt } from '../../assets';
+import { colors } from '../../styles/tokens';
 import {
     INGREDIENT_TIER,
     ingredientLabel,
@@ -312,7 +313,7 @@ const styles = StyleSheet.create({
         width: '100%',
         maxWidth: 380,
         borderWidth: 2,
-        borderColor: '#E8B84A',
+        borderColor: colors.gold,
     },
     header: {
         flexDirection: 'row',
@@ -321,13 +322,13 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     title: {
-        color: '#E8B84A',
+        color: colors.gold,
         fontFamily: 'Monaco',
         fontSize: 26,
         flexShrink: 1,
     },
     counter: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 18,
         opacity: 0.7,
@@ -348,7 +349,7 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     tapHint: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 20,
         marginTop: 14,
@@ -388,7 +389,7 @@ const styles = StyleSheet.create({
         height: 56,
     },
     cardName: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 17,
         marginTop: 4,
@@ -411,10 +412,10 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(46, 90, 62, 0.85)',
         borderRadius: 6,
         borderWidth: 1,
-        borderColor: '#E8F5E8',
+        borderColor: colors.mintPale,
     },
     skipText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 18,
     },

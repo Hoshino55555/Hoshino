@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, useWindowDimensions } from 'react-native';
+import { colors } from '../../styles/tokens';
 
 interface FrameProps {
     children: React.ReactNode;
@@ -367,7 +368,7 @@ const styles = StyleSheet.create({
     },
     outerPixel: {
         position: 'absolute',
-        backgroundColor: '#2E5A3E', // Dark green
+        backgroundColor: colors.forestDark, // Dark green
         zIndex: 10,
     },
     glowPixel: {
@@ -377,7 +378,7 @@ const styles = StyleSheet.create({
     },
     innerPixel: {
         position: 'absolute',
-        backgroundColor: '#2E5A3E', // Same dark green
+        backgroundColor: colors.forestDark, // Same dark green
         zIndex: 12,
     },
 });

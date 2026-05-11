@@ -5,6 +5,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { useWallet } from '../../contexts/WalletContext';
 import { VRF_RUNTIME_CONFIG } from '../../config/vrf';
 import { MagicBlockVRFService, type VRFContext } from '../../services/VRFService';
+import { colors } from '../../styles/tokens';
 
 interface Props {
     onClose: () => void;
@@ -214,7 +215,7 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     card: {
-        backgroundColor: '#ffffff',
+        backgroundColor: colors.white,
         borderRadius: 12,
         padding: 16,
         gap: 10,

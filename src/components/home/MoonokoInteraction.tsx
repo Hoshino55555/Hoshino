@@ -8,6 +8,7 @@ import ForagePopOut, { computeForageStaggerMs, FORAGE_FLIGHT_MS } from './Forage
 import type { ForagedItem } from '../../services/GameStateService';
 import type { PendingWidgetAction } from '../../types/AppTypes';
 import { Backgrounds, Menu, Stars, Frames, Forage, getCharacterAnim } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 const WIDGET_ACTION_TTL_MS = 60_000;
 
@@ -932,7 +933,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
         zIndex: 1000,
     },
 });

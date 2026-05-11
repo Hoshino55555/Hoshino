@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ImageBackground, StyleSheet } from 'react-native';
 import { Frames } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 interface WalletButtonProps {
     connected: boolean;
@@ -67,12 +68,12 @@ const styles = StyleSheet.create({
         zIndex: 90,
     },
     connectButton: {
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         paddingVertical: 6,
         paddingHorizontal: 12,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: '#E8F5E8',
+        borderColor: colors.mintPale,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     connectText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontSize: 13,
         fontFamily: 'Monaco',
         transform: [{ translateY: 3 }],
@@ -97,7 +98,7 @@ const styles = StyleSheet.create({
         borderRadius: 0,
     },
     connectedText: {
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontSize: 26,
         lineHeight: 17,
         fontFamily: 'Monaco',

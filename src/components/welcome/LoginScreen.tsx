@@ -20,6 +20,7 @@ import {
 import { mobileWalletService, useWallet } from '../../contexts/WalletContext';
 import type { ExternalWalletProvider } from '../../contexts/WalletContext';
 import { Logos } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 const WALLET_APP_URL = 'https://hoshino.gg';
 const WALLET_REDIRECT_PATH = '/wallet-auth';
@@ -566,7 +567,7 @@ const styles = StyleSheet.create({
     input: {
         borderWidth: 2,
         borderColor: '#1c556c',
-        backgroundColor: '#ffffff',
+        backgroundColor: colors.white,
         borderRadius: 16,
         paddingHorizontal: 14,
         paddingVertical: Platform.OS === 'ios' ? 14 : 12,
@@ -646,7 +647,7 @@ const styles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: '#ffffff',
+        backgroundColor: colors.white,
         alignItems: 'center',
         justifyContent: 'center',
     },

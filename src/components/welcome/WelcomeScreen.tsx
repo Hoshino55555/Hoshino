@@ -4,6 +4,7 @@ import Frame from '../chrome/Frame';
 import { useWallet } from '../../contexts/WalletContext';
 import InnerScreen from '../chrome/InnerScreen';
 import { Logos, Misc } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 interface Props {
     onContinue: (playerName?: string) => void;
@@ -749,7 +750,7 @@ const styles = StyleSheet.create({
         zIndex: 2,
     },
     storyDialogueLargeBox: {
-        backgroundColor: '#E8F5E8', // Light pastel green background
+        backgroundColor: colors.mintPale, // Light pastel green background
         padding: 0, // Remove padding to create pixelated border effect
         borderRadius: 0, // Remove rounded corners for pixelated look
         borderWidth: 0, // Remove CSS border - we'll use pixelated borders
@@ -760,7 +761,7 @@ const styles = StyleSheet.create({
         overflow: 'visible', // Allow pixelated borders to show
     },
     storyDialogueInnerBox: {
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
         padding: 0,
         borderRadius: 0, // Remove rounded corners for pixelated look
         borderWidth: 0, // Remove CSS border - we'll use pixelated borders
@@ -771,13 +772,13 @@ const styles = StyleSheet.create({
     },
     storySpeakerLarge: {
         fontSize: 24,
-        color: '#2E5A3E', // Dark green text
+        color: colors.forestDark, // Dark green text
         marginBottom: 5,
         fontFamily: 'Monaco',
     },
     storyTextLarge: {
         fontSize: 23,
-        color: '#2E5A3E', // Dark green text
+        color: colors.forestDark, // Dark green text
         lineHeight: 18,
         fontFamily: 'Monaco',
         letterSpacing: -1, // Reduce space between characters
@@ -801,7 +802,7 @@ const styles = StyleSheet.create({
     },
     storyPromptLarge: {
         fontSize: 26,
-        color: '#4A7A5A', // Medium green for subtle text
+        color: colors.forestMid, // Medium green for subtle text
         marginTop: 5,
         fontStyle: 'italic',
         fontFamily: 'Monaco',
@@ -846,7 +847,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         marginBottom: 2,
         textAlign: 'center',
-        color: '#2E5A3E', // Same dark green as the input text
+        color: colors.forestDark, // Same dark green as the input text
         fontFamily: 'Monaco',
     },
     nameDisplayContainer: {
@@ -860,7 +861,7 @@ const styles = StyleSheet.create({
     nameDisplay: {
         fontSize: 18,
         textAlign: 'center',
-        color: '#2E5A3E', // Dark green text to match border
+        color: colors.forestDark, // Dark green text to match border
         letterSpacing: 2,
         width: '100%',
         lineHeight: 24,
@@ -901,17 +902,17 @@ const styles = StyleSheet.create({
         maxWidth: 250,
         alignSelf: 'center',
         borderWidth: 2,
-        borderColor: '#2E5A3E', // Dark teal outer border
+        borderColor: colors.forestDark, // Dark teal outer border
         borderRadius: 6, // Less rounded for more pixelated look
         padding: 3, // Small padding for inner border
-        backgroundColor: '#E8F5E8', // Off-white background between borders
+        backgroundColor: colors.mintPale, // Off-white background between borders
     },
     nameInputInnerBox: {
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
         padding: 15, // Increased padding
         borderRadius: 6,
         borderWidth: 2,
-        borderColor: '#4A7A5A', // Medium teal inner border
+        borderColor: colors.forestMid, // Medium teal inner border
         width: '100%',
         height: 80, // Increased height from 50 to 70
         justifyContent: 'center',
@@ -930,13 +931,13 @@ const styles = StyleSheet.create({
     },
     choiceText: {
         fontSize: 27,
-        color: '#4A7A5A', // Medium green for choice text
+        color: colors.forestMid, // Medium green for choice text
         marginHorizontal: 30, // Increased horizontal spacing instead of gap
         fontFamily: 'Monaco',
         opacity: 0.5, // Make non-underlined options transparent
     },
     selectedChoice: {
-        color: '#2E5A3E', // Dark green for selected choice
+        color: colors.forestDark, // Dark green for selected choice
         fontFamily: 'Monaco',
         opacity: 1, // Make selected option fully opaque
     },
@@ -951,7 +952,7 @@ const styles = StyleSheet.create({
         borderTopWidth: 8, // Reduced from 12 to 8
         borderLeftColor: 'transparent',
         borderRightColor: 'transparent',
-        borderTopColor: '#2E5A3E',
+        borderTopColor: colors.forestDark,
     },
     arrowText: {
         fontSize: 20,
@@ -968,7 +969,7 @@ const styles = StyleSheet.create({
         paddingLeft: 10,
         paddingTop: 5,
         paddingRight: 10,
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
     },
     dialogTextContainer: {
         flex: 1, // Take up available space for text
@@ -985,7 +986,7 @@ const styles = StyleSheet.create({
         left: 6,
         right: 6,
         height: 3,
-        backgroundColor: '#2E5A3E', // Dark green outer border
+        backgroundColor: colors.forestDark, // Dark green outer border
         zIndex: 10,
     },
     dialogBorderBottom: {
@@ -994,7 +995,7 @@ const styles = StyleSheet.create({
         left: 6,
         right: 6,
         height: 3,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         zIndex: 10,
     },
     dialogBorderLeft: {
@@ -1003,7 +1004,7 @@ const styles = StyleSheet.create({
         bottom: 3,
         left: 0,
         width: 3,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         zIndex: 10,
     },
     dialogBorderRight: {
@@ -1012,7 +1013,7 @@ const styles = StyleSheet.create({
         bottom: 3,
         right: 0,
         width: 3,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         zIndex: 10,
     },
 
@@ -1023,7 +1024,7 @@ const styles = StyleSheet.create({
         left: 8,
         right: 8,
         height: 4,
-        backgroundColor: '#4A7A5A', // Medium green inner border
+        backgroundColor: colors.forestMid, // Medium green inner border
         zIndex: 11,
     },
     dialogBorderInnerBottom: {
@@ -1032,7 +1033,7 @@ const styles = StyleSheet.create({
         left: 8,
         right: 8,
         height: 4,
-        backgroundColor: '#4A7A5A',
+        backgroundColor: colors.forestMid,
         zIndex: 11,
     },
     dialogBorderInnerLeft: {
@@ -1041,7 +1042,7 @@ const styles = StyleSheet.create({
         bottom: 8,
         left: 8,
         width: 4,
-        backgroundColor: '#4A7A5A',
+        backgroundColor: colors.forestMid,
         zIndex: 11,
     },
     dialogBorderInnerRight: {
@@ -1050,7 +1051,7 @@ const styles = StyleSheet.create({
         bottom: 8,
         right: 8,
         width: 4,
-        backgroundColor: '#4A7A5A',
+        backgroundColor: colors.forestMid,
         zIndex: 11,
     },
 
@@ -1061,7 +1062,7 @@ const styles = StyleSheet.create({
         left: 3,
         width: 6,
         height: 6,
-        backgroundColor: '#2E5A3E', // Dark green outer corners
+        backgroundColor: colors.forestDark, // Dark green outer corners
         zIndex: 10,
     },
     dialogCornerTR: {
@@ -1070,7 +1071,7 @@ const styles = StyleSheet.create({
         right: 3,
         width: 6,
         height: 6,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         zIndex: 10,
     },
     dialogCornerBL: {
@@ -1079,7 +1080,7 @@ const styles = StyleSheet.create({
         left: 3,
         width: 6,
         height: 6,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         zIndex: 10,
     },
     dialogCornerBR: {
@@ -1088,7 +1089,7 @@ const styles = StyleSheet.create({
         right: 3,
         width: 6,
         height: 6,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         zIndex: 10,
     },
 
@@ -1099,7 +1100,7 @@ const styles = StyleSheet.create({
         left: 12,
         width: 3,
         height: 3,
-        backgroundColor: '#4A7A5A', // Medium green inner corner pixels
+        backgroundColor: colors.forestMid, // Medium green inner corner pixels
         zIndex: 11,
     },
     dialogCornerPixelTL2: {
@@ -1108,7 +1109,7 @@ const styles = StyleSheet.create({
         left: 4,
         width: 3,
         height: 3,
-        backgroundColor: '#4A7A5A',
+        backgroundColor: colors.forestMid,
         zIndex: 11,
     },
     dialogCornerPixelTR1: {
@@ -1117,7 +1118,7 @@ const styles = StyleSheet.create({
         right: 12,
         width: 3,
         height: 3,
-        backgroundColor: '#4A7A5A',
+        backgroundColor: colors.forestMid,
         zIndex: 11,
     },
     dialogCornerPixelTR2: {
@@ -1126,7 +1127,7 @@ const styles = StyleSheet.create({
         right: 4,
         width: 3,
         height: 3,
-        backgroundColor: '#4A7A5A',
+        backgroundColor: colors.forestMid,
         zIndex: 11,
     },
     dialogCornerPixelBL1: {
@@ -1135,7 +1136,7 @@ const styles = StyleSheet.create({
         left: 12,
         width: 3,
         height: 3,
-        backgroundColor: '#4A7A5A',
+        backgroundColor: colors.forestMid,
         zIndex: 11,
     },
     dialogCornerPixelBL2: {
@@ -1144,7 +1145,7 @@ const styles = StyleSheet.create({
         left: 4,
         width: 3,
         height: 3,
-        backgroundColor: '#4A7A5A',
+        backgroundColor: colors.forestMid,
         zIndex: 11,
     },
     dialogCornerPixelBR1: {
@@ -1153,7 +1154,7 @@ const styles = StyleSheet.create({
         right: 12,
         width: 3,
         height: 3,
-        backgroundColor: '#4A7A5A',
+        backgroundColor: colors.forestMid,
         zIndex: 11,
     },
     dialogCornerPixelBR2: {
@@ -1162,7 +1163,7 @@ const styles = StyleSheet.create({
         right: 4,
         width: 3,
         height: 3,
-        backgroundColor: '#4A7A5A',
+        backgroundColor: colors.forestMid,
         zIndex: 11,
     },
 

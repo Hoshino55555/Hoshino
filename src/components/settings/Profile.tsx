@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FooterBackButton, { FOOTER_BACK_BUTTON_OFFSET_Y } from '../chrome/FooterBackButton';
+import { colors } from '../../styles/tokens';
 
 interface Props {
     onBack: () => void;
@@ -65,7 +66,7 @@ const Profile: React.FC<Props> = ({
     };
 
     return (
-        <View style={[styles.safeArea, { backgroundColor: '#E8F5E8' }]} testID="profile-screen">
+        <View style={[styles.safeArea, { backgroundColor: colors.mintPale }]} testID="profile-screen">
                 <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
                     <FooterBackButton
                         onPress={onBack}
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 38,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         textAlign: 'center',
         marginBottom: 18,
@@ -158,17 +159,17 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 14,
         borderWidth: 2,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
     },
     sectionTitle: {
         fontSize: 26,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         marginBottom: 10,
     },
     fieldLabel: {
         fontSize: 20,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         opacity: 0.75,
         marginBottom: 4,
@@ -178,13 +179,13 @@ const styles = StyleSheet.create({
     },
     valueText: {
         fontSize: 23,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         lineHeight: 15,
     },
     addressText: {
         fontSize: 15,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         lineHeight: 14,
     },
@@ -194,19 +195,19 @@ const styles = StyleSheet.create({
     },
     nameInput: {
         flex: 1,
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
         borderWidth: 1,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
         borderRadius: 4,
         paddingHorizontal: 10,
         paddingVertical: 8,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontSize: 23,
         fontFamily: 'Monaco',
         marginRight: 8,
     },
     saveButton: {
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         paddingHorizontal: 14,
         justifyContent: 'center',
         borderRadius: 4,
@@ -215,7 +216,7 @@ const styles = StyleSheet.create({
         opacity: 0.4,
     },
     saveButtonText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontSize: 21,
         fontFamily: 'Monaco',
     },
@@ -224,12 +225,12 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 6,
         borderWidth: 2,
-        borderColor: '#E8F5E8',
+        borderColor: colors.mintPale,
         alignItems: 'center',
         marginTop: 8,
     },
     logoutButtonText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontSize: 23,
         fontFamily: 'Monaco',
     },

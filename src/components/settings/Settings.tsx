@@ -18,6 +18,7 @@ import PageArtShell from '../chrome/PageArtShell';
 import SettingsService, { MenuButton, type SoundLevel } from '../../services/SettingsService';
 import MusicService from '../../services/MusicService';
 import { Menu, Backgrounds } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 interface Props {
     onBack: () => void;
@@ -335,7 +336,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 33,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         textAlign: 'center',
         marginBottom: 14,
@@ -346,11 +347,11 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         padding: 12,
         borderWidth: 2,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
     },
     sectionTitle: {
         fontSize: 26,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         marginBottom: 6,
     },
@@ -362,7 +363,7 @@ const styles = StyleSheet.create({
     },
     collapseChevron: {
         fontSize: 33,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         marginBottom: 6,
         paddingHorizontal: 6,
@@ -378,7 +379,7 @@ const styles = StyleSheet.create({
         right: 10,
         top: 4 + 38 + 6,
         height: 2,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
     },
     volumeDotsRow: {
         flexDirection: 'row',
@@ -403,7 +404,7 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     volumeTooltipText: {
-        color: '#ffffff',
+        color: colors.white,
         fontFamily: 'Monaco',
         fontSize: 14,
         lineHeight: 14,
@@ -424,7 +425,7 @@ const styles = StyleSheet.create({
         height: 14,
         borderRadius: 7,
         borderWidth: 2,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
         backgroundColor: '#f0fff0',
     },
     volumeDotActive: {
@@ -434,12 +435,12 @@ const styles = StyleSheet.create({
     volumeTick: {
         width: 2,
         height: 6,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         marginTop: 4,
     },
     sectionDescription: {
         fontSize: 20,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         marginBottom: 12,
         opacity: 0.75,
@@ -450,7 +451,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#2E5A3E',
+        borderBottomColor: colors.forestDark,
         backgroundColor: '#f0fff0',
     },
     buttonInfo: {
@@ -459,7 +460,7 @@ const styles = StyleSheet.create({
     },
     buttonName: {
         fontSize: 23,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
     },
     dragHandle: {
@@ -470,11 +471,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#d4f5c4',
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
     },
     dragHandleText: {
         fontSize: 23,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
     },
     buttonIcon: {
@@ -492,14 +493,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#f0fff0',
     },
     resetButton: {
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         padding: 10,
         borderRadius: 4,
         alignItems: 'center',
         marginTop: 12,
     },
     resetButtonText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontSize: 21,
         fontFamily: 'Monaco',
     },
@@ -511,7 +512,7 @@ const styles = StyleSheet.create({
     },
     settingLabel: {
         fontSize: 23,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
     },
     themeButtons: {
@@ -524,19 +525,19 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         borderRadius: 4,
         borderWidth: 2,
-        borderColor: '#2E5A3E',
-        backgroundColor: '#E8F5E8',
+        borderColor: colors.forestDark,
+        backgroundColor: colors.mintPale,
     },
     activeThemeButton: {
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
     },
     themeButtonText: {
         fontSize: 21,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
     },
     activeThemeButtonText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
     },
     miniMenuPreview: {
         marginBottom: 12,
@@ -544,14 +545,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#f0fff0',
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
     },
     miniMenuBar: {
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
         borderRadius: 3,
         padding: 4,
         borderWidth: 1,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
     },
     miniMenuRow: {
         flexDirection: 'row',
@@ -567,7 +568,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
         width: 20,
         height: 20,
     },

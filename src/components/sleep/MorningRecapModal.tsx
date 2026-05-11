@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { getCharacterSleep, Backgrounds, getIngredientArt } from '../../assets';
 import type { ForagedItem } from '../../services/GameStateService';
+import { colors } from '../../styles/tokens';
 
 export interface MorningRecapDeltas {
     energyGained: number;
@@ -251,7 +252,7 @@ const MorningRecapModal: React.FC<Props> = ({
 };
 
 const PIXEL_SHADOW = {
-    shadowColor: '#000000',
+    shadowColor: colors.black,
     shadowOffset: { width: 3, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 0,
@@ -273,7 +274,7 @@ const styles = StyleSheet.create({
     heroPanel: {
         height: 220,
         borderWidth: 3,
-        borderColor: '#000000',
+        borderColor: colors.black,
         borderRadius: 4,
         overflow: 'hidden',
         alignItems: 'center',
@@ -293,16 +294,16 @@ const styles = StyleSheet.create({
         top: 12,
         fontFamily: 'PressStart2P',
         fontSize: 14,
-        color: '#ffffff',
+        color: colors.white,
         letterSpacing: 1,
-        textShadowColor: '#000000',
+        textShadowColor: colors.black,
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 0,
     },
     window: {
         backgroundColor: '#e5dcf5',
         borderWidth: 3,
-        borderColor: '#000000',
+        borderColor: colors.black,
         borderRadius: 4,
         marginBottom: 16,
         ...PIXEL_SHADOW,
@@ -310,7 +311,7 @@ const styles = StyleSheet.create({
     windowHeader: {
         backgroundColor: '#c6d6f2',
         borderBottomWidth: 2,
-        borderBottomColor: '#000000',
+        borderBottomColor: colors.black,
         paddingVertical: 10,
         alignItems: 'center',
     },
@@ -374,7 +375,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
         backgroundColor: '#8ee2d9',
         borderWidth: 2,
-        borderColor: '#000000',
+        borderColor: colors.black,
         borderRadius: 3,
         ...PIXEL_SHADOW,
     },

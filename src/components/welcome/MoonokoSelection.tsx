@@ -14,6 +14,7 @@ import InnerScreen from '../chrome/InnerScreen';
 
 import { MOONOKOS } from '../../data/moonokos';
 import { Backgrounds, getCharacterAnim } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 const getImageSource = (imageName: string) => getCharacterAnim(imageName);
 
@@ -424,12 +425,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 50,
     },
     slotMachineCard: {
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
         borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 3,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
@@ -453,7 +454,7 @@ const styles = StyleSheet.create({
     },
     characterName: {
         fontSize: 33,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         textAlign: 'center',
         fontFamily: 'Monaco',
     },
@@ -463,17 +464,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     spinButton: {
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
         padding: 10,
         borderRadius: 8,
         borderWidth: 3,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
         alignItems: 'center',
         justifyContent: 'center',
         minWidth: 80,
     },
     spinText: {
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontSize: 14,
         fontFamily: 'Monaco',
         transform: [{ translateX: 1 }, { translateY: 4 }],
@@ -491,7 +492,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     modalContent: {
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
         borderRadius: 20,
         padding: 20,
         margin: 20,
@@ -512,15 +513,15 @@ const styles = StyleSheet.create({
         width: 30,
         height: 30,
         borderRadius: 4,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
     },
     modalCloseText: {
         fontSize: 18,
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         transform: [{ translateY: -1 }],
     },
@@ -532,14 +533,14 @@ const styles = StyleSheet.create({
     modalCharacterName: {
         fontSize: 47,
 
-        color: '#2E5A3E',
+        color: colors.forestDark,
         marginBottom: 10,
         textAlign: 'center',
         fontFamily: 'Monaco',
     },
     modalDescription: {
         fontSize: 26,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         textAlign: 'center',
         lineHeight: 20,
         marginBottom: 15,
@@ -547,24 +548,24 @@ const styles = StyleSheet.create({
     },
     congratulationsTitle: {
         fontSize: 38,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         textAlign: 'center',
         marginBottom: 15,
         fontFamily: 'Monaco',
     },
     mintButton: {
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         paddingVertical: 12,
         paddingHorizontal: 20,
         borderRadius: 8,
         borderWidth: 2,
-        borderColor: '#E8F5E8',
+        borderColor: colors.mintPale,
         marginTop: 15,
         alignItems: 'center',
         justifyContent: 'center',
     },
     mintButtonText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontSize: 30,
         fontFamily: 'Monaco',
     },

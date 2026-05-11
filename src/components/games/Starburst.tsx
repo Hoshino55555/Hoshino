@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors } from '../../styles/tokens';
 
 interface StarburstProps {
     onBack: () => void;
@@ -377,7 +378,7 @@ const styles = StyleSheet.create({
     // Solid backdrop so the game doesn't bleed onto the prior route's art —
     // matches Profile's safeArea tone and keeps the dark-green title legible.
     screenBg: {
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
     },
     bottomBar: {
         position: 'absolute',
@@ -396,10 +397,10 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(46, 90, 62, 0.85)',
         borderRadius: 6,
         borderWidth: 1,
-        borderColor: '#E8F5E8',
+        borderColor: colors.mintPale,
     },
     topButtonText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 21,
     },
@@ -412,7 +413,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 33,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         marginBottom: 8,
     },
@@ -424,17 +425,17 @@ const styles = StyleSheet.create({
     },
     scoreLabel: {
         fontSize: 21,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         marginRight: 8,
     },
     scoreValue: {
         fontSize: 30,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
     },
     messageContainer: {
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         paddingVertical: 6,
         paddingHorizontal: 12,
         borderRadius: 6,
@@ -443,12 +444,12 @@ const styles = StyleSheet.create({
     },
     winMessage: {
         fontSize: 26,
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
     },
     loseMessage: {
         fontSize: 26,
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
     },
     gameBoard: {
@@ -468,24 +469,24 @@ const styles = StyleSheet.create({
     hintCell: {
         backgroundColor: '#D4E8D4',
         borderWidth: 2,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
         borderRadius: 4,
         justifyContent: 'center',
         alignItems: 'center',
     },
     hintSum: {
         fontSize: 21,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
     },
     hintStar: {
         fontSize: 17,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
     },
     cell: {
         borderWidth: 2,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
         borderRadius: 4,
         justifyContent: 'center',
         alignItems: 'center',
@@ -494,14 +495,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#B8D4B8',
     },
     cellFlipped: {
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
     },
     cellStar: {
         backgroundColor: '#FF6B6B',
     },
     cellText: {
         fontSize: 30,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
     },
     notesGrid: {
@@ -518,7 +519,7 @@ const styles = StyleSheet.create({
     },
     noteText: {
         fontSize: 17,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         textAlign: 'center',
         minWidth: 8,
@@ -533,25 +534,25 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         backgroundColor: '#D4E8D4',
         borderWidth: 2,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
         borderRadius: 6,
         minWidth: 36,
         alignItems: 'center',
     },
     modeButtonActive: {
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
     },
     modeButtonText: {
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         fontSize: 21,
     },
     modeButtonTextActive: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
     },
     instructionText: {
         fontSize: 17,
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontFamily: 'Monaco',
         textAlign: 'center',
         marginTop: 4,
@@ -560,14 +561,14 @@ const styles = StyleSheet.create({
         marginTop: 16,
         paddingVertical: 14,
         paddingHorizontal: 32,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         borderRadius: 8,
         borderWidth: 2,
-        borderColor: '#E8F5E8',
+        borderColor: colors.mintPale,
         alignSelf: 'center',
     },
     newGameButtonText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 30,
         textAlign: 'center',

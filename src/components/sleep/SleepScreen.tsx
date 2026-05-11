@@ -11,6 +11,7 @@ import {
 import type { ImageStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Backgrounds, Sleep, getCharacterSleep } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 const SLEEP_REQUIRED_MS = 8 * 60 * 60 * 1000;
 
@@ -179,13 +180,13 @@ const styles = StyleSheet.create({
     clock: {
         fontFamily: '04b03',
         fontSize: 64,
-        color: '#FFFFFF',
+        color: colors.white,
         letterSpacing: 2,
     },
     subtitle: {
         fontFamily: '04b03',
         fontSize: 18,
-        color: '#FFFFFF',
+        color: colors.white,
         marginTop: 6,
         letterSpacing: 1,
     },
@@ -230,12 +231,12 @@ const styles = StyleSheet.create({
     alarmLabel: {
         fontFamily: '04b03',
         fontSize: 22,
-        color: '#FFFFFF',
+        color: colors.white,
     },
     alarmTime: {
         fontFamily: '04b03',
         fontSize: 24,
-        color: '#FFFFFF',
+        color: colors.white,
         letterSpacing: 1,
         // Visually centered in the painted pill on the right side of the
         // box; the box art reserves roughly the right third for the pill.

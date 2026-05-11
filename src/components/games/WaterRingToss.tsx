@@ -19,6 +19,7 @@ import Svg, {
     Stop,
 } from 'react-native-svg';
 import InnerScreen from '../chrome/InnerScreen';
+import { colors } from '../../styles/tokens';
 
 interface WaterRingTossProps {
     onBack: () => void;
@@ -1153,7 +1154,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     bannerSub: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 14,
         marginTop: 2,

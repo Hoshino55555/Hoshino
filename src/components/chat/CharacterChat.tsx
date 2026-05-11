@@ -18,6 +18,7 @@ import * as Clipboard from 'expo-clipboard';
 import chatService from '../../services/ChatService';
 import { getCharacterAnim } from '../../assets';
 import { useGameStateContext } from '../../contexts/GameStateContext';
+import { colors } from '../../styles/tokens';
 
 interface Character {
     id: string;
@@ -551,7 +552,7 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     capacityPct: {
-        color: '#ffffff',
+        color: colors.white,
         fontFamily: 'Monaco',
         fontSize: 20,
         marginBottom: 2,
@@ -610,7 +611,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-start',
         marginBottom: 6,
-        backgroundColor: '#ffffff',
+        backgroundColor: colors.white,
         borderWidth: 2,
         borderColor: '#1a1a1a',
         borderRadius: 6,

@@ -27,6 +27,7 @@ import { SHOP_CATALOG } from '../../data/shopCatalog';
 import type { ActiveCamp } from '../../services/StarFragmentService';
 import { newRequestId } from '../../services/requestId';
 import { Backgrounds, getIngredientArt, ShopItems, Frames } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 type InventoryTab = 'ingredients' | 'consumables' | 'accessories';
 
@@ -396,13 +397,13 @@ const styles = StyleSheet.create({
         color: '#003300',
     },
     sectionHeading: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 21,
         marginBottom: 10,
     },
     emptyText: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontSize: 11,
         fontStyle: 'italic',
         textAlign: 'center',

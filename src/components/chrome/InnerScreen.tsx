@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Easing } from 'react-native';
 import { useChromeConfig } from '../../contexts/ChromeContext';
 import { Backgrounds } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 interface InnerScreenProps {
     children: React.ReactNode;
@@ -258,7 +259,7 @@ const styles = StyleSheet.create({
         position: 'relative',
         borderWidth: 0,
         borderColor: 'rgba(0, 0, 0, 0.35)',
-        backgroundColor: '#E8F5E8',
+        backgroundColor: colors.mintPale,
         shadowColor: 'transparent',
         shadowOpacity: 0,
         shadowRadius: 0,
@@ -451,15 +452,15 @@ const styles = StyleSheet.create({
         width: 30,
         height: 30,
         borderRadius: 4,
-        backgroundColor: '#2E5A3E',
+        backgroundColor: colors.forestDark,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#2E5A3E',
+        borderColor: colors.forestDark,
     },
     closeButtonText: {
         fontSize: 18,
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         transform: [{ translateY: -1 }],
     },

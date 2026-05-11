@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useChrome } from '../../contexts/ChromeContext';
 import { Chrome } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 export const DeviceCasing: React.FC = () => {
     const { active, pressFrame } = useChrome();
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.3)',
     },
     buttonText: {
-        color: '#2E5A3E',
+        color: colors.forestDark,
         fontSize: 24,
         fontFamily: 'Monaco',
     },

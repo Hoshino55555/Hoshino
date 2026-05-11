@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FooterBackBar from '../chrome/FooterBackBar';
 import PageArtShell from '../chrome/PageArtShell';
 import { Backgrounds } from '../../assets';
+import { colors } from '../../styles/tokens';
 
 export type ArcadeGameId = 'starburst' | 'water-ring-toss';
 
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
         width: '48%',
         backgroundColor: 'rgba(46, 90, 62, 0.85)',
         borderWidth: 2,
-        borderColor: '#E8B84A',
+        borderColor: colors.gold,
         borderRadius: 8,
         padding: 12,
         alignItems: 'center',
@@ -159,7 +160,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     tileDescription: {
-        color: '#E8F5E8',
+        color: colors.mintPale,
         fontFamily: 'Monaco',
         fontSize: 17,
         textAlign: 'center',
