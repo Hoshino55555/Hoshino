@@ -175,6 +175,7 @@ export const ShopItems = {
     sfPackLarge: require('../../assets/images/ui/shop-items/shards-pack-large.png'),
     starterPack: require('../../assets/images/ui/shop-items/starter-pack.png'),
     carryCapacity: require('../../assets/images/ui/shop-items/carry-capacity.png'),
+    inventorySize: require('../../assets/images/ui/shop-items/inventory-size.png'),
     potSize: require('../../assets/images/ui/shop-items/pot-size.png'),
     promoPack: require('../../assets/images/ui/shop-items/promo-pack-1.png'),
     snoozeSeed: require('../../assets/images/ui/shop-items/snooze-seed.png'),
@@ -329,6 +330,8 @@ export const Frames = {
     editButton: require('../../assets/images/ui/frames/edit-button.png'),
     inventorySlot: require('../../assets/images/ui/frames/inventory-slot.png'),
     pantrySlot: require('../../assets/images/ui/frames/pantry-slot.png'),
+    ingredientBoxModal: require('../../assets/images/ui/frames/ingredient-box-modal.png'),
+    purchaseModalBg: require('../../assets/images/ui/frames/purchase-modal-bg.png'),
 } as const;
 
 export const Audio = {

@@ -154,7 +154,7 @@ const dealsItems: ShopItem[] = [
         priceStarFragments: 0,
         inStock: true,
         tab: 'deals',
-        subcategory: 'Shards',
+        subcategory: 'Bundles',
         currency: 'starFragments',
         status: 'asset-pending',
         image: ShopItems.promoPack,
@@ -209,7 +209,7 @@ const dealsItems: ShopItem[] = [
         subcategory: 'Upgrades',
         currency: 'starFragments',
         status: 'available',
-        image: ShopItems.carryCapacity,
+        image: ShopItems.inventorySize,
         summary: '+50 capacity',
     },
     {
@@ -302,8 +302,9 @@ const consumablesItems: ShopItem[] = [
     },
     {
         id: 'booster-mood',
-        name: 'Mood',
-        description: 'Instantly +2 mood',
+        name: 'Ball',
+        description: 'Restores Mood',
+        summary: 'Restores Mood',
         imageUrl: '',
         category: ItemCategory.POWERUP,
         rarity: ItemRarity.UNCOMMON,
@@ -318,8 +319,9 @@ const consumablesItems: ShopItem[] = [
     },
     {
         id: 'booster-sleep',
-        name: 'Sleep',
-        description: 'Instantly +2 energy',
+        name: 'Snooze Seed',
+        description: 'Restores Energy',
+        summary: 'Restores Energy',
         imageUrl: '',
         category: ItemCategory.POWERUP,
         rarity: ItemRarity.UNCOMMON,
@@ -334,8 +336,9 @@ const consumablesItems: ShopItem[] = [
     },
     {
         id: 'booster-hunger',
-        name: 'Hunger',
-        description: 'Instantly +2 hunger',
+        name: 'Starberry',
+        description: 'Restores Hunger',
+        summary: 'Restores Hunger',
         imageUrl: '',
         category: ItemCategory.POWERUP,
         rarity: ItemRarity.UNCOMMON,
@@ -350,7 +353,7 @@ const consumablesItems: ShopItem[] = [
     },
     {
         id: 'sleeping-camp',
-        name: 'Sleeping Camp',
+        name: 'Satelite Dish',
         description: 'Moonoko forages 20% faster and carries 50% more · 1 week',
         imageUrl: '',
         category: ItemCategory.UTILITY,
@@ -364,7 +367,7 @@ const consumablesItems: ShopItem[] = [
         status: 'available',
         image: ShopItems.satelliteDish,
         durationLabel: '1 week',
-        summary: '+50% carry · +20% forage speed',
+        summary: '+50% carry +20% forage',
     },
 ];
 

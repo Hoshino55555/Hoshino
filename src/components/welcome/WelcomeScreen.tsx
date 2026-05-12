@@ -929,16 +929,19 @@ const styles = StyleSheet.create({
         right: 0,
     },
     choiceText: {
-        fontSize: 24,
-        color: colors.forestMid, // Medium green for choice text
-        marginHorizontal: 30, // Increased horizontal spacing instead of gap
-        fontFamily: fonts.body,
-        opacity: 0.5, // Make non-underlined options transparent
+        // YES/NO use the old PressStart2P face at the original size so they
+        // read as bolder than the Monaco dialog copy around them. Localized
+        // to this style — the rest of the welcome flow stays on Monaco.
+        fontSize: 16,
+        color: colors.forestMid,
+        marginHorizontal: 10,
+        fontFamily: fonts.pixel,
+        opacity: 0.5,
     },
     selectedChoice: {
-        color: colors.forestDark, // Dark green for selected choice
-        fontFamily: fonts.body,
-        opacity: 1, // Make selected option fully opaque
+        color: colors.forestDark,
+        fontFamily: fonts.pixel,
+        opacity: 1,
     },
     continueArrow: {
         position: 'absolute',

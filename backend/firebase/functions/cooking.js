@@ -363,3 +363,28 @@ exports.getCookingProfile = onCall(COMMON_OPTS, async (request) => {
     recipeProgress: data.recipeProgress || {},
   };
 });
+
+// Power-user shortcut: writes every catalog recipe id into the user's
+// `discoveredRecipes` so the recipe book renders the full grid without
+// requiring each dish to be discovered by manual cook. Idempotent — re-runs
+// just no-op since we union with the existing set. Recipe progress is
+// untouched (a recipe still has to be cooked to level it up). Triggered by
+// the 4-tap gesture on MANUAL COOK in FeedingPage.
+exports.unlockAllRecipes = onCall(COMMON_OPTS, async (request) => {
+  const uid = requireAuth(request);
+  const allIds = catalog.RECIPES.map((r) => r.id);
+  const ref = cookingRef(uid);
+  const snap = await ref.get();
+  const existing = snap.exists && Array.isArray(snap.data().discoveredRecipes)
+    ? snap.data().discoveredRecipes
+    : [];
+  const merged = Array.from(new Set([...existing, ...allIds]));
+  await ref.set(
+    { discoveredRecipes: merged, updatedAt: Date.now() },
+    { merge: true }
+  );
+  return {
+    discoveredRecipes: merged,
+    recipeProgress: (snap.exists && snap.data().recipeProgress) || {},
+  };
+});

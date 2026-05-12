@@ -6,9 +6,10 @@ import {
     TouchableOpacity,
     StyleSheet,
     Image,
+    ImageBackground,
     ActivityIndicator,
 } from 'react-native';
-import { Stars } from '../../assets';
+import { Frames, Stars } from '../../assets';
 import type { ShopItem } from '../../data/shopCatalog';
 import { colors, terminalGreen, fonts } from '../../styles/tokens';
 
@@ -33,62 +34,67 @@ const ConfirmPurchaseModal: React.FC<Props> = ({ item, purchasing, onCancel, onC
             onRequestClose={onCancel}
         >
             <View style={styles.backdrop}>
-                <View style={styles.card}>
-                    <Text style={styles.title}>{item?.name}</Text>
-                    {item?.summary ? (
-                        <Text style={styles.summary}>{item.summary}</Text>
-                    ) : null}
-                    <View style={styles.priceRow}>
-                        {isFree ? (
-                            <Text style={styles.price}>FREE</Text>
-                        ) : (
-                            <>
-                                <Image
-                                    source={Stars.fragment}
-                                    style={styles.priceIcon}
-                                    resizeMode="contain"
-                                />
-                                <Text style={styles.price}>
-                                    {item?.priceStarFragments ?? 0}
-                                </Text>
-                            </>
-                        )}
-                    </View>
-                    <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                            style={[styles.btn, styles.cancelBtn]}
-                            onPress={onCancel}
-                            disabled={purchasing}
-                        >
-                            <Text style={styles.btnText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[
-                                styles.btn,
-                                styles.buyBtn,
-                                purchasing && styles.btnDisabled,
-                            ]}
-                            onPress={onConfirm}
-                            disabled={purchasing}
-                        >
-                            {purchasing ? (
-                                <View style={styles.processingRow}>
-                                    <ActivityIndicator
-                                        size="small"
-                                        color={colors.white}
-                                    />
-                                    <Text style={[styles.btnText, styles.buyBtnText]}>
-                                        Processing…
-                                    </Text>
-                                </View>
+                <ImageBackground
+                    source={Frames.purchaseModalBg}
+                    style={styles.cardFramed}
+                    imageStyle={styles.cardFramedBg}
+                    resizeMode="stretch"
+                >
+                    <View style={styles.framedTop}>
+                        <Text style={styles.framedTitle} numberOfLines={1}>
+                            {item?.name}
+                        </Text>
+                        {item?.summary ? (
+                            <Text style={styles.framedSummary} numberOfLines={1}>
+                                {item.summary}
+                            </Text>
+                        ) : null}
+                        <View style={styles.framedPriceRow}>
+                            {isFree ? (
+                                <Text style={styles.framedPrice}>FREE</Text>
                             ) : (
-                                <Text style={[styles.btnText, styles.buyBtnText]}>
-                                    Buy
-                                </Text>
+                                <>
+                                    <Image
+                                        source={Stars.fragment}
+                                        style={styles.framedPriceIcon}
+                                        resizeMode="contain"
+                                    />
+                                    <Text style={styles.framedPrice}>
+                                        {item?.priceStarFragments ?? 0}
+                                    </Text>
+                                </>
                             )}
-                        </TouchableOpacity>
+                        </View>
                     </View>
-                </View>
+                    <TouchableOpacity
+                        style={[styles.framedBtn, styles.framedBtnLeft]}
+                        onPress={onCancel}
+                        disabled={purchasing}
+                    >
+                        <Text style={styles.framedBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[
+                            styles.framedBtn,
+                            styles.framedBtnRight,
+                            purchasing && styles.btnDisabled,
+                        ]}
+                        onPress={onConfirm}
+                        disabled={purchasing}
+                    >
+                        {purchasing ? (
+                            <View style={styles.processingRow}>
+                                <ActivityIndicator
+                                    size="small"
+                                    color={terminalGreen.bgMid}
+                                />
+                                <Text style={styles.framedBtnText}>Processing…</Text>
+                            </View>
+                        ) : (
+                            <Text style={styles.framedBtnText}>Buy</Text>
+                        )}
+                    </TouchableOpacity>
+                </ImageBackground>
             </View>
         </Modal>
     );
@@ -102,82 +108,71 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 24,
     },
-    card: {
-        width: '100%',
-        maxWidth: 360,
-        backgroundColor: colors.mintPale,
-        borderWidth: 3,
-        borderColor: terminalGreen.bgMid,
-        borderTopColor: terminalGreen.accent,
-        borderLeftColor: terminalGreen.accent,
-        borderRightColor: terminalGreen.bgDeep,
-        borderBottomColor: terminalGreen.bgDeep,
-        padding: 18,
+    cardFramed: {
+        width: 320,
+        height: 172,
+    },
+    cardFramedBg: {
+        resizeMode: 'stretch',
+    },
+    framedTop: {
+        position: 'absolute',
+        top: 14,
+        left: '6%',
+        right: '6%',
         alignItems: 'center',
     },
-    title: {
+    framedTitle: {
         fontFamily: fonts.body,
-        fontSize: 30,
+        fontSize: 26,
         color: terminalGreen.bgMid,
         textAlign: 'center',
-        marginBottom: 6,
     },
-    summary: {
+    framedSummary: {
         fontFamily: fonts.body,
-        fontSize: 21,
+        fontSize: 20,
         color: colors.slotInk,
         textAlign: 'center',
-        marginBottom: 10,
+        marginTop: 3,
     },
-    priceRow: {
+    framedPriceRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 16,
+        marginTop: 5,
     },
-    priceIcon: {
-        width: 22,
-        height: 22,
-        marginRight: 6,
+    framedPriceIcon: {
+        width: 20,
+        height: 20,
+        marginRight: 5,
     },
-    price: {
+    framedPrice: {
         fontFamily: fonts.body,
-        fontSize: 33,
+        fontSize: 26,
         color: terminalGreen.bgMid,
     },
-    buttonRow: {
-        flexDirection: 'row',
-        gap: 8,
-        width: '100%',
-    },
-    btn: {
-        flex: 1,
-        paddingVertical: 12,
+    framedBtn: {
+        position: 'absolute',
+        top: 95,
+        height: 50,
+        width: 130,
         alignItems: 'center',
-        borderWidth: 2,
+        justifyContent: 'flex-start',
+        paddingTop: 14,
     },
-    cancelBtn: {
-        backgroundColor: colors.mintPale,
-        borderColor: terminalGreen.bgMid,
+    framedBtnLeft: {
+        left: 20,
     },
-    buyBtn: {
-        backgroundColor: terminalGreen.accent,
-        borderColor: terminalGreen.bgMid,
-        borderTopColor: terminalGreen.ok,
-        borderLeftColor: terminalGreen.ok,
-        borderRightColor: '#004400',
-        borderBottomColor: '#002200',
+    framedBtnRight: {
+        right: 20,
+    },
+    framedBtnText: {
+        fontFamily: fonts.body,
+        fontSize: 28,
+        color: terminalGreen.bgMid,
     },
     btnDisabled: {
         opacity: 0.5,
-    },
-    btnText: {
-        fontFamily: fonts.body,
-        fontSize: 24,
-        color: terminalGreen.bgMid,
-    },
-    buyBtnText: {
-        color: colors.white,
     },
     processingRow: {
         flexDirection: 'row',

@@ -36,7 +36,7 @@ import WalletButton from './src/components/chrome/WalletButton';
 
 // React Native compatible wallet integration
 import { useWallet, WalletProvider } from './src/contexts/WalletContext';
-import { ChromeProvider } from './src/contexts/ChromeContext';
+import { ChromeProvider, useChrome } from './src/contexts/ChromeContext';
 import { HoshinoPrivyProvider } from './src/contexts/PrivyContext';
 import { usePrivy } from '@privy-io/expo';
 import LoginScreen from './src/components/welcome/LoginScreen';
@@ -81,6 +81,10 @@ function App() {
     const [welcomePhase, setWelcomePhase] = useState<string>('intro');
     const [shouldGoToCongratulations, setShouldGoToCongratulations] = useState(false);
     const [shouldFadeInInteraction, setShouldFadeInInteraction] = useState(false);
+    // True when the hold-both demo gesture is replaying the welcome flow.
+    // We hide the stored playerName so the name input starts empty, matching
+    // a fresh first-time-user experience. Reset when leaving welcome.
+    const [welcomeDemoReplay, setWelcomeDemoReplay] = useState(false);
 
     // Sleep modal opens from the room's sleep menu button. The modal itself
     // doesn't need the iris (it's a transient confirmation), but the
@@ -144,6 +148,20 @@ function App() {
             setLastError(null);
         };
     }, []);
+
+    // HACKATHON DEMO: hold both left + right chrome buttons for 1s to jump
+    // back into the welcome flow. Lets the demo run replay the onboarding
+    // dialog without having to wipe profile state. Detection lives in
+    // ChromeContext (both buttons share that pressIn/Out plumbing).
+    const { onHoldBoth } = useChrome();
+    useEffect(() => {
+        return onHoldBoth(() => {
+            setWelcomePhase('intro');
+            setWelcomeDemoReplay(true);
+            replaceView('welcome');
+            addNotification('Replaying welcome flow', 'info');
+        });
+    }, [onHoldBoth, replaceView, addNotification]);
 
     const connectWallet = async () => {
         setLastError(null);
@@ -211,6 +229,7 @@ function App() {
             savePlayerName(name);
             addNotification(`✨ Welcome, ${name}! Ready to start your stellar adventure!`, 'success');
         }
+        setWelcomeDemoReplay(false);
         replaceView('selection');
     };
 
@@ -219,6 +238,7 @@ function App() {
             savePlayerName(name);
         }
         setShouldFadeInInteraction(true);
+        setWelcomeDemoReplay(false);
         replaceView('interaction');
     };
 
@@ -244,7 +264,7 @@ function App() {
 
     return (
         <GameStateProvider characterId={selectedCharacter?.id ?? null}>
-        <GameStateGate hasCharacter={!!selectedCharacter}>
+        <GameStateGate hasCharacter={!!selectedCharacter} skipGate={currentView === 'welcome'}>
         <WidgetSnapshotController selectedCharacter={selectedCharacter} />
         <SafeAreaView style={styles.container}>
             <StatusBar style="light" hidden={true} />
@@ -271,7 +291,11 @@ function App() {
                     selectedCharacter={selectedCharacter}
                     connected={connected}
                     walletAddress={walletAddress ?? undefined}
-                    playerName={playerName}
+                    playerName={
+                        currentView === 'welcome' && welcomeDemoReplay
+                            ? ''
+                            : playerName
+                    }
                     connection={connection}
                     email={email}
                     walletSource={walletSource}
@@ -438,16 +462,20 @@ function SplashShim() {
 // (mood:3, hunger:5, energy:3) for a few hundred ms before the server
 // response repaints them — visible as the stat stars jumping at first
 // paint. New users with no selectedCharacter bypass the gate so they
-// can reach the selection flow.
+// can reach the selection flow. skipGate is set while the welcome flow
+// is still active so the post-mint congratulations phase isn't covered
+// by the splash while the first getState() round-trip runs.
 function GameStateGate({
     hasCharacter,
+    skipGate,
     children,
 }: {
     hasCharacter: boolean;
+    skipGate?: boolean;
     children: ReactNode;
 }) {
     const { state } = useGameStateContext();
-    if (hasCharacter && !state) {
+    if (!skipGate && hasCharacter && !state) {
         return <SplashShim />;
     }
     return <>{children}</>;

@@ -43,7 +43,7 @@ export const DeviceCasing: React.FC = () => {
 };
 
 export const DeviceButtons: React.FC = () => {
-    const { active, pressIn, pressOut } = useChrome();
+    const { active, pressIn, pressOut, holdBothTouchHandlers } = useChrome();
     const { width, height } = useWindowDimensions();
     const buttonSize = Math.min(width * 0.19, height * 0.09);
     const bottomOffset = height * 0.095;
@@ -73,6 +73,9 @@ export const DeviceButtons: React.FC = () => {
                 overlayMode && styles.darkenedButtons,
             ]}
             pointerEvents="box-none"
+            onTouchStart={holdBothTouchHandlers.onTouchStart}
+            onTouchEnd={holdBothTouchHandlers.onTouchEnd}
+            onTouchCancel={holdBothTouchHandlers.onTouchCancel}
         >
             <TouchableOpacity
                 style={[

@@ -53,6 +53,7 @@ interface GameStateContextType {
         replayed: boolean;
     }>;
     devResetMealClaims: () => Promise<GameState>;
+    unlockAllRecipes: () => Promise<string[]>;
 }
 
 const GameStateContext = createContext<GameStateContextType | undefined>(undefined);

@@ -46,6 +46,7 @@ exports.devResetMealClaims = gameState.devResetMealClaims;
 exports.cook = cooking.cook;
 exports.getInventory = cooking.getInventory;
 exports.getCookingProfile = cooking.getCookingProfile;
+exports.unlockAllRecipes = cooking.unlockAllRecipes;
 
 // Player profile (playerName + selectedCharacterId; ownedCharacterIds derived
 // from /users/{uid}/moonokos/*). Replaces AsyncStorage-only profile so app

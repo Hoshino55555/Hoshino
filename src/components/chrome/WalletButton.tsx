@@ -62,8 +62,8 @@ const WalletButton: React.FC<WalletButtonProps> = ({
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        bottom: 20,
-        right: -25,
+        top: 20,
+        right: -20,
         zIndex: Z.wallet,
         elevation: Z.wallet,
     },

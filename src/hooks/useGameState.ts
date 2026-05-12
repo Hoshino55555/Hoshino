@@ -56,6 +56,7 @@ interface UseGameStateResult {
         replayed: boolean;
     }>;
     devResetMealClaims: () => Promise<GameState>;
+    unlockAllRecipes: () => Promise<string[]>;
 }
 
 export function useGameState(characterId: string | null | undefined): UseGameStateResult {
@@ -319,6 +320,13 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         [characterId]
     );
 
+    const unlockAllRecipes = useCallback(async () => {
+        const profile = await GameStateService.unlockAllRecipes();
+        setDiscoveredRecipes(profile.discoveredRecipes);
+        setRecipeProgress(profile.recipeProgress);
+        return profile.discoveredRecipes;
+    }, []);
+
     const devResetMealClaims = useCallback(async () => {
         if (!characterId) throw new Error('No character selected');
         const requestedFor = characterId;
@@ -358,5 +366,6 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         applyBooster,
         consumeBooster,
         devResetMealClaims,
+        unlockAllRecipes,
     };
 }

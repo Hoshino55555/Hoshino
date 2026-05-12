@@ -115,7 +115,13 @@ const MoonokoSelection: React.FC<Props> = ({
 
 
     const landOnRandomCharacter = () => {
-        const finalIndex = Math.floor(Math.random() * CHARACTERS.length);
+        // HACKATHON DEMO: force the gacha to always land on Aro so the
+        // recording stays consistent. Revert to random selection after the
+        // demo by replacing the index with `Math.floor(Math.random() * CHARACTERS.length)`.
+        const aroIndex = CHARACTERS.findIndex((c) => c.id === 'aro');
+        const finalIndex = aroIndex >= 0
+            ? aroIndex
+            : Math.floor(Math.random() * CHARACTERS.length);
         const finalScrollX = finalIndex * cardStride;
         
         setCurrentCharacterIndex(finalIndex);

@@ -211,6 +211,72 @@ const MoonokoInteraction: React.FC<Props> = ({
     // popOutItems is still set while the items finish their arcs.
     const [bagEmpty, setBagEmpty] = useState(false);
     const drainInFlightRef = useRef(false);
+    // Dev double-tap fake forage: timestamp of last tap, plus a queue of
+    // staged items that mirrors the real `hasPendingFinds` state. Double-tap
+    // stages the items + shows the exclamation badge; the next single tap
+    // claims them and triggers the pop-out — same two-step UX as a real
+    // forage drain.
+    const lastTapRef = useRef<number>(0);
+    const [queuedFakeItems, setQueuedFakeItems] = useState<ForagedItem[] | null>(null);
+
+    const handleCharacterDoubleTap = useCallback(() => {
+        if (!__DEV__) return;
+        if (popOutItems) return;
+        if (queuedFakeItems) return;
+        const tiers: Array<{
+            ingredients: string[];
+            tier: ForagedItem['tier'];
+            weight: number;
+        }> = [
+            {
+                tier: 'common',
+                weight: 4,
+                ingredients: ['egg', 'lettuce', 'potato', 'rice', 'carrot'],
+            },
+            {
+                tier: 'uncommon',
+                weight: 3,
+                ingredients: ['banana', 'strawberry', 'tomato', 'tofu', 'oat', 'bread'],
+            },
+            {
+                tier: 'rare',
+                weight: 2,
+                ingredients: ['bacon', 'milk', 'tuna', 'gouda'],
+            },
+            {
+                tier: 'ultra_rare',
+                weight: 1,
+                ingredients: ['star_dust'],
+            },
+        ];
+        const totalWeight = tiers.reduce((s, t) => s + t.weight, 0);
+        const pickTier = () => {
+            let r = Math.random() * totalWeight;
+            for (const t of tiers) {
+                r -= t.weight;
+                if (r <= 0) return t;
+            }
+            return tiers[0];
+        };
+        const count = 10;
+        const now = Date.now();
+        const fake: ForagedItem[] = Array.from({ length: count }, (_, i) => {
+            const t = pickTier();
+            const ingredient =
+                t.ingredients[Math.floor(Math.random() * t.ingredients.length)];
+            return {
+                id: `dev-dbl-${now}-${i}`,
+                ingredient,
+                tier: t.tier,
+                tickMs: now,
+                slot: i,
+                source: 'awake',
+            };
+        });
+        // Stage the items + leave the badge up — the next single tap claims
+        // them via handleCharacterPress, matching the real forage flow.
+        setQueuedFakeItems(fake);
+    }, [popOutItems, queuedFakeItems]);
 
     const handleCharacterLongPress = useCallback(() => {
         if (!__DEV__) return;
@@ -269,6 +335,24 @@ const MoonokoInteraction: React.FC<Props> = ({
     }, [popOutItems]);
 
     const handleCharacterPress = useCallback(() => {
+        // Dev affordance: a double-tap stages fake items + raises the badge,
+        // then the next single tap claims them. Mirrors the real
+        // exclamation → drain flow so welcome/test flows can exercise the
+        // pop-out without waiting on the server tick.
+        if (__DEV__) {
+            if (queuedFakeItems && !popOutItems) {
+                setPopOutItems(queuedFakeItems);
+                setQueuedFakeItems(null);
+                return;
+            }
+            const now = Date.now();
+            const elapsed = now - lastTapRef.current;
+            lastTapRef.current = now;
+            if (elapsed > 0 && elapsed < 300 && !popOutItems) {
+                handleCharacterDoubleTap();
+                return;
+            }
+        }
         if (drainInFlightRef.current || popOutItems) return;
         if (!hasPendingFinds) return;
         // Play the animation immediately from the cached finds — the drain
@@ -300,7 +384,7 @@ const MoonokoInteraction: React.FC<Props> = ({
             .finally(() => {
                 drainInFlightRef.current = false;
             });
-    }, [popOutItems, hasPendingFinds, pendingFinds, drainForaged, onNotification]);
+    }, [popOutItems, hasPendingFinds, pendingFinds, drainForaged, onNotification, queuedFakeItems, handleCharacterDoubleTap]);
 
     // Widget deep-link → auto-drain. Wait until gameState has resolved so
     // foragedItems is real, then validate the action targets the active
@@ -650,7 +734,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                                 },
                             ]}
                         />
-                        {hasPendingFinds && !popOutItems && (
+                        {(hasPendingFinds || queuedFakeItems !== null) && !popOutItems && (
                             <Animated.View
                                 style={[
                                     styles.exclamationBadge,

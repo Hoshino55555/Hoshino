@@ -3,14 +3,15 @@ import {
     Animated,
     Easing,
     Image,
+    ImageBackground,
     Modal,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
-import { getIngredientArt } from '../../assets';
-import { colors, fonts } from '../../styles/tokens';
+import { Frames, getIngredientArt } from '../../assets';
+import { colors, fonts, terminalGreen } from '../../styles/tokens';
 import {
     INGREDIENT_TIER,
     ingredientLabel,
@@ -219,7 +220,12 @@ const BoxRevealModal: React.FC<Props> = ({ boxes, onClose }) => {
     return (
         <Modal transparent visible animationType="fade" onRequestClose={onClose}>
             <View style={styles.backdrop}>
-                <View style={styles.card}>
+                <ImageBackground
+                    source={Frames.ingredientBoxModal}
+                    style={styles.card}
+                    imageStyle={styles.cardImageBg}
+                    resizeMode="stretch"
+                >
                     <View style={styles.header}>
                         <Text style={styles.title} numberOfLines={1}>
                             {currentBox.itemName}
@@ -292,7 +298,7 @@ const BoxRevealModal: React.FC<Props> = ({ boxes, onClose }) => {
                             <View style={{ width: 1 }} />
                         )}
                     </View>
-                </View>
+                </ImageBackground>
             </View>
         </Modal>
     );
@@ -307,13 +313,17 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     card: {
-        backgroundColor: '#0F2A1E',
-        borderRadius: 12,
-        padding: 16,
-        width: '100%',
-        maxWidth: 380,
-        borderWidth: 2,
-        borderColor: colors.gold,
+        // Fixed-size frame matching the 425×460 source image at ~0.8 scale
+        // so the cream interior is large enough to fit the pack image and
+        // 1–3 ingredient cards without overflowing the painted border.
+        width: 340,
+        height: 368,
+        paddingHorizontal: 24,
+        paddingTop: 18,
+        paddingBottom: 18,
+    },
+    cardImageBg: {
+        resizeMode: 'stretch',
     },
     header: {
         flexDirection: 'row',
@@ -322,25 +332,25 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     title: {
-        color: colors.gold,
+        color: terminalGreen.bgMid,
         fontFamily: fonts.body,
         fontSize: 24,
         flexShrink: 1,
     },
     counter: {
-        color: colors.mintPale,
+        color: colors.slotInk,
         fontFamily: fonts.body,
         fontSize: 18,
-        opacity: 0.7,
+        opacity: 0.8,
         marginLeft: 8,
     },
     packArea: {
         alignItems: 'center',
-        paddingVertical: 24,
+        paddingVertical: 12,
     },
     packWrapper: {
-        width: 200,
-        height: 200,
+        width: 170,
+        height: 170,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -349,12 +359,12 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     tapHint: {
-        color: colors.mintPale,
+        color: terminalGreen.bgMid,
         fontFamily: fonts.body,
         fontSize: 20,
         marginTop: 14,
         textAlign: 'center',
-        opacity: 0.8,
+        opacity: 0.85,
     },
     revealArea: {
         alignItems: 'center',
@@ -367,12 +377,12 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     ingredientCard: {
-        width: 96,
-        minHeight: 110,
+        width: 84,
+        minHeight: 100,
         backgroundColor: 'rgba(46, 90, 62, 0.85)',
         borderRadius: 6,
         borderWidth: 2,
-        padding: 8,
+        padding: 6,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -409,13 +419,12 @@ const styles = StyleSheet.create({
     skipBtn: {
         paddingVertical: 6,
         paddingHorizontal: 12,
-        backgroundColor: 'rgba(46, 90, 62, 0.85)',
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: colors.mintPale,
+        backgroundColor: colors.mintPale,
+        borderWidth: 2,
+        borderColor: terminalGreen.bgMid,
     },
     skipText: {
-        color: colors.mintPale,
+        color: terminalGreen.bgMid,
         fontFamily: fonts.body,
         fontSize: 18,
     },

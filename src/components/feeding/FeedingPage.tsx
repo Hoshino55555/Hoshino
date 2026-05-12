@@ -126,7 +126,6 @@ interface RecipeCardProps {
     affordable: boolean;
     isPending: boolean;
     alreadyClaimed: boolean;
-    secretAllUnlocked: boolean;
     level: number;
     projectedXp: number;
     onPress: (recipe: Recipe) => void;
@@ -137,16 +136,11 @@ const RecipeCard = React.memo<RecipeCardProps>(({
     affordable,
     isPending,
     alreadyClaimed,
-    secretAllUnlocked,
     level,
     projectedXp,
     onPress,
 }) => {
-    // Dev-reveal mode shows every card at full opacity for art QA — the
-    // affordability / claimed dim signals are noise when you're eyeballing
-    // card visuals. Tap behavior is unaffected (still uses hardDisabled below).
-    const visuallyDisabled =
-        !secretAllUnlocked && (!affordable || isPending || alreadyClaimed);
+    const visuallyDisabled = !affordable || isPending || alreadyClaimed;
     // Keep the card tappable when the only reason it's disabled is the claimed
     // window, so we can pop the explanatory toast instead of silently eating the tap.
     const hardDisabled = isPending || (!affordable && !alreadyClaimed);
@@ -249,6 +243,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
         cookManual,
         cookRecipe,
         devResetMealClaims,
+        unlockAllRecipes,
     } = useGameStateContext();
     const insets = useSafeAreaInsets();
     const { width: screenWidth } = useWindowDimensions();
@@ -273,15 +268,14 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
         return () => clearTimeout(timer);
     }, [lastResult]);
 
-    // Hidden visual-QA toggle: 8 taps on MANUAL COOK within 800ms intervals
-    // unlocks every recipe card on screen. Purely client-side — does not call
-    // the discovery endpoint, just overrides the rendered list so we can
-    // eyeball card art for recipes the user hasn't actually cooked yet.
-    // Modal opens on a 220ms debounce so rapid tap salvos accrue without
-    // popping the picker on the first hit.
-    const [secretAllUnlocked, setSecretAllUnlocked] = useState(false);
+    // Power-user shortcut: 4 taps on MANUAL COOK within 800ms intervals calls
+    // the server to mark every catalog recipe as discovered. Persists in the
+    // user's cooking doc, so recipes stay unlocked across page changes and
+    // app reloads. Modal opens on a 220ms debounce so rapid tap salvos
+    // accrue without popping the picker on the first hit.
     const secretTapCount = useRef(0);
     const secretLastTapAt = useRef(0);
+    const unlockInFlight = useRef(false);
     const manualOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Two-tap detector for the dev star tap zone — debounces against
     // accidental brushes and gives the second tap a punchline.
@@ -290,8 +284,8 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
 
     const discoveredSet = useMemo(() => new Set(discoveredRecipes), [discoveredRecipes]);
     const discoveredRecipeDetails = useMemo(
-        () => (secretAllUnlocked ? RECIPES : RECIPES.filter((r) => discoveredSet.has(r.id))),
-        [discoveredSet, secretAllUnlocked]
+        () => RECIPES.filter((r) => discoveredSet.has(r.id)),
+        [discoveredSet]
     );
 
     const currentWindow = currentMealWindow();
@@ -317,26 +311,43 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
 
     // Tracks rapid taps on the MANUAL COOK card. Counter resets if the user
     // pauses longer than 800ms between taps, so accidental discovery is
-    // unlikely. At 8 the visual-QA override flips on for the rest of the
-    // session and we cancel any pending modal open so the salvo stays clean.
+    // unlikely. At 4 we call the server to mark every recipe as discovered —
+    // persistent across reloads — and cancel any pending modal open so the
+    // salvo stays clean.
     const handleManualPress = useCallback(() => {
         if (manualOpenTimer.current) {
             clearTimeout(manualOpenTimer.current);
             manualOpenTimer.current = null;
         }
 
-        // Run the secret-tap counter before the alreadyClaimed gate so a QA
-        // tap salvo still works after the user has cooked the current meal
-        // window. Counter resets on a >800ms pause between taps.
-        if (!secretAllUnlocked) {
+        // Run the secret-tap counter before the alreadyClaimed gate so the
+        // unlock salvo still works after the user has cooked the current
+        // meal window. Counter resets on a >800ms pause between taps. Skip
+        // counting once every recipe is already discovered.
+        const allAlreadyDiscovered = discoveredSet.size >= RECIPES.length;
+        if (!allAlreadyDiscovered) {
             const now = Date.now();
             if (now - secretLastTapAt.current > 800) secretTapCount.current = 0;
             secretLastTapAt.current = now;
             secretTapCount.current += 1;
-            if (secretTapCount.current >= 8) {
+            if (secretTapCount.current >= 4) {
                 secretTapCount.current = 0;
-                setSecretAllUnlocked(true);
-                onNotification?.('All recipe cards unlocked', 'info');
+                if (!unlockInFlight.current) {
+                    unlockInFlight.current = true;
+                    unlockAllRecipes()
+                        .then(() => {
+                            onNotification?.('All recipes unlocked', 'info');
+                        })
+                        .catch((e: any) => {
+                            onNotification?.(
+                                e?.message || 'Failed to unlock recipes',
+                                'error'
+                            );
+                        })
+                        .finally(() => {
+                            unlockInFlight.current = false;
+                        });
+                }
                 return;
             }
         }
@@ -346,13 +357,13 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
             return;
         }
 
-        // Defer the picker so a rapid 8-tap salvo can complete without the
+        // Defer the picker so a rapid 4-tap salvo can complete without the
         // modal stealing focus on tap #1.
         manualOpenTimer.current = setTimeout(() => {
             manualOpenTimer.current = null;
             setManualOpen(true);
         }, 220);
-    }, [secretAllUnlocked, alreadyClaimed, notifyAlreadyClaimed, onNotification]);
+    }, [discoveredSet, alreadyClaimed, notifyAlreadyClaimed, onNotification, unlockAllRecipes]);
 
     const handleCookRecipe = useCallback((recipe: Recipe) => {
         if (pendingManual) return;
@@ -470,7 +481,6 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                                         affordable={affordable}
                                         isPending={isPending}
                                         alreadyClaimed={alreadyClaimed}
-                                        secretAllUnlocked={secretAllUnlocked}
                                         level={level}
                                         projectedXp={projectedXp}
                                         onPress={handleCookRecipe}
@@ -813,7 +823,7 @@ const ManualCookModal: React.FC<ManualCookModalProps> = ({
                         <Image
                             source={Backgrounds.cooking}
                             style={modalStyles.sheetBgImage}
-                            resizeMode="contain"
+                            resizeMode="cover"
                         />
                     </View>
                     <Text style={modalStyles.title}>
@@ -1347,19 +1357,15 @@ const modalStyles = StyleSheet.create({
         borderRadius: 12,
         overflow: 'hidden',
     },
-    // cooking-bg-base.png is the full device-aperture art (1200×2670, mostly
-    // portrait). resizeMode="contain" preserves its native aspect so bricks
-    // render at the same relative scale as on the FeedingPage — the modal
-    // ends up with purpleBg side bars (the sheet's backstop) instead of a
-    // cover-cropped zoomed-in brick band.
+    // Cover-fill and bias the painted cooking backdrop upward so the source
+    // image's transparent top strip clips out of the modal.
     sheetBgImage: {
         position: 'absolute',
-        top: -380,
+        top: '-12%',
         left: 0,
         right: 0,
-        bottom: 0,
-        width: '105%',
-        height: '190%',
+        width: '100%',
+        height: '112%',
     },
     title: {
         color: colors.goldBright,

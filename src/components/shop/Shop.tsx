@@ -147,8 +147,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             bannerReserve: banner,
             bannerShadowReserve: bannerShadow,
             bottomBarReserve: bottomBar,
-            contentTopPadding: bannerShadow * 1.01,
-            contentBottomPadding: bottomBar * 0.96,
+            contentTopPadding: bannerShadow * 1.06,
+            contentBottomPadding: bottomBar * 1.15,
         };
     }, [screenWidth]);
 
@@ -474,6 +474,14 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
         overlay?: React.ReactNode;
         flashing?: boolean;
         testID?: string;
+        // Tint wash: when set, layers a tinted copy of item.image at
+        // tintOpacity (default 0.55) on top of the original. tintColor
+        // flattens the overlay to a single hue but respects alpha, so the
+        // wash hits only the artwork silhouette. The original underneath
+        // bleeds through and shifts the perceived hue (purple → blue, etc.)
+        // without the flat-silhouette look pure tintColor produces.
+        tintColor?: string;
+        tintOpacity?: number;
     }) => {
         const {
             item,
@@ -486,6 +494,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             overlay,
             flashing,
             testID,
+            tintColor,
+            tintOpacity = 0.55,
         } = params;
         return (
             <TouchableOpacity
@@ -529,6 +539,17 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
                                 style={imageStyle ?? styles.itemImage}
                                 resizeMode="contain"
                             />
+                            {tintColor ? (
+                                <Image
+                                    source={item.image}
+                                    style={[
+                                        imageStyle ?? styles.itemImage,
+                                        styles.tintOverlay,
+                                        { tintColor, opacity: tintOpacity },
+                                    ]}
+                                    resizeMode="contain"
+                                />
+                            ) : null}
                             {description ? (
                                 <Text style={styles.itemSummary} numberOfLines={2}>
                                     {description}
@@ -779,6 +800,8 @@ const Shop: React.FC<ShopProps> = ({ connection, onNotification, onClose, onItem
             title: item.name,
             description: item.summary,
             onPress: () => requestPurchase(item),
+            tintColor: '#3a6dd6',
+            tintOpacity: 0.55,
             priceNode: (
                 <Text style={[styles.itemPrice, { color: colors.forestDark }]}>FREE</Text>
             ),
@@ -1162,6 +1185,9 @@ const styles = StyleSheet.create({
         width: 64,
         height: 64,
         marginBottom: 2,
+    },
+    tintOverlay: {
+        marginTop: -66,
     },
     itemName: {
         fontFamily: fonts.body,
