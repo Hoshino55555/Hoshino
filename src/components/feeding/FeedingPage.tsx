@@ -322,34 +322,33 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
 
         // Run the secret-tap counter before the alreadyClaimed gate so the
         // unlock salvo still works after the user has cooked the current
-        // meal window. Counter resets on a >800ms pause between taps. Skip
-        // counting once every recipe is already discovered.
-        const allAlreadyDiscovered = discoveredSet.size >= RECIPES.length;
-        if (!allAlreadyDiscovered) {
-            const now = Date.now();
-            if (now - secretLastTapAt.current > 800) secretTapCount.current = 0;
-            secretLastTapAt.current = now;
-            secretTapCount.current += 1;
-            if (secretTapCount.current >= 4) {
-                secretTapCount.current = 0;
-                if (!unlockInFlight.current) {
-                    unlockInFlight.current = true;
-                    unlockAllRecipes()
-                        .then(() => {
-                            onNotification?.('All recipes unlocked', 'info');
-                        })
-                        .catch((e: any) => {
-                            onNotification?.(
-                                e?.message || 'Failed to unlock recipes',
-                                'error'
-                            );
-                        })
-                        .finally(() => {
-                            unlockInFlight.current = false;
-                        });
-                }
-                return;
+        // meal window. Counter resets on a >800ms pause between taps. The
+        // callable also tops inventory up to 20 of each, so we keep firing
+        // even after all recipes are already discovered — the demo refill
+        // is the recurring value.
+        const now = Date.now();
+        if (now - secretLastTapAt.current > 800) secretTapCount.current = 0;
+        secretLastTapAt.current = now;
+        secretTapCount.current += 1;
+        if (secretTapCount.current >= 4) {
+            secretTapCount.current = 0;
+            if (!unlockInFlight.current) {
+                unlockInFlight.current = true;
+                unlockAllRecipes()
+                    .then(() => {
+                        onNotification?.('Recipes unlocked + pantry refilled', 'info');
+                    })
+                    .catch((e: any) => {
+                        onNotification?.(
+                            e?.message || 'Failed to unlock recipes',
+                            'error'
+                        );
+                    })
+                    .finally(() => {
+                        unlockInFlight.current = false;
+                    });
             }
+            return;
         }
 
         if (alreadyClaimed) {
@@ -363,7 +362,7 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
             manualOpenTimer.current = null;
             setManualOpen(true);
         }, 220);
-    }, [discoveredSet, alreadyClaimed, notifyAlreadyClaimed, onNotification, unlockAllRecipes]);
+    }, [alreadyClaimed, notifyAlreadyClaimed, onNotification, unlockAllRecipes]);
 
     const handleCookRecipe = useCallback((recipe: Recipe) => {
         if (pendingManual) return;

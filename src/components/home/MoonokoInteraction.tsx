@@ -220,7 +220,6 @@ const MoonokoInteraction: React.FC<Props> = ({
     const [queuedFakeItems, setQueuedFakeItems] = useState<ForagedItem[] | null>(null);
 
     const handleCharacterDoubleTap = useCallback(() => {
-        if (!__DEV__) return;
         if (popOutItems) return;
         if (queuedFakeItems) return;
         const tiers: Array<{
@@ -279,7 +278,6 @@ const MoonokoInteraction: React.FC<Props> = ({
     }, [popOutItems, queuedFakeItems]);
 
     const handleCharacterLongPress = useCallback(() => {
-        if (!__DEV__) return;
         if (popOutItems) return;
         const tiers: Array<{
             ingredients: string[];
@@ -335,23 +333,21 @@ const MoonokoInteraction: React.FC<Props> = ({
     }, [popOutItems]);
 
     const handleCharacterPress = useCallback(() => {
-        // Dev affordance: a double-tap stages fake items + raises the badge,
+        // Demo affordance: a double-tap stages fake items + raises the badge,
         // then the next single tap claims them. Mirrors the real
-        // exclamation → drain flow so welcome/test flows can exercise the
-        // pop-out without waiting on the server tick.
-        if (__DEV__) {
-            if (queuedFakeItems && !popOutItems) {
-                setPopOutItems(queuedFakeItems);
-                setQueuedFakeItems(null);
-                return;
-            }
-            const now = Date.now();
-            const elapsed = now - lastTapRef.current;
-            lastTapRef.current = now;
-            if (elapsed > 0 && elapsed < 300 && !popOutItems) {
-                handleCharacterDoubleTap();
-                return;
-            }
+        // exclamation → drain flow so the demo can exercise the pop-out
+        // without waiting on the server tick.
+        if (queuedFakeItems && !popOutItems) {
+            setPopOutItems(queuedFakeItems);
+            setQueuedFakeItems(null);
+            return;
+        }
+        const now = Date.now();
+        const elapsed = now - lastTapRef.current;
+        lastTapRef.current = now;
+        if (elapsed > 0 && elapsed < 300 && !popOutItems) {
+            handleCharacterDoubleTap();
+            return;
         }
         if (drainInFlightRef.current || popOutItems) return;
         if (!hasPendingFinds) return;
@@ -719,7 +715,7 @@ const MoonokoInteraction: React.FC<Props> = ({
                         onPress={handleCharacterPress}
                         onLongPress={handleCharacterLongPress}
                         delayLongPress={500}
-                        disabled={!__DEV__ && !hasPendingFinds && !popOutItems}
+                        disabled={!!popOutItems}
                         style={styles.characterTouch}
                     >
                         <Image
