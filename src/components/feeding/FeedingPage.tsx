@@ -520,12 +520,11 @@ const FeedingPage = ({ onBack, onNotification }: Props) => {
                     </View>
                 )}
 
-                {/* Dev-only: tap the star painted into the banner art to
-                    clear all meal-window claim flags so the feed flow can
-                    be retested without waiting for the next game-day
-                    rollover. Position is a guess against the banner art —
-                    tweak the % values if it doesn't sit on the star. */}
-                {__DEV__ && (() => {
+                {/* Demo affordance: 2-tap the star painted into the banner
+                    art clears all meal-window claim flags so the feed flow
+                    can be retested without waiting for the next game-day
+                    rollover. */}
+                {(() => {
                     const zoneW = screenWidth * 0.45;
                     const zoneH = bannerReserve * 0.30;
                     return (
