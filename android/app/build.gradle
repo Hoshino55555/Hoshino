@@ -92,8 +92,8 @@ android {
         applicationId 'com.socks.hoshino'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 36
-        versionName "0.1.22-preview"
+        versionCode 37
+        versionName "0.1.23-demo"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
