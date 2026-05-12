@@ -365,26 +365,46 @@ exports.getCookingProfile = onCall(COMMON_OPTS, async (request) => {
 });
 
 // Power-user shortcut: writes every catalog recipe id into the user's
-// `discoveredRecipes` so the recipe book renders the full grid without
-// requiring each dish to be discovered by manual cook. Idempotent — re-runs
-// just no-op since we union with the existing set. Recipe progress is
-// untouched (a recipe still has to be cooked to level it up). Triggered by
-// the 4-tap gesture on MANUAL COOK in FeedingPage.
+// `discoveredRecipes` and bumps each ingredient in inventory to at least
+// DEMO_INGREDIENT_TOP_UP. Idempotent on recipes (union with existing); for
+// inventory we set to max(existing, top-up) so re-firing the unlock doesn't
+// keep stacking. Recipe progress is untouched (a recipe still has to be
+// cooked to level it up). Triggered by the 4-tap gesture on MANUAL COOK.
+const DEMO_INGREDIENT_TOP_UP = 20;
 exports.unlockAllRecipes = onCall(COMMON_OPTS, async (request) => {
   const uid = requireAuth(request);
   const allIds = catalog.RECIPES.map((r) => r.id);
-  const ref = cookingRef(uid);
-  const snap = await ref.get();
-  const existing = snap.exists && Array.isArray(snap.data().discoveredRecipes)
-    ? snap.data().discoveredRecipes
-    : [];
-  const merged = Array.from(new Set([...existing, ...allIds]));
-  await ref.set(
-    { discoveredRecipes: merged, updatedAt: Date.now() },
-    { merge: true }
-  );
+  const cookRef = cookingRef(uid);
+  const invRef = inventoryRef(uid);
+
+  const [cookSnap, invSnap] = await Promise.all([cookRef.get(), invRef.get()]);
+
+  const existingDiscovered =
+    cookSnap.exists && Array.isArray(cookSnap.data().discoveredRecipes)
+      ? cookSnap.data().discoveredRecipes
+      : [];
+  const mergedDiscovered = Array.from(new Set([...existingDiscovered, ...allIds]));
+
+  const existingCounts = (invSnap.exists && invSnap.data().counts) || {};
+  const nextCounts = { ...existingCounts };
+  for (const ingredientId of Object.keys(catalog.INGREDIENT_TIER)) {
+    const cur = Number(nextCounts[ingredientId]) || 0;
+    if (cur < DEMO_INGREDIENT_TOP_UP) {
+      nextCounts[ingredientId] = DEMO_INGREDIENT_TOP_UP;
+    }
+  }
+
+  await Promise.all([
+    cookRef.set(
+      { discoveredRecipes: mergedDiscovered, updatedAt: Date.now() },
+      { merge: true }
+    ),
+    invRef.set({ counts: nextCounts, updatedAt: Date.now() }, { merge: true }),
+  ]);
+
   return {
-    discoveredRecipes: merged,
-    recipeProgress: (snap.exists && snap.data().recipeProgress) || {},
+    discoveredRecipes: mergedDiscovered,
+    recipeProgress: (cookSnap.exists && cookSnap.data().recipeProgress) || {},
+    counts: nextCounts,
   };
 });

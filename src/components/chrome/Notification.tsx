@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
         color: PALETTE.bodyText,
         fontFamily: fonts.body,
         fontSize: 20,
-        lineHeight: 14,
+        lineHeight: 24,
     },
     statusText: {
         marginTop: 4,

@@ -8,6 +8,7 @@ import SleepConfirmationModal from '../components/sleep/SleepConfirmationModal';
 import SleepScreen from '../components/sleep/SleepScreen';
 import { useGameStateContext } from '../contexts/GameStateContext';
 import { cancelSleepAlarm, scheduleSleepAlarm } from '../services/AlarmService';
+import { DEMO_WAKE_FALLBACK_DELTAS, buildDemoWakeForagedItems } from '../services/DemoWakeRecap';
 import { SLEEP_REQUIRED_MS } from '../services/GameStateService';
 import type { ForagedItem } from '../services/GameStateService';
 import MusicService from '../services/MusicService';
@@ -174,22 +175,7 @@ export default function SleepController({
                 .then((next) => {
                     setPendingStartSleep(false);
                     if (next?.sleepStartedAt) {
-                        scheduleSleepAlarm(
-                            wakeAtMs,
-                            selectedCharacter?.name,
-                        ).then((res) => {
-                            if (!res.ok && res.reason === 'notifications-denied') {
-                                onNotification(
-                                    'Enable notifications for a wake-up alarm.',
-                                    'info',
-                                );
-                            } else if (res.ok && res.reason === 'inexact') {
-                                onNotification(
-                                    'Wake reminder set (may be a few min late).',
-                                    'info',
-                                );
-                            }
-                        });
+                        scheduleSleepAlarm(wakeAtMs, selectedCharacter?.name);
                     }
                 })
                 .catch((e: any) => {
@@ -235,15 +221,12 @@ export default function SleepController({
                 const sleepItems = (next.foragedItems ?? []).filter(
                     (f) => f.source === 'sleep',
                 );
-                // Only show the recap on a real full-rest wake. Force-wake
-                // without 8h returns no grants and would render an empty
-                // ceremony.
-                if (
+                const hasRealRecap =
                     energyGained > 0 ||
                     moodGained > 0 ||
                     xpGained > 0 ||
-                    sleepItems.length > 0
-                ) {
+                    sleepItems.length > 0;
+                if (hasRealRecap) {
                     setRecapState({
                         deltas: {
                             energyGained,
@@ -252,6 +235,18 @@ export default function SleepController({
                             totalSleeps: next.totalSleeps ?? 0,
                         },
                         items: sleepItems,
+                    });
+                } else {
+                    // Demo build: show a fake full-night recap so wake always
+                    // demonstrates the ceremony, even on early-tap wakes that
+                    // returned no real grants. Items here aren't backed by
+                    // server inventory, so drainForaged on dismiss is a no-op.
+                    setRecapState({
+                        deltas: {
+                            ...DEMO_WAKE_FALLBACK_DELTAS,
+                            totalSleeps: (next.totalSleeps ?? 0) + 1,
+                        },
+                        items: buildDemoWakeForagedItems(Date.now()),
                     });
                 }
             }
@@ -276,30 +271,6 @@ export default function SleepController({
                 playerName={playerName}
                 defaultWakeAtMs={Date.now() + SLEEP_REQUIRED_MS}
                 onCancel={() => setSleepModalVisible(false)}
-                onSmokeTest={() => {
-                    setSleepModalVisible(false);
-                    scheduleSleepAlarm(
-                        Date.now() + 60_000,
-                        selectedCharacter?.name,
-                    ).then((res) => {
-                        if (!res.ok && res.reason === 'notifications-denied') {
-                            onNotification(
-                                'Enable notifications to test the alarm.',
-                                'info',
-                            );
-                        } else if (res.ok) {
-                            onNotification(
-                                `Test alarm scheduled (${res.reason} - 60s)`,
-                                'success',
-                            );
-                        } else {
-                            onNotification(
-                                `Smoke test failed: ${res.reason}`,
-                                'error',
-                            );
-                        }
-                    });
-                }}
                 onConfirm={handleConfirmSleep}
             />
 

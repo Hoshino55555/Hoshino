@@ -822,7 +822,10 @@ const ManualCookModal: React.FC<ManualCookModalProps> = ({
                     <View pointerEvents="none" style={modalStyles.sheetBgClip}>
                         <Image
                             source={Backgrounds.cooking}
-                            style={modalStyles.sheetBgImage}
+                            style={[
+                                modalStyles.sheetBgImage,
+                                !recipe && modalStyles.sheetBgImageManual,
+                            ]}
                             resizeMode="cover"
                         />
                     </View>
@@ -1366,6 +1369,10 @@ const modalStyles = StyleSheet.create({
         right: 0,
         width: '100%',
         height: '112%',
+    },
+    sheetBgImageManual: {
+        top: '-52%',
+        height: '168%',
     },
     title: {
         color: colors.goldBright,

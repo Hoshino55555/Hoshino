@@ -187,7 +187,10 @@ const callGetCookingProfile = httpsCallable<Record<string, never>, CookingProfil
     'getCookingProfile'
 );
 
-const callUnlockAllRecipes = httpsCallable<Record<string, never>, CookingProfile>(
+interface UnlockAllRecipesResponse extends CookingProfile {
+    counts: IngredientCounts;
+}
+const callUnlockAllRecipes = httpsCallable<Record<string, never>, UnlockAllRecipesResponse>(
     functions,
     'unlockAllRecipes'
 );
@@ -323,11 +326,12 @@ export const GameStateService = {
         };
     },
 
-    async unlockAllRecipes(): Promise<CookingProfile> {
+    async unlockAllRecipes(): Promise<UnlockAllRecipesResponse> {
         const res = await callUnlockAllRecipes({});
         return {
             discoveredRecipes: res.data.discoveredRecipes || [],
             recipeProgress: res.data.recipeProgress || {},
+            counts: res.data.counts || {},
         };
     },
 

@@ -324,6 +324,7 @@ export function useGameState(characterId: string | null | undefined): UseGameSta
         const profile = await GameStateService.unlockAllRecipes();
         setDiscoveredRecipes(profile.discoveredRecipes);
         setRecipeProgress(profile.recipeProgress);
+        setInventory(profile.counts);
         return profile.discoveredRecipes;
     }, []);
 

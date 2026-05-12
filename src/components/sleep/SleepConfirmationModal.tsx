@@ -106,7 +106,6 @@ interface Props {
     defaultWakeAtMs: number;
     onConfirm: (wakeAtMs: number) => void;
     onCancel: () => void;
-    onSmokeTest?: () => void;
 }
 
 const MIN_OFFSET_MS = 5 * 60 * 1000;
@@ -161,7 +160,6 @@ const SleepConfirmationModal: React.FC<Props> = ({
     defaultWakeAtMs,
     onConfirm,
     onCancel,
-    onSmokeTest,
 }) => {
     const { width } = useWindowDimensions();
     const [parts, setParts] = useState<WakeParts>(() => partsFromMs(defaultWakeAtMs));
@@ -396,15 +394,6 @@ const SleepConfirmationModal: React.FC<Props> = ({
                             </TouchableOpacity>
                         </View>
 
-                        {__DEV__ && onSmokeTest ? (
-                            <TouchableOpacity
-                                style={styles.smokeBtn}
-                                onPress={() => close(onSmokeTest)}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.smokeText}>DEV · test alarm 60s</Text>
-                            </TouchableOpacity>
-                        ) : null}
                     </View>
                 </Animated.View>
             </Animated.View>
@@ -588,21 +577,6 @@ const styles = StyleSheet.create({
     buttonText: {
         fontSize: 11,
         color: colors.purpleText,
-        fontFamily: fonts.pixel,
-        letterSpacing: 1,
-    },
-    smokeBtn: {
-        marginTop: 14,
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderWidth: 1,
-        borderColor: colors.purpleMid,
-        borderRadius: 4,
-        backgroundColor: 'transparent',
-    },
-    smokeText: {
-        fontSize: 7,
-        color: colors.purpleMid,
         fontFamily: fonts.pixel,
         letterSpacing: 1,
     },
